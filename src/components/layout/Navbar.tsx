@@ -9,8 +9,10 @@ import {
   Zap, Package, UtensilsCrossed, Tag, Menu, X, ShoppingBag
 } from 'lucide-react'
 import { useCartStore } from '@/lib/store/cart'
+import { useAddressStore } from '@/lib/store/address'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import LocationPicker from '@/components/LocationPicker'
 
 const navLinks = [
   { label: 'Essentials', href: '/essentials', icon: Package },
@@ -26,13 +28,25 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
   const deliveryEta = useDeliveryEta()
+  const { addresses, selectedId } = useAddressStore()
+  const [hydrated, setHydrated] = useState(false)
+
+  useEffect(() => {
+    useAddressStore.persist.rehydrate()
+    setHydrated(true)
+  }, [])
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  const selectedAddress = hydrated ? addresses.find((a) => a.id === selectedId) ?? null : null
+  const locationLabel = selectedAddress ? selectedAddress.address : 'Tarikere, Karnataka'
+  const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
 
   const onRestaurantSide = pathname.startsWith('/restaurant')
 
@@ -69,12 +83,12 @@ export default function Navbar() {
         {/* Mobile header — Blinkit style */}
         <div className="lg:hidden px-4 pt-3 pb-3">
           <div className="flex items-start justify-between gap-3 mb-3">
-            <button className="text-left min-w-0">
+            <button onClick={() => setShowLocationPicker(true)} className="text-left min-w-0">
               <div className="text-[17px] font-[900] text-[#1F1F1F] leading-tight" style={{ fontWeight: 900 }}>
                 Delivery in {deliveryEta} minutes
               </div>
               <div className="flex items-center gap-1 text-[13px] text-[#374151]">
-                <span className="truncate">Tarikere, Karnataka</span>
+                <span className="truncate max-w-[220px]">{locationLabel}</span>
                 <ChevronDown className="w-4 h-4 shrink-0" />
               </div>
             </button>
@@ -124,14 +138,15 @@ export default function Navbar() {
             </Link>
 
             {/* Location */}
-            <button className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-[#F8FAFC] transition-colors group shrink-0 max-w-[200px]">
+            <button onClick={() => setShowLocationPicker(true)}
+              className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-[#F8FAFC] transition-colors group shrink-0 max-w-[220px]">
               <MapPin className="w-4 h-4 text-[#16A34A] shrink-0" strokeWidth={2} />
               <div className="text-left min-w-0">
                 <div className="text-[12px] font-[800] text-[#111827] leading-none mb-0.5" style={{ fontWeight: 800 }}>
                   Delivery in {deliveryEta} minutes
                 </div>
                 <div className="text-[11.5px] text-[#6B7280] truncate leading-none">
-                  Tarikere, Karnataka
+                  {locationSubLabel === 'Set your location' ? locationLabel : `${locationSubLabel} · ${locationLabel}`}
                 </div>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-[#6B7280] shrink-0 group-hover:text-[#16A34A] transition-colors" />
@@ -254,6 +269,8 @@ export default function Navbar() {
 
       {/* Spacer */}
       <div className="h-[168px] lg:h-16" />
+
+      {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
     </>
   )
 }

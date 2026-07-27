@@ -1,0 +1,143 @@
+'use client'
+
+import { useState } from 'react'
+import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useAddressStore } from '@/lib/store/address'
+import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
+
+const LABELS = [
+  { key: 'Home', icon: Home },
+  { key: 'Work', icon: Briefcase },
+  { key: 'Other', icon: Star },
+]
+
+type Step = 'list' | 'confirm' | 'manual'
+
+export default function LocationPicker({ onClose }: { onClose: () => void }) {
+  const { addresses, selectedId, addAddress, selectAddress, removeAddress } = useAddressStore()
+  const [step, setStep] = useState<Step>('list')
+  const [locating, setLocating] = useState(false)
+  const [error, setError] = useState('')
+  const [draftAddress, setDraftAddress] = useState('')
+  const [draftLabel, setDraftLabel] = useState('Home')
+  const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
+
+  async function handleUseCurrentLocation() {
+    setLocating(true); setError('')
+    try {
+      const pos = await getCurrentPosition()
+      const { latitude, longitude } = pos.coords
+      const address = await reverseGeocode(latitude, longitude)
+      setDraftCoords({ lat: latitude, lng: longitude })
+      setDraftAddress(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+      setDraftLabel('Home')
+      setStep('confirm')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not get your location')
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  function openManual() {
+    setDraftAddress(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setStep('manual')
+  }
+
+  function saveDraft() {
+    if (!draftAddress.trim()) { setError('Please enter an address'); return }
+    const saved = addAddress({ label: draftLabel, address: draftAddress.trim(), lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null })
+    selectAddress(saved.id)
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl z-10 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6] sticky top-0 bg-white">
+          <h2 className="text-[16px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>
+            {step === 'list' ? 'Select delivery location' : step === 'confirm' ? 'Confirm your location' : 'Add new address'}
+          </h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
+            <X className="w-4 h-4 text-[#6B7280]" />
+          </button>
+        </div>
+
+        {step === 'list' && (
+          <div className="p-4">
+            {error && <p className="text-[12.5px] text-[#DC2626] mb-3">{error}</p>}
+            <button onClick={handleUseCurrentLocation} disabled={locating}
+              className="w-full flex items-center gap-3 p-3.5 border-2 border-[#DCFCE7] bg-[#F0FDF4] rounded-xl mb-4 hover:border-[#16A34A] transition-all disabled:opacity-70">
+              <div className="w-9 h-9 bg-[#16A34A] rounded-xl flex items-center justify-center shrink-0">
+                {locating ? <Loader2 className="w-4 h-4 text-white animate-spin" /> : <LocateFixed className="w-4 h-4 text-white" />}
+              </div>
+              <span className="text-[13.5px] font-[700] text-[#15803D]">{locating ? 'Getting your location...' : 'Use current location'}</span>
+            </button>
+
+            {addresses.length > 0 && (
+              <div className="space-y-2 mb-4">
+                <p className="text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide px-1">Saved addresses</p>
+                {addresses.map((a) => {
+                  const LabelIcon = LABELS.find((l) => l.key === a.label)?.icon ?? MapPin
+                  return (
+                    <button key={a.id} onClick={() => { selectAddress(a.id); onClose() }}
+                      className={cn('w-full text-left flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all',
+                        selectedId === a.id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]')}>
+                      <div className="w-9 h-9 bg-[#F3F4F6] rounded-xl flex items-center justify-center shrink-0">
+                        <LabelIcon className="w-4 h-4 text-[#6B7280]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px] font-[700] text-[#111827]">{a.label}</span>
+                          {selectedId === a.id && <Check className="w-3.5 h-3.5 text-[#16A34A]" />}
+                        </div>
+                        <p className="text-[12px] text-[#6B7280] line-clamp-2">{a.address}</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); removeAddress(a.id) }}
+                        className="text-[11px] text-[#DC2626] hover:underline shrink-0">Remove</button>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <button onClick={openManual}
+              className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[#D1D5DB] rounded-xl text-[13.5px] font-medium text-[#16A34A] hover:border-[#16A34A] hover:bg-[#F0FDF4] transition-all">
+              <Plus className="w-4 h-4" /> Add new address
+            </button>
+          </div>
+        )}
+
+        {(step === 'confirm' || step === 'manual') && (
+          <div className="p-4 space-y-4">
+            {error && <p className="text-[12.5px] text-[#DC2626]">{error}</p>}
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Address</label>
+              <textarea value={draftAddress} onChange={(e) => setDraftAddress(e.target.value)} rows={3}
+                placeholder="House no, street, area, city, pincode"
+                className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all resize-none" />
+            </div>
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Save as</label>
+              <div className="flex gap-2">
+                {LABELS.map(({ key, icon: Icon }) => (
+                  <button key={key} onClick={() => setDraftLabel(key)}
+                    className={cn('flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12.5px] font-[600] border-2 transition-all',
+                      draftLabel === key ? 'border-[#16A34A] bg-[#F0FDF4] text-[#15803D]' : 'border-[#E5E7EB] text-[#6B7280]')}>
+                    <Icon className="w-3.5 h-3.5" /> {key}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setStep('list')} className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Back</button>
+              <button onClick={saveDraft} className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all">Save Address</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

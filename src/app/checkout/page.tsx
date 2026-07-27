@@ -2,25 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, LocateFixed } from 'lucide-react'
+import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
+import { useAddressStore } from '@/lib/store/address'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
+import LocationPicker from '@/components/LocationPicker'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
-
-const ADDRESSES = [
-  { id: '1', label: 'Home', address: 'No. 12, 5th Cross, 4th Block, Koramangala, Bangalore - 560034', isDefault: true },
-  { id: '2', label: 'Work', address: 'WeWork Galaxy, 43 Residency Rd, Ashok Nagar, Bangalore - 560025', isDefault: false },
-]
 
 const PAYMENT_METHODS = [
   { id: 'upi',  label: 'UPI',                  icon: Smartphone,  desc: 'Pay via any UPI app' },
@@ -28,12 +26,14 @@ const PAYMENT_METHODS = [
   { id: 'cod',  label: 'Cash on Delivery',      icon: Banknote,    desc: 'Pay when delivered' },
 ]
 
+const LABEL_ICONS: Record<string, typeof Home> = { Home, Work: Briefcase, Other: Star }
+
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore()
+  const { addresses, selectedId } = useAddressStore()
   const deliveryEta = useDeliveryEta()
   const [mounted, setMounted] = useState(false)
   const cartTotal = total()
-  const [selectedAddress, setSelectedAddress] = useState('1')
   const [selectedPayment, setSelectedPayment] = useState('upi')
   const [coupon, setCoupon] = useState('')
   const [couponApplied, setCouponApplied] = useState(false)
@@ -41,47 +41,30 @@ export default function CheckoutPage() {
   const [placed, setPlaced] = useState(false)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState('')
-  const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [locating, setLocating] = useState(false)
-  const [locateMsg, setLocateMsg] = useState('')
+  const [showLocationPicker, setShowLocationPicker] = useState(false)
 
-  function useCurrentLocation() {
-    if (!navigator.geolocation) { setLocateMsg('Geolocation not supported on this device'); return }
-    setLocating(true); setLocateMsg('')
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeoCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-        setLocating(false)
-        setLocateMsg('Using your current location for this delivery')
-      },
-      (err) => { setLocating(false); setLocateMsg(err.message || 'Could not get your location') },
-      { enableHighAccuracy: true, timeout: 15000 }
-    )
-  }
-
-  // Hydrate cart from localStorage before rendering
+  // Hydrate persisted stores before rendering
   useEffect(() => {
     useCartStore.persist.rehydrate()
+    useAddressStore.persist.rehydrate()
     setMounted(true)
   }, [])
+
+  const selectedAddress = addresses.find((a) => a.id === selectedId) ?? null
 
   const discount = couponApplied ? Math.min(cartTotal * 0.1, 100) : 0
   const deliveryFee = cartTotal > 199 ? 0 : 29
   const grandTotal = cartTotal - discount + deliveryFee
 
   const handlePlace = async () => {
-    if (items.length === 0) return
+    if (items.length === 0 || !selectedAddress) return
     setPlacing(true)
     setPlaceError('')
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-
-      // Derive restaurant_id from cart items (restaurant orders have it set)
       const restaurantId = items.find((i) => i.restaurant_id)?.restaurant_id ?? null
-      const address = ADDRESSES.find((a) => a.id === selectedAddress)?.address ?? ''
 
-      // Create the order
       const { data: order, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -92,9 +75,9 @@ export default function CheckoutPage() {
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount,
-          address,
-          delivery_latitude: geoCoords?.lat ?? null,
-          delivery_longitude: geoCoords?.lng ?? null,
+          address: selectedAddress.address,
+          delivery_latitude: selectedAddress.lat,
+          delivery_longitude: selectedAddress.lng,
           coupon_code: couponApplied ? coupon : null,
           payment_method: selectedPayment,
           payment_status: selectedPayment === 'cod' ? 'pending' : 'paid',
@@ -106,7 +89,6 @@ export default function CheckoutPage() {
 
       if (orderErr || !order) throw orderErr ?? new Error('Failed to create order')
 
-      // Insert order items — only include base columns that exist in the schema
       const orderItems = items.map((item) => ({
         order_id: order.id,
         product_id: item.product_id,
@@ -136,19 +118,35 @@ export default function CheckoutPage() {
     return (
       <>
         <Navbar />
-        <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center px-6">
-          <div className="bg-white rounded-3xl border border-[#E5E7EB] p-10 max-w-md w-full text-center shadow-zippy-lg">
-            <div className="w-20 h-20 bg-[#DCFCE7] rounded-full flex items-center justify-center mx-auto mb-6">
-              <Check className="w-10 h-10 text-[#16A34A]" strokeWidth={2.5} />
+        <div className="min-h-screen bg-[#F8FAFC] px-4 py-10">
+          <div className="max-w-md mx-auto">
+            <div className="bg-white rounded-3xl border border-[#E5E7EB] p-8 text-center shadow-zippy-lg mb-5">
+              <div className="w-20 h-20 bg-[#DCFCE7] rounded-full flex items-center justify-center mx-auto mb-6 order-success-pop">
+                <Check className="w-10 h-10 text-[#16A34A]" strokeWidth={2.5} />
+              </div>
+              <h2 className="text-[22px] font-[800] text-[#111827] mb-2" style={{ fontWeight: 800 }}>Order Placed!</h2>
+              <p className="text-[13.5px] text-[#6B7280] mb-2">Your order has been confirmed and will arrive in</p>
+              <div className="flex items-center justify-center gap-2 text-[26px] font-[900] text-[#16A34A] mb-2" style={{ fontWeight: 900 }}>
+                <Zap className="w-6 h-6 fill-[#16A34A]" /> {deliveryEta} minutes
+              </div>
+              {orderId && (
+                <p className="text-[11.5px] text-[#9CA3AF] font-mono">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
+              )}
             </div>
-            <h2 className="text-[24px] font-[800] text-[#111827] mb-2" style={{ fontWeight: 800 }}>Order Placed!</h2>
-            <p className="text-[14px] text-[#6B7280] mb-2">Your order has been confirmed and will arrive in</p>
-            <div className="flex items-center justify-center gap-2 text-[28px] font-[900] text-[#16A34A] mb-4" style={{ fontWeight: 900 }}>
-              <Zap className="w-7 h-7 fill-[#16A34A]" /> {deliveryEta} minutes
-            </div>
+
+            {/* Live tracking preview — same as Blinkit/Zepto's post-order map */}
             {orderId && (
-              <p className="text-[11.5px] text-[#9CA3AF] font-mono mb-6">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
+              <div className="bg-white rounded-3xl border border-[#E5E7EB] p-4 mb-5 shadow-zippy-lg">
+                <p className="text-[12.5px] font-[700] text-[#111827] mb-3 px-1">Live Order Tracking</p>
+                <LiveTrackingMap
+                  riderLocation={null}
+                  dropLocation={selectedAddress?.lat && selectedAddress?.lng ? { lat: selectedAddress.lat, lng: selectedAddress.lng } : null}
+                  className="h-48"
+                />
+                <p className="text-[11.5px] text-[#9CA3AF] px-1 mt-2">A delivery partner will be assigned shortly — their live location will appear here.</p>
+              </div>
             )}
+
             <div className="space-y-3">
               <Link href={orderId ? `/orders/${orderId}/track` : '/orders'}>
                 <button className="w-full py-3.5 bg-[#16A34A] text-white font-[700] rounded-2xl hover:bg-[#15803D] transition-colors shadow-[0_4px_16px_rgba(22,163,74,0.35)]" style={{ fontWeight: 700 }}>
@@ -169,7 +167,7 @@ export default function CheckoutPage() {
     <>
       <Navbar />
       <CartSidebar />
-      <div className="min-h-screen bg-[#F8FAFC]">
+      <div className="min-h-screen bg-[#F8FAFC] pb-28 lg:pb-0">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-8">
           <div className="flex items-center gap-2 text-[13px] text-[#6B7280] mb-6">
             <Link href="/" className="hover:text-[#16A34A]">Home</Link>
@@ -196,42 +194,49 @@ export default function CheckoutPage() {
                   </div>
                   <h3 className="text-[16px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>Delivery Address</h3>
                 </div>
-                <div className="space-y-3">
-                  {ADDRESSES.map((addr) => (
-                    <button
-                      key={addr.id}
-                      onClick={() => setSelectedAddress(addr.id)}
-                      className={cn(
-                        'w-full text-left flex items-start gap-3 p-4 rounded-xl border-2 transition-all',
-                        selectedAddress === addr.id
-                          ? 'border-[#16A34A] bg-[#F0FDF4]'
-                          : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
-                      )}
-                    >
-                      <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all', selectedAddress === addr.id ? 'border-[#16A34A] bg-[#16A34A]' : 'border-[#D1D5DB]')}>
-                        {selectedAddress === addr.id && <div className="w-2 h-2 rounded-full bg-white" />}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[13px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>{addr.label}</span>
-                          {addr.isDefault && <span className="text-[10.5px] bg-[#DCFCE7] text-[#16A34A] px-2 py-0.5 rounded-full font-medium">Default</span>}
-                        </div>
-                        <p className="text-[12.5px] text-[#6B7280] leading-relaxed">{addr.address}</p>
-                      </div>
+
+                {!mounted ? (
+                  <div className="h-20 bg-[#F3F4F6] rounded-xl animate-pulse" />
+                ) : addresses.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-[13.5px] text-[#6B7280] mb-4">You haven&apos;t saved a delivery address yet.</p>
+                    <button onClick={() => setShowLocationPicker(true)}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#16A34A] text-white text-[13.5px] font-[600] rounded-xl hover:bg-[#15803D] transition-all">
+                      <Plus className="w-4 h-4" /> Add delivery address
                     </button>
-                  ))}
-                  <button className="w-full flex items-center gap-2 py-3 text-[13.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
-                    <Plus className="w-4 h-4" /> Add new address
-                  </button>
-                  <button type="button" onClick={useCurrentLocation} disabled={locating}
-                    className="w-full flex items-center justify-center gap-2 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A] transition-all disabled:opacity-60">
-                    {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
-                    {locating ? 'Getting your location...' : 'Use current location for live tracking'}
-                  </button>
-                  {locateMsg && (
-                    <p className={cn('text-[12px]', geoCoords ? 'text-[#16A34A]' : 'text-[#DC2626]')}>{locateMsg}</p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {addresses.map((addr) => {
+                      const LabelIcon = LABEL_ICONS[addr.label] ?? Star
+                      return (
+                        <button
+                          key={addr.id}
+                          onClick={() => useAddressStore.getState().selectAddress(addr.id)}
+                          className={cn(
+                            'w-full text-left flex items-start gap-3 p-4 rounded-xl border-2 transition-all',
+                            selectedId === addr.id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
+                          )}
+                        >
+                          <div className="w-9 h-9 bg-[#F3F4F6] rounded-xl flex items-center justify-center shrink-0">
+                            <LabelIcon className="w-4 h-4 text-[#6B7280]" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[13px] font-[700] text-[#111827]">{addr.label}</span>
+                            <p className="text-[12.5px] text-[#6B7280] leading-relaxed">{addr.address}</p>
+                          </div>
+                          <div className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all', selectedId === addr.id ? 'border-[#16A34A] bg-[#16A34A]' : 'border-[#D1D5DB]')}>
+                            {selectedId === addr.id && <div className="w-2 h-2 rounded-full bg-white" />}
+                          </div>
+                        </button>
+                      )
+                    })}
+                    <button onClick={() => setShowLocationPicker(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 text-[13.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
+                      <Plus className="w-4 h-4" /> Add new address
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Payment */}
@@ -351,14 +356,17 @@ export default function CheckoutPage() {
                   <p className="text-[11.5px] text-[#14532D] font-medium">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
                 </div>
 
+                {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
                   onClick={handlePlace}
-                  disabled={placing || !mounted || items.length === 0}
-                  className="w-full mt-5 flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
+                  disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+                  className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
                 >
                   {placing ? (
                     <><Loader2 className="w-5 h-5 animate-spin" />Placing order...</>
+                  ) : !selectedAddress ? (
+                    <>Select a delivery address</>
                   ) : (
                     <>Place Order • ₹{grandTotal.toFixed(0)}</>
                   )}
@@ -368,6 +376,25 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile: Place Order stays fixed at the bottom, always visible without scrolling */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        <button
+          onClick={handlePlace}
+          disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+          className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
+        >
+          {placing ? (
+            <><Loader2 className="w-5 h-5 animate-spin" />Placing order...</>
+          ) : !selectedAddress ? (
+            <>Select a delivery address</>
+          ) : (
+            <>Place Order • ₹{grandTotal.toFixed(0)}</>
+          )}
+        </button>
+      </div>
+
+      {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
       <SiteFooter />
     </>
   )

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, NavigationOff } from 'lucide-react'
+import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { unlockAudio, playNewOrderAlarm } from '@/lib/orderAlarm'
 
@@ -83,6 +83,7 @@ export default function DeliveryOrdersPage() {
       partnerIdRef.current = p.id
       await loadOrders(p.id)
       setLoading(false)
+      startLocationSharing() // auto-share — the rider just needs to allow the permission prompt
 
       channel = supabase
         .channel(`delivery-orders-${p.id}-${Date.now()}`)
@@ -113,13 +114,8 @@ export default function DeliveryOrdersPage() {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [])
 
-  function toggleLocationSharing() {
-    if (sharingLocation) {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
-      setSharingLocation(false)
-      return
-    }
+  function startLocationSharing() {
+    if (watchIdRef.current !== null) return // already sharing
     if (!navigator.geolocation) { setLocationError('Geolocation not supported on this device'); return }
     setLocationError('')
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -185,6 +181,13 @@ export default function DeliveryOrdersPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={startLocationSharing}
+                title={sharingLocation ? 'Sharing your live location with customers' : locationError || 'Tap to allow location sharing'}
+                className={cn('w-9 h-9 flex items-center justify-center rounded-xl border transition-all',
+                  sharingLocation ? 'bg-[#F5F3FF] border-[#DDD6FE] text-[#7C3AED]' : locationError ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
+                <Navigation className={cn('w-4 h-4', sharingLocation && 'animate-pulse')} />
+              </button>
+              <button
                 onClick={() => { unlockAudio(); if (!soundOn) playNewOrderAlarm(); setSoundOn(!soundOn) }}
                 className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
                   soundOn ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
@@ -195,14 +198,7 @@ export default function DeliveryOrdersPage() {
               </a>
             </div>
           </div>
-
-          <button onClick={toggleLocationSharing}
-            className={cn('w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-[700] transition-all mb-3',
-              sharingLocation ? 'bg-[#7C3AED] text-white shadow-[0_2px_10px_rgba(124,58,237,0.35)]' : 'bg-[#F5F3FF] text-[#7C3AED] border border-[#DDD6FE]')}>
-            {sharingLocation ? <Navigation className="w-4 h-4 animate-pulse" /> : <NavigationOff className="w-4 h-4" />}
-            {sharingLocation ? 'Sharing live location — customers can see you' : 'Start sharing my live location'}
-          </button>
-          {locationError && <p className="text-[11.5px] text-[#DC2626] mb-3">{locationError}</p>}
+          {locationError && <p className="text-[11.5px] text-[#DC2626] mb-3">{locationError} — tap the location icon to retry</p>}
 
           {newOrderFlash && (
             <div className="mb-3 flex items-center gap-2 px-4 py-2.5 bg-[#7C3AED] rounded-xl animate-pulse">
