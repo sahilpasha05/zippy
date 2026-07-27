@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import { createBrowserClient } from '@supabase/ssr'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -172,6 +173,7 @@ export default function RestaurantsPage() {
           )}
         </div>
       </div>
+      <SiteFooter />
     </>
   )
 }

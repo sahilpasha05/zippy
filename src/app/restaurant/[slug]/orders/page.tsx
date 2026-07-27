@@ -63,6 +63,8 @@ export default function SlugOrdersPage() {
       .from('orders')
       .select('id, status, total, customer_name, customer_phone, placed_at, address, order_items(name, quantity, price)')
       .eq('restaurant_id', restaurantId)
+      // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
+      .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('placed_at', { ascending: false })
       .limit(50)
     setOrders((data as unknown as Order[]) ?? [])

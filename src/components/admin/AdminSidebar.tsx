@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package } from 'lucide-react'
+import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { href: '/admin/restaurants',  label: 'Restaurants',  icon: Store },
   { href: '/admin/products',     label: 'Products',     icon: Package },
   { href: '/admin/orders',       label: 'All Orders',   icon: ShoppingBag },
+  { href: '/admin/delivery',     label: 'Delivery Partners', icon: Bike },
   { href: '/admin/users',        label: 'Users',        icon: Users },
   { href: '/admin/analytics',    label: 'Analytics',    icon: BarChart3 },
   { href: '/admin/settings',     label: 'Settings',     icon: Settings },

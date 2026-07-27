@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { TrendingUp, ShoppingBag, Store, Users, ArrowUp } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Store, Users } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -16,14 +17,20 @@ type Order = { id: string; status: string; total: number; placed_at: string; res
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 export default function AdminAnalyticsPage() {
+  const [range, setRange] = useState<DateRange>(presetRange(30))
   const [orders, setOrders] = useState<Order[]>([])
   const [restaurantCount, setRestaurantCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
+      setLoading(true)
+      const fromISO = new Date(range.from + 'T00:00:00').toISOString()
+      const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
       const [{ data: ords }, { count }] = await Promise.all([
-        supabase.from('orders').select('id, status, total, placed_at, restaurant_id').order('placed_at', { ascending: false }).limit(500),
+        supabase.from('orders').select('id, status, total, placed_at, restaurant_id')
+          .gte('placed_at', fromISO).lte('placed_at', toISO)
+          .order('placed_at', { ascending: false }).limit(5000),
         supabase.from('restaurants').select('*', { count: 'exact', head: true }).eq('is_active', true),
       ])
       setOrders((ords as Order[]) ?? [])
@@ -31,7 +38,7 @@ export default function AdminAnalyticsPage() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [range])
 
   const delivered = orders.filter((o) => o.status === 'delivered')
   const totalRevenue = delivered.reduce((s, o) => s + o.total, 0)
@@ -68,9 +75,12 @@ export default function AdminAnalyticsPage() {
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
-        <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">
-          <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Analytics</h1>
-          <p className="text-[12.5px] text-[#9CA3AF]">Platform-wide performance overview</p>
+        <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10 space-y-3">
+          <div>
+            <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Analytics</h1>
+            <p className="text-[12.5px] text-[#9CA3AF]">Platform-wide performance overview</p>
+          </div>
+          <DateRangeFilter value={range} onChange={setRange} />
         </div>
 
         <div className="p-6 space-y-6">
@@ -78,13 +88,8 @@ export default function AdminAnalyticsPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {stats.map(({ label, value, icon: Icon, color, bg }) => (
               <div key={label} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: bg }}>
-                    <Icon className="w-5 h-5" style={{ color }} />
-                  </div>
-                  <span className="flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#DCFCE7] text-[#15803D]">
-                    <ArrowUp className="w-3 h-3" />12%
-                  </span>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: bg }}>
+                  <Icon className="w-5 h-5" style={{ color }} />
                 </div>
                 {loading ? <div className="h-7 w-24 bg-[#F3F4F6] rounded animate-pulse mb-1" /> : (
                   <div className="text-[24px] font-[800] text-[#111827] mb-0.5" style={{ fontWeight: 800 }}>{value}</div>
@@ -98,7 +103,7 @@ export default function AdminAnalyticsPage() {
             {/* Revenue by day */}
             <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
               <h2 className="text-[15px] font-[700] text-[#111827] mb-1" style={{ fontWeight: 700 }}>Revenue by Day of Week</h2>
-              <p className="text-[12px] text-[#9CA3AF] mb-5">From delivered orders</p>
+              <p className="text-[12px] text-[#9CA3AF] mb-5">From delivered orders in range</p>
               <div className="flex items-end gap-2 h-40">
                 {DAYS.map((day, i) => {
                   const val = revenueByDay[i]
@@ -118,7 +123,7 @@ export default function AdminAnalyticsPage() {
             {/* Revenue by hour */}
             <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
               <h2 className="text-[15px] font-[700] text-[#111827] mb-1" style={{ fontWeight: 700 }}>Revenue by Hour</h2>
-              <p className="text-[12px] text-[#9CA3AF] mb-5">Peak ordering times</p>
+              <p className="text-[12px] text-[#9CA3AF] mb-5">Peak ordering times in range</p>
               <div className="flex items-end gap-1 h-40">
                 {revenueByHour.map((val, h) => {
                   const pct = (val / maxHourRevenue) * 100

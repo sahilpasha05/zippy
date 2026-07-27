@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2 } from 'lucide-react'
+import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, LocateFixed } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,7 @@ import { useCartStore } from '@/lib/store/cart'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,6 +41,23 @@ export default function CheckoutPage() {
   const [placed, setPlaced] = useState(false)
   const [orderId, setOrderId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState('')
+  const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [locating, setLocating] = useState(false)
+  const [locateMsg, setLocateMsg] = useState('')
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) { setLocateMsg('Geolocation not supported on this device'); return }
+    setLocating(true); setLocateMsg('')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setLocating(false)
+        setLocateMsg('Using your current location for this delivery')
+      },
+      (err) => { setLocating(false); setLocateMsg(err.message || 'Could not get your location') },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  }
 
   // Hydrate cart from localStorage before rendering
   useEffect(() => {
@@ -75,6 +93,8 @@ export default function CheckoutPage() {
           delivery_fee: deliveryFee,
           discount,
           address,
+          delivery_latitude: geoCoords?.lat ?? null,
+          delivery_longitude: geoCoords?.lng ?? null,
           coupon_code: couponApplied ? coupon : null,
           payment_method: selectedPayment,
           payment_status: selectedPayment === 'cod' ? 'pending' : 'paid',
@@ -130,7 +150,7 @@ export default function CheckoutPage() {
               <p className="text-[11.5px] text-[#9CA3AF] font-mono mb-6">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
             )}
             <div className="space-y-3">
-              <Link href="/orders">
+              <Link href={orderId ? `/orders/${orderId}/track` : '/orders'}>
                 <button className="w-full py-3.5 bg-[#16A34A] text-white font-[700] rounded-2xl hover:bg-[#15803D] transition-colors shadow-[0_4px_16px_rgba(22,163,74,0.35)]" style={{ fontWeight: 700 }}>
                   Track your order
                 </button>
@@ -203,6 +223,14 @@ export default function CheckoutPage() {
                   <button className="w-full flex items-center gap-2 py-3 text-[13.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
                     <Plus className="w-4 h-4" /> Add new address
                   </button>
+                  <button type="button" onClick={useCurrentLocation} disabled={locating}
+                    className="w-full flex items-center justify-center gap-2 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A] transition-all disabled:opacity-60">
+                    {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+                    {locating ? 'Getting your location...' : 'Use current location for live tracking'}
+                  </button>
+                  {locateMsg && (
+                    <p className={cn('text-[12px]', geoCoords ? 'text-[#16A34A]' : 'text-[#DC2626]')}>{locateMsg}</p>
+                  )}
                 </div>
               </div>
 
@@ -234,6 +262,9 @@ export default function CheckoutPage() {
                     </button>
                   ))}
                 </div>
+                <p className="text-[11.5px] text-[#9CA3AF] mt-4">
+                  Payments for Zippy orders are processed by CloudByte — your bank statement or payment app may show &quot;CloudByte&quot; as the merchant name.
+                </p>
               </div>
 
               {/* Coupon */}
@@ -337,6 +368,7 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+      <SiteFooter />
     </>
   )
 }

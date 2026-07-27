@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 const STATUS_CONFIG = {
   pending:          { label: 'Order Placed',     icon: Package,     color: '#6B7280', bg: '#F3F4F6' },
@@ -189,6 +190,7 @@ export default function OrdersPage() {
           </div>
         </div>
       </div>
+      <SiteFooter />
     </>
   )
 }

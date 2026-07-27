@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 const OFFERS = [
   { id: '1', code: 'ZIPPY50', title: 'New User Special', description: '50% OFF on your first order, up to ₹100 discount', discount: '50% OFF', minOrder: 99, validTill: '2026-12-31', type: 'grocery', color: '#16A34A', bg: '#DCFCE7', border: '#BBF7D0', emoji: '🎉' },
@@ -115,6 +116,7 @@ export default function OffersPage() {
           </div>
         </div>
       </div>
+      <SiteFooter />
     </>
   )
 }

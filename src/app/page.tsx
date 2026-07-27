@@ -7,6 +7,7 @@ import TrendingProducts from '@/components/home/TrendingProducts'
 import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
 import OffersStrip from '@/components/home/OffersStrip'
 import QuickCategories from '@/components/home/QuickCategories'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 export default function HomePage() {
   return (
@@ -30,6 +31,7 @@ export default function HomePage() {
         <TrendingProducts />
         <FeaturedRestaurants />
       </div>
+      <SiteFooter />
     </div>
   )
 }

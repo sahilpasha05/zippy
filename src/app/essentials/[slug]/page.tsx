@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
+import SiteFooter from '@/components/layout/SiteFooter'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -186,6 +187,7 @@ export default function CategoryPage() {
           )}
         </div>
       </div>
+      <SiteFooter />
     </>
   )
 }
