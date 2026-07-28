@@ -5,6 +5,7 @@ import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } f
 import { cn } from '@/lib/utils'
 import { useAddressStore } from '@/lib/store/address'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const LABELS = [
   { key: 'Home', icon: Home },
@@ -113,6 +114,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
         {(step === 'confirm' || step === 'manual') && (
           <div className="p-4 space-y-4">
             {error && <p className="text-[12.5px] text-[#DC2626]">{error}</p>}
+            {step === 'confirm' && draftCoords && (
+              <LiveTrackingMap riderLocation={null} dropLocation={draftCoords} className="h-44" />
+            )}
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Address</label>
               <textarea value={draftAddress} onChange={(e) => setDraftAddress(e.target.value)} rows={3}
