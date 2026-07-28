@@ -48,21 +48,21 @@ export default function SlugSettingsPage() {
   }
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#16A34A] animate-spin" /></main>
     </div>
   )
 
   if (!restaurant) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center"><p className="text-[#374151]">Restaurant not found</p></main>
     </div>
   )
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={restaurant} />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10 flex items-center justify-between">

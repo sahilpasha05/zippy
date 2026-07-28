@@ -84,7 +84,7 @@ export default function NewRestaurantPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">

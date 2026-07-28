@@ -14,6 +14,7 @@ type Props = {
   dropLocation: LatLng | null
   riderStale?: boolean
   className?: string
+  showRiderStatus?: boolean // set false when there's no delivery context (e.g. confirming your own address pin)
 }
 
 // Simple bike SVG used as the rider's live marker
@@ -36,7 +37,7 @@ function dropMarkerEl() {
   return el
 }
 
-export default function LiveTrackingMap({ riderLocation, dropLocation, riderStale, className }: Props) {
+export default function LiveTrackingMap({ riderLocation, dropLocation, riderStale, className, showRiderStatus = true }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const riderMarkerRef = useRef<mapboxgl.Marker | null>(null)
@@ -103,12 +104,12 @@ export default function LiveTrackingMap({ riderLocation, dropLocation, riderStal
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-[#E5E7EB] ${className ?? ''}`}>
       <div ref={containerRef} className="w-full h-full min-h-[280px]" />
-      {riderLocation && riderStale && (
+      {showRiderStatus && riderLocation && riderStale && (
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/95 backdrop-blur rounded-full text-[11.5px] font-medium text-[#D97706] shadow-sm">
           <AlertTriangle className="w-3.5 h-3.5" /> Rider location hasn&apos;t updated recently
         </div>
       )}
-      {!riderLocation && (
+      {showRiderStatus && !riderLocation && (
         <div className="absolute top-3 left-3 px-3 py-1.5 bg-white/95 backdrop-blur rounded-full text-[11.5px] font-medium text-[#6B7280] shadow-sm">
           Waiting for rider&apos;s live location...
         </div>

@@ -87,7 +87,7 @@ export default function SlugDashboard() {
   ]
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#16A34A] animate-spin" />
@@ -96,7 +96,7 @@ export default function SlugDashboard() {
   )
 
   if (!restaurant) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center">
         <p className="text-[15px] text-[#374151]">Restaurant not found</p>
@@ -105,7 +105,7 @@ export default function SlugDashboard() {
   )
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={restaurant} />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-4 flex items-center justify-between sticky top-0 z-10">

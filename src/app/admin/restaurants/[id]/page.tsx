@@ -108,7 +108,7 @@ export default function ManageRestaurantPage() {
   }
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#7C3AED] animate-spin" />
@@ -117,7 +117,7 @@ export default function ManageRestaurantPage() {
   )
 
   if (!restaurant) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 flex flex-col items-center justify-center gap-3">
         <p className="text-[15px] text-[#374151]">Restaurant not found</p>
@@ -127,7 +127,7 @@ export default function ManageRestaurantPage() {
   )
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">

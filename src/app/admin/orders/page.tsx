@@ -115,11 +115,11 @@ export default function AdminOrdersPage() {
   const partnerName = (id: string | null) => partners.find((p) => p.id === id)?.name
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
-        <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="bg-white border-b border-[#E5E7EB] px-4 sm:px-6 py-4 sm:py-5 sticky top-0 z-10">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>All Orders</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">
@@ -129,32 +129,32 @@ export default function AdminOrdersPage() {
                 </span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#7C3AED] transition-all">
-                <Search className="w-3.5 h-3.5 text-[#9CA3AF]" />
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-none flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#7C3AED] transition-all">
+                <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search by customer or order ID..."
-                  className="bg-transparent text-[13px] outline-none w-48 placeholder:text-[#9CA3AF]" />
+                  className="bg-transparent text-[13px] outline-none w-full sm:w-48 min-w-0 placeholder:text-[#9CA3AF]" />
               </div>
-              <button onClick={load} className="w-9 h-9 flex items-center justify-center border border-[#E5E7EB] rounded-xl text-[#6B7280] hover:border-[#7C3AED] hover:text-[#7C3AED] transition-all">
+              <button onClick={load} className="w-9 h-9 shrink-0 flex items-center justify-center border border-[#E5E7EB] rounded-xl text-[#6B7280] hover:border-[#7C3AED] hover:text-[#7C3AED] transition-all">
                 <RefreshCw className="w-4 h-4" />
               </button>
             </div>
           </div>
 
           {/* Auto-assign toolbar */}
-          <div className="flex items-center gap-2 mb-4 p-3 bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl">
+          <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl">
             <Bike className="w-4 h-4 text-[#7C3AED] shrink-0" />
             <span className="text-[12.5px] text-[#5B21B6] font-medium shrink-0">Auto-assign</span>
             <select value={autoAssignPartner} onChange={(e) => setAutoAssignPartner(e.target.value)}
-              className="flex-1 max-w-[220px] px-3 py-1.5 border border-[#DDD6FE] rounded-lg text-[12.5px] bg-white outline-none focus:border-[#7C3AED]">
+              className="flex-1 min-w-[160px] sm:max-w-[220px] px-3 py-1.5 border border-[#DDD6FE] rounded-lg text-[12.5px] bg-white outline-none focus:border-[#7C3AED]">
               <option value="">Select delivery partner...</option>
               {partners.filter((p) => p.is_active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <button onClick={autoAssign} disabled={!autoAssignPartner || autoAssigning}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#7C3AED] text-white text-[12px] font-[600] rounded-lg hover:bg-[#6D28D9] transition-all disabled:opacity-50">
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#7C3AED] text-white text-[12px] font-[600] rounded-lg hover:bg-[#6D28D9] transition-all disabled:opacity-50 shrink-0">
               <Zap className="w-3.5 h-3.5" />
-              {autoAssigning ? 'Assigning...' : `Assign all ${unassignedCnt} unassigned`}
+              {autoAssigning ? 'Assigning...' : `Assign all ${unassignedCnt}`}
             </button>
             {autoAssignMsg && <span className="text-[12px] text-[#16A34A] font-medium">{autoAssignMsg}</span>}
           </div>
@@ -187,8 +187,8 @@ export default function AdminOrdersPage() {
               <p className="text-[15px] font-semibold text-[#374151]">No orders found</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
-              <table className="w-full">
+            <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-x-auto shadow-zippy-sm">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
                     {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Total', 'Time'].map((h) => (

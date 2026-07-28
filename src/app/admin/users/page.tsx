@@ -50,11 +50,11 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Users</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">{profiles.length} registered users</p>
@@ -78,8 +78,8 @@ export default function AdminUsersPage() {
               <p className="text-[15px] font-semibold text-[#374151]">No users found</p>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
-              <table className="w-full">
+            <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-x-auto shadow-zippy-sm">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
                     {['User', 'Email', 'Role', 'Restaurant', 'Joined'].map((h) => (

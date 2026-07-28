@@ -95,7 +95,7 @@ export default function RestaurantDashboard() {
   ]
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#16A34A] animate-spin" />
@@ -104,7 +104,7 @@ export default function RestaurantDashboard() {
   )
 
   if (!restaurant) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
         <div className="text-center">
@@ -116,7 +116,7 @@ export default function RestaurantDashboard() {
   )
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={restaurant} />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-4 flex items-center justify-between sticky top-0 z-10">

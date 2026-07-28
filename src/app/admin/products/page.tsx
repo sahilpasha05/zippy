@@ -151,11 +151,11 @@ export default function AdminProductsPage() {
   })
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <AdminSidebar />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Products</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">{products.length} products · {categories.length} categories</p>

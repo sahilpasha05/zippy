@@ -15,12 +15,17 @@ const LABELS = [
 
 type Step = 'list' | 'confirm' | 'manual'
 
+const INPUT = 'w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all'
+
 export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const { addresses, selectedId, addAddress, selectAddress, removeAddress } = useAddressStore()
   const [step, setStep] = useState<Step>('list')
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
-  const [draftAddress, setDraftAddress] = useState('')
+  const [detectedArea, setDetectedArea] = useState('')
+  const [houseNo, setHouseNo] = useState('')
+  const [areaLine, setAreaLine] = useState('')
+  const [landmark, setLandmark] = useState('')
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -31,8 +36,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       const { latitude, longitude } = pos.coords
       const address = await reverseGeocode(latitude, longitude)
       setDraftCoords({ lat: latitude, lng: longitude })
-      setDraftAddress(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
-      setDraftLabel('Home')
+      setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+      setAreaLine(address ?? '')
+      setHouseNo(''); setLandmark(''); setDraftLabel('Home')
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not get your location')
@@ -42,13 +48,14 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   }
 
   function openManual() {
-    setDraftAddress(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
     setStep('manual')
   }
 
   function saveDraft() {
-    if (!draftAddress.trim()) { setError('Please enter an address'); return }
-    const saved = addAddress({ label: draftLabel, address: draftAddress.trim(), lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null })
+    if (!houseNo.trim() || !areaLine.trim()) { setError('Please fill in the house/flat number and area'); return }
+    const fullAddress = [houseNo.trim(), areaLine.trim(), landmark.trim() ? `near ${landmark.trim()}` : null].filter(Boolean).join(', ')
+    const saved = addAddress({ label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null })
     selectAddress(saved.id)
     onClose()
   }
@@ -114,15 +121,33 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
         {(step === 'confirm' || step === 'manual') && (
           <div className="p-4 space-y-4">
             {error && <p className="text-[12.5px] text-[#DC2626]">{error}</p>}
+
             {step === 'confirm' && draftCoords && (
-              <LiveTrackingMap riderLocation={null} dropLocation={draftCoords} className="h-44" />
+              <>
+                <LiveTrackingMap riderLocation={null} dropLocation={draftCoords} className="h-40" showRiderStatus={false} />
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-[#F0FDF4] border border-[#DCFCE7] rounded-xl">
+                  <MapPin className="w-3.5 h-3.5 text-[#16A34A] mt-0.5 shrink-0" />
+                  <p className="text-[12px] text-[#15803D]">Detected: {detectedArea}</p>
+                </div>
+              </>
             )}
+
             <div>
-              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Address</label>
-              <textarea value={draftAddress} onChange={(e) => setDraftAddress(e.target.value)} rows={3}
-                placeholder="House no, street, area, city, pincode"
-                className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all resize-none" />
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">House / Flat / Block No. *</label>
+              <input value={houseNo} onChange={(e) => setHouseNo(e.target.value)} placeholder="e.g. Flat 302, Block B"
+                className={INPUT} />
             </div>
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Apartment / Road / Area *</label>
+              <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. MG Road, Koramangala"
+                className={INPUT} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Landmark <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
+              <input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="e.g. Near Apollo Pharmacy"
+                className={INPUT} />
+            </div>
+
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Save as</label>
               <div className="flex gap-2">

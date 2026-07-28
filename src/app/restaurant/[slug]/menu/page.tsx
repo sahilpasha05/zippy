@@ -53,18 +53,18 @@ export default function SlugMenuPage() {
   })
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={null} />
       <main className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 text-[#16A34A] animate-spin" /></main>
     </div>
   )
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={restaurant} />
       <main className="flex-1 overflow-auto">
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-4 sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
               <h1 className="text-[18px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Menu</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">{items.filter((i) => i.available).length} available · {items.filter((i) => !i.available).length} unavailable</p>

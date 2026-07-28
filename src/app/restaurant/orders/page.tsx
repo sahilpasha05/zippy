@@ -129,12 +129,12 @@ export default function RestaurantOrdersPage() {
   const activeCnt = orders.filter((o) => !['delivered','cancelled'].includes(o.status)).length
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
       <RestaurantSidebar restaurant={restaurant} />
       <main className="flex-1 overflow-auto">
         {/* Top bar */}
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-4 sticky top-0 z-10">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-[18px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Orders</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">
@@ -144,20 +144,20 @@ export default function RestaurantOrdersPage() {
                 </span>
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => { unlockAudio(); if (!soundOn) playNewOrderAlarm(); setSoundOn(!soundOn) }}
                 title={soundOn ? 'New-order alarm is ON — click to mute' : 'Alarm muted — click to enable'}
-                className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
+                className={cn('shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
                   soundOn ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
                 {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                 {soundOn ? 'Alarm On' : 'Muted'}
               </button>
-              <div className="flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#16A34A] transition-all">
-                <Search className="w-3.5 h-3.5 text-[#9CA3AF]" />
+              <div className="flex-1 sm:flex-none flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#16A34A] transition-all">
+                <Search className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search orders..."
-                  className="bg-transparent text-[13px] text-[#111827] placeholder:text-[#9CA3AF] outline-none w-40" />
+                  className="bg-transparent text-[13px] text-[#111827] placeholder:text-[#9CA3AF] outline-none w-full sm:w-40 min-w-0" />
               </div>
             </div>
           </div>
