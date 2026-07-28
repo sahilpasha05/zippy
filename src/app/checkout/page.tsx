@@ -28,6 +28,26 @@ const PAYMENT_METHODS = [
 
 const LABEL_ICONS: Record<string, typeof Home> = { Home, Work: Briefcase, Other: Star }
 
+declare global {
+  interface Window {
+    PhonePeCheckout?: {
+      transact: (opts: { tokenUrl: string; callback?: (response: string) => void; type?: 'IFRAME' }) => void
+      closePage: () => void
+    }
+  }
+}
+
+function loadPhonePeScript(): Promise<void> {
+  if (window.PhonePeCheckout) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'https://mercury.phonepe.com/web/bundle/checkout.js'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Could not load PhonePe checkout'))
+    document.body.appendChild(script)
+  })
+}
+
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore()
   const { addresses, selectedId } = useAddressStore()
@@ -71,7 +91,7 @@ export default function CheckoutPage() {
           user_id: user?.id ?? null,
           restaurant_id: restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',
-          status: 'confirmed',
+          status: selectedPayment === 'cod' ? 'confirmed' : 'pending',
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount,
@@ -80,7 +100,7 @@ export default function CheckoutPage() {
           delivery_longitude: selectedAddress.lng,
           coupon_code: couponApplied ? coupon : null,
           payment_method: selectedPayment,
-          payment_status: selectedPayment === 'cod' ? 'pending' : 'paid',
+          payment_status: 'pending',
           customer_name: user?.user_metadata?.full_name ?? null,
           placed_at: new Date().toISOString(),
         })
@@ -102,14 +122,55 @@ export default function CheckoutPage() {
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
 
-      setOrderId(order.id)
-      clearCart()
-      setPlaced(true)
+      if (selectedPayment === 'cod') {
+        setOrderId(order.id)
+        clearCart()
+        setPlaced(true)
+        setPlacing(false)
+        return
+      }
+
+      // UPI / Card: hand off to PhonePe. Cart is only cleared once payment actually succeeds.
+      const initRes = await fetch('/api/phonepe/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id }),
+      })
+      const initData = await initRes.json()
+      if (!initRes.ok) throw new Error(initData.error ?? 'Could not start payment')
+
+      await loadPhonePeScript()
+      window.PhonePeCheckout!.transact({
+        tokenUrl: initData.redirectUrl,
+        type: 'IFRAME',
+        callback: async (response: string) => {
+          if (response === 'USER_CANCEL') {
+            setPlacing(false)
+            setPlaceError('Payment was cancelled. Your cart is still saved — you can try again.')
+            return
+          }
+          // 'CONCLUDED' (or the iframe closing for any other reason) — confirm the real state server-side
+          try {
+            const statusRes = await fetch(`/api/phonepe/status/${order.id}`)
+            const statusData = await statusRes.json()
+            if (statusData.state === 'COMPLETED') {
+              setOrderId(order.id)
+              clearCart()
+              setPlaced(true)
+            } else {
+              setPlaceError('Payment was not completed. Your cart is still saved — you can try again.')
+            }
+          } catch {
+            setPlaceError('Could not confirm payment status. Please check your orders page before retrying.')
+          } finally {
+            setPlacing(false)
+          }
+        },
+      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Something went wrong.'
       setPlaceError(msg)
       console.error(err)
-    } finally {
       setPlacing(false)
     }
   }
