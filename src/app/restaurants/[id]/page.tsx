@@ -26,29 +26,10 @@ type Restaurant = {
   is_open: boolean; rating: number
 }
 
-// Fallback menu until a menu_items table is wired up
-const FALLBACK_MENU = [
-  {
-    category: 'Mains', items: [
-      { id: 'f1', name: 'Special Thali', desc: 'Chef special with dal, sabzi, rice & roti. Wholesome meal.', price: 199, image: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=200&h=200&fit=crop', isVeg: true,  isBestseller: true,  rating: 4.8 },
-      { id: 'f2', name: 'Paneer Butter Masala', desc: 'Rich creamy paneer curry with butter naan.', price: 219, image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=200&h=200&fit=crop', isVeg: true,  isBestseller: false, rating: 4.6 },
-      { id: 'f3', name: 'Chicken Curry', desc: 'Home-style chicken in tomato onion masala.', price: 249, image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=200&h=200&fit=crop', isVeg: false, isBestseller: false, rating: 4.5 },
-    ]
-  },
-  {
-    category: 'Starters', items: [
-      { id: 'f4', name: 'Veg Manchurian', desc: 'Crispy veggie balls in manchurian sauce.', price: 149, image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=200&h=200&fit=crop', isVeg: true,  isBestseller: true,  rating: 4.7 },
-      { id: 'f5', name: 'Chicken 65', desc: 'Spicy deep-fried chicken with curry leaves.', price: 189, image: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=200&h=200&fit=crop', isVeg: false, isBestseller: false, rating: 4.6 },
-    ]
-  },
-  {
-    category: 'Drinks', items: [
-      { id: 'f6', name: 'Sweet Lassi', desc: 'Chilled yoghurt drink with cardamom.', price: 79, image: 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=200&h=200&fit=crop', isVeg: true,  isBestseller: false, rating: 4.5 },
-    ]
-  },
-]
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
 
-type MenuItem = typeof FALLBACK_MENU[0]['items'][0]
+type MenuItem = { id: string; name: string; desc: string; price: number; image: string; isVeg: boolean; isBestseller: boolean; rating: number }
+type MenuSection = { category: string; items: MenuItem[] }
 
 function MenuItemRow({ item, restaurantId }: { item: MenuItem; restaurantId: string }) {
   const { addItem, items, updateQuantity } = useCartStore()
@@ -101,26 +82,54 @@ function MenuItemRow({ item, restaurantId }: { item: MenuItem; restaurantId: str
 export default function RestaurantDetailPage() {
   const { id: slug } = useParams<{ id: string }>()
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
+  const [menu, setMenu] = useState<MenuSection[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeCategory, setActiveCategory] = useState(FALLBACK_MENU[0].category)
+  const [activeCategory, setActiveCategory] = useState('')
   const [search, setSearch] = useState('')
   const [wishlist, setWishlist] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data: rest } = await supabase
         .from('restaurants')
         .select('id, name, slug, cuisine, description, cover_url, logo_url, address, delivery_time, min_order, delivery_fee, is_open, rating')
         .eq('slug', slug)
         .single()
-      setRestaurant(data as Restaurant ?? null)
+      setRestaurant(rest as Restaurant ?? null)
+
+      if (rest) {
+        const [{ data: cats }, { data: prods }] = await Promise.all([
+          supabase.from('restaurant_categories').select('id, name').eq('restaurant_id', rest.id).order('sort_order'),
+          supabase.from('restaurant_products').select('*, restaurant_categories(name)').eq('restaurant_id', rest.id).eq('is_available', true),
+        ])
+
+        const toMenuItem = (p: Record<string, unknown>): MenuItem => ({
+          id: p.id as string,
+          name: p.name as string,
+          desc: (p.description as string | null) ?? '',
+          price: Number(p.price),
+          image: (p.image_url as string | null) ?? PLACEHOLDER_IMAGE,
+          isVeg: p.is_veg as boolean,
+          isBestseller: p.is_bestseller as boolean,
+          rating: Number(p.rating ?? 4),
+        })
+
+        const sections: MenuSection[] = (cats ?? [])
+          .map((c) => ({ category: c.name, items: (prods ?? []).filter((p) => p.category_id === c.id).map(toMenuItem) }))
+          .filter((s) => s.items.length > 0)
+
+        const uncategorized = (prods ?? []).filter((p) => !p.category_id).map(toMenuItem)
+        if (uncategorized.length > 0) sections.push({ category: 'Other', items: uncategorized })
+
+        setMenu(sections)
+        setActiveCategory(sections[0]?.category ?? '')
+      }
       setLoading(false)
     }
     load()
   }, [slug])
 
-  const MENU = FALLBACK_MENU
-  const filteredMenu = MENU.map((section) => ({
+  const filteredMenu = menu.map((section) => ({
     ...section,
     items: section.items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())),
   })).filter((s) => s.items.length > 0)
@@ -209,7 +218,7 @@ export default function RestaurantDetailPage() {
             <aside className="hidden lg:block w-52 shrink-0">
               <div className="sticky top-24 bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
                 <div className="p-3">
-                  {MENU.map((section) => (
+                  {menu.map((section) => (
                     <button key={section.category} onClick={() => setActiveCategory(section.category)}
                       className={cn('w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all mb-1',
                         activeCategory === section.category ? 'bg-[#DCFCE7] text-[#16A34A] font-semibold' : 'text-[#374151] hover:bg-[#F8FAFC]')}>
@@ -228,15 +237,23 @@ export default function RestaurantDetailPage() {
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu..."
                   className="bg-transparent text-[14px] outline-none flex-1 placeholder:text-[#9CA3AF]" />
               </div>
-              {filteredMenu.map((section) => (
-                <div key={section.category} className="mb-8">
-                  <h2 className="text-[18px] font-[800] text-[#111827] mb-1">{section.category}</h2>
-                  <p className="text-[12.5px] text-[#9CA3AF] mb-4">{section.items.length} items</p>
-                  <div className="bg-white rounded-2xl border border-[#E5E7EB] px-6">
-                    {section.items.map((item) => <MenuItemRow key={item.id} item={item} restaurantId={restaurant.id} />)}
-                  </div>
+              {filteredMenu.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-[#E5E7EB] py-16 text-center">
+                  <p className="text-[14px] font-medium text-[#374151]">
+                    {menu.length === 0 ? 'This restaurant hasn’t added any menu items yet.' : 'No items match your search.'}
+                  </p>
                 </div>
-              ))}
+              ) : (
+                filteredMenu.map((section) => (
+                  <div key={section.category} className="mb-8">
+                    <h2 className="text-[18px] font-[800] text-[#111827] mb-1">{section.category}</h2>
+                    <p className="text-[12.5px] text-[#9CA3AF] mb-4">{section.items.length} items</p>
+                    <div className="bg-white rounded-2xl border border-[#E5E7EB] px-6">
+                      {section.items.map((item) => <MenuItemRow key={item.id} item={item} restaurantId={restaurant.id} />)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
