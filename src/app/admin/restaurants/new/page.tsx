@@ -6,6 +6,7 @@ import { ArrowLeft, Store, Loader2, CheckCircle, AlertCircle, UserPlus } from 'l
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import ImageUploadField from '@/components/admin/ImageUploadField'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -168,18 +169,8 @@ export default function NewRestaurantPage() {
               {/* Images */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 space-y-4">
                 <h2 className="text-[14px] font-[700] text-[#111827]">Images</h2>
-                <div>
-                  <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Cover Image URL</label>
-                  <input value={form.cover_url} onChange={(e) => set('cover_url', e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
-                </div>
-                <div>
-                  <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Logo URL</label>
-                  <input value={form.logo_url} onChange={(e) => set('logo_url', e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
-                </div>
+                <ImageUploadField label="Cover Image" value={form.cover_url || null} onChange={(url) => set('cover_url', url ?? '')} />
+                <ImageUploadField label="Logo Image" value={form.logo_url || null} onChange={(url) => set('logo_url', url ?? '')} />
               </div>
 
               {/* Delivery Settings */}

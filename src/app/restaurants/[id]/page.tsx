@@ -31,7 +31,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7
 type MenuItem = { id: string; name: string; desc: string; price: number; image: string; isVeg: boolean; isBestseller: boolean; rating: number }
 type MenuSection = { category: string; items: MenuItem[] }
 
-function MenuItemRow({ item, restaurantId }: { item: MenuItem; restaurantId: string }) {
+function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaurantId: string; disabled: boolean }) {
   const { addItem, items, updateQuantity } = useCartStore()
   const cartItem = items.find((i) => i.product_id === item.id)
 
@@ -59,9 +59,13 @@ function MenuItemRow({ item, restaurantId }: { item: MenuItem; restaurantId: str
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
         <div className="w-24 h-24 rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
-          <Image src={item.image} alt={item.name} width={96} height={96} className="w-full h-full object-cover" />
+          <Image src={item.image} alt={item.name} width={96} height={96} unoptimized className="w-full h-full object-cover" />
         </div>
-        {cartItem ? (
+        {disabled ? (
+          <button disabled className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] text-[12px] font-[600] rounded-xl cursor-not-allowed">
+            Unavailable
+          </button>
+        ) : cartItem ? (
           <div className="flex items-center gap-1">
             <button onClick={() => updateQuantity(item.id, cartItem.quantity - 1)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E7EB] text-[#374151] hover:border-[#16A34A]"><Minus className="w-3.5 h-3.5" /></button>
             <span className="w-6 text-center text-[13px] font-[700]">{cartItem.quantity}</span>
@@ -163,12 +167,12 @@ export default function RestaurantDetailPage() {
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* Hero */}
         <div className="relative h-64 lg:h-80 bg-[#F8FAFC] overflow-hidden">
-          <Image src={cover} alt={restaurant.name} fill className="object-cover" priority sizes="100vw" />
+          <Image src={cover} alt={restaurant.name} fill unoptimized className={cn('object-cover', !restaurant.is_open && 'grayscale')} priority sizes="100vw" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
             <div className="flex items-end gap-4">
               <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
-                <Image src={logo} alt="" width={64} height={64} className="w-full h-full object-cover" />
+                <Image src={logo} alt="" width={64} height={64} unoptimized className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="text-[24px] font-[800] text-white tracking-tight">{restaurant.name}</h1>
@@ -208,6 +212,11 @@ export default function RestaurantDetailPage() {
               <span className="text-[#16A34A] font-medium">{restaurant.delivery_fee === 0 ? 'Free delivery' : `₹${restaurant.delivery_fee} delivery`}</span>
               <span>Min ₹{restaurant.min_order}</span>
             </div>
+            {!restaurant.is_open && (
+              <div className="mt-3 px-4 py-2.5 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-[12.5px] text-[#B91C1C] font-medium">
+                This restaurant is currently unavailable and not accepting orders right now.
+              </div>
+            )}
           </div>
         </div>
 
@@ -249,7 +258,7 @@ export default function RestaurantDetailPage() {
                     <h2 className="text-[18px] font-[800] text-[#111827] mb-1">{section.category}</h2>
                     <p className="text-[12.5px] text-[#9CA3AF] mb-4">{section.items.length} items</p>
                     <div className="bg-white rounded-2xl border border-[#E5E7EB] px-6">
-                      {section.items.map((item) => <MenuItemRow key={item.id} item={item} restaurantId={restaurant.id} />)}
+                      {section.items.map((item) => <MenuItemRow key={item.id} item={item} restaurantId={restaurant.id} disabled={!restaurant.is_open} />)}
                     </div>
                   </div>
                 ))

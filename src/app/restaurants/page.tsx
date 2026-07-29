@@ -33,19 +33,20 @@ type Restaurant = {
 
 function RestaurantCard({ r }: { r: Restaurant }) {
   return (
-    <Link href={`/restaurants/${r.slug}`} className="group bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden hover:shadow-zippy hover:border-[#D1D5DB] transition-all duration-200 hover:-translate-y-0.5 block">
+    <Link href={`/restaurants/${r.slug}`} className={cn('group relative bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden transition-all duration-200 block',
+      r.is_open ? 'hover:shadow-zippy hover:border-[#D1D5DB] hover:-translate-y-0.5' : '')}>
       <div className="relative h-44 bg-[#F8FAFC] overflow-hidden">
         {r.cover_url && (
-          <Image src={r.cover_url} alt={r.name} fill className="object-cover" sizes="(max-width: 640px) 100vw, 50vw" />
+          <Image src={r.cover_url} alt={r.name} fill unoptimized className={cn('object-cover', !r.is_open && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw" />
         )}
         <div className={cn('absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold border', r.is_open ? 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]' : 'bg-white text-[#6B7280] border-[#E5E7EB]')}>
           {r.is_open ? '● Open now' : '○ Closed'}
         </div>
       </div>
-      <div className="p-4">
+      <div className={cn('p-4', !r.is_open && 'opacity-60')}>
         <div className="flex items-start gap-3 mb-3">
           <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E5E7EB] shrink-0 bg-[#F8FAFC]">
-            {r.logo_url && <Image src={r.logo_url} alt="" width={44} height={44} className="w-full h-full object-cover" />}
+            {r.logo_url && <Image src={r.logo_url} alt="" width={44} height={44} unoptimized className="w-full h-full object-cover" />}
           </div>
           <div className="min-w-0">
             <h3 className="text-[15px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>{r.name}</h3>
@@ -65,6 +66,11 @@ function RestaurantCard({ r }: { r: Restaurant }) {
           <span className="text-[#16A34A] font-medium">{r.delivery_fee === 0 ? 'Free delivery' : `₹${r.delivery_fee} delivery`}</span>
         </div>
       </div>
+      {!r.is_open && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/5 pointer-events-none">
+          <span className="px-3 py-1.5 bg-white/95 backdrop-blur rounded-full text-[12px] font-[700] text-[#374151] shadow-sm">Currently unavailable</span>
+        </div>
+      )}
     </Link>
   )
 }

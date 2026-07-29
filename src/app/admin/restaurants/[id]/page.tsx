@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, CheckCircle, AlertCircle, UserPlus, UserCheck, User
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import ImageUploadField from '@/components/admin/ImageUploadField'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -182,6 +183,8 @@ export default function ManageRestaurantPage() {
                 <textarea value={restaurant.description ?? ''} onChange={(e) => setField('description', e.target.value)}
                   rows={2} className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all resize-none" />
               </div>
+              <ImageUploadField label="Cover Image" value={restaurant.cover_url} onChange={(url) => setField('cover_url', url)} />
+              <ImageUploadField label="Logo Image" value={restaurant.logo_url} onChange={(url) => setField('logo_url', url)} />
             </div>
           </div>
 

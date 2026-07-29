@@ -90,8 +90,10 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 {addresses.map((a) => {
                   const LabelIcon = LABELS.find((l) => l.key === a.label)?.icon ?? MapPin
                   return (
-                    <button key={a.id} onClick={() => { selectAddress(a.id); onClose() }}
-                      className={cn('w-full text-left flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all',
+                    <div key={a.id} role="button" tabIndex={0}
+                      onClick={() => { selectAddress(a.id); onClose() }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { selectAddress(a.id); onClose() } }}
+                      className={cn('w-full text-left flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer',
                         selectedId === a.id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]')}>
                       <div className="w-9 h-9 bg-[#F3F4F6] rounded-xl flex items-center justify-center shrink-0">
                         <LabelIcon className="w-4 h-4 text-[#6B7280]" />
@@ -105,7 +107,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                       </div>
                       <button onClick={(e) => { e.stopPropagation(); removeAddress(a.id) }}
                         className="text-[11px] text-[#DC2626] hover:underline shrink-0">Remove</button>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
