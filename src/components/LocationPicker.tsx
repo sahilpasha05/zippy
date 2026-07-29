@@ -26,6 +26,8 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const [houseNo, setHouseNo] = useState('')
   const [areaLine, setAreaLine] = useState('')
   const [landmark, setLandmark] = useState('')
+  const [contactName, setContactName] = useState('')
+  const [contactPhone, setContactPhone] = useState('')
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -38,7 +40,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       setDraftCoords({ lat: latitude, lng: longitude })
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       setAreaLine(address ?? '')
-      setHouseNo(''); setLandmark(''); setDraftLabel('Home')
+      setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftLabel('Home')
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not get your location')
@@ -48,14 +50,19 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   }
 
   function openManual() {
-    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
     setStep('manual')
   }
 
   function saveDraft() {
     if (!houseNo.trim() || !areaLine.trim()) { setError('Please fill in the house/flat number and area'); return }
+    if (!contactName.trim()) { setError('Please enter a name for this address'); return }
+    if (!/^\d{10}$/.test(contactPhone.trim())) { setError('Please enter a valid 10-digit mobile number'); return }
     const fullAddress = [houseNo.trim(), areaLine.trim(), landmark.trim() ? `near ${landmark.trim()}` : null].filter(Boolean).join(', ')
-    const saved = addAddress({ label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null })
+    const saved = addAddress({
+      label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null,
+      contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
+    })
     selectAddress(saved.id)
     onClose()
   }
@@ -148,6 +155,25 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Landmark <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
               <input value={landmark} onChange={(e) => setLandmark(e.target.value)} placeholder="e.g. Near Apollo Pharmacy"
                 className={INPUT} />
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Your Name *</label>
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="e.g. Priya Sharma"
+                className={INPUT} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Mobile Number *</label>
+              <div className="flex items-center gap-2 px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl focus-within:border-[#16A34A] transition-all">
+                <span className="text-[13.5px] font-[600] text-[#6B7280] shrink-0">+91</span>
+                <input
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="98765 43210"
+                  inputMode="numeric"
+                  className="flex-1 bg-transparent text-[13.5px] outline-none min-w-0"
+                />
+              </div>
             </div>
 
             <div>

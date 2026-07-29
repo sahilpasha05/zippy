@@ -101,7 +101,8 @@ export default function CheckoutPage() {
           coupon_code: couponApplied ? coupon : null,
           payment_method: selectedPayment,
           payment_status: 'pending',
-          customer_name: user?.user_metadata?.full_name ?? null,
+          customer_name: selectedAddress.contactName || user?.user_metadata?.full_name || null,
+          customer_phone: selectedAddress.contactPhone || null,
           placed_at: new Date().toISOString(),
         })
         .select('id')

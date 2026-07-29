@@ -1,10 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 const NAV = [
   { href: '/admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
@@ -19,7 +25,18 @@ const NAV = [
 
 export default function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [email, setEmail] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ''))
+  }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/admin/login')
+  }
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -61,11 +78,11 @@ export default function AdminSidebar() {
           <div className="w-9 h-9 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white text-[13px] font-bold shrink-0">A</div>
           <div className="min-w-0">
             <div className="text-[12.5px] font-[600] text-[#111827] truncate">Admin</div>
-            <div className="text-[11px] text-[#9CA3AF]">admin@zippy.app</div>
+            <div className="text-[11px] text-[#9CA3AF] truncate">{email || '...'}</div>
           </div>
-          <Link href="/" className="text-[#9CA3AF] hover:text-[#EF4444] transition-colors ml-auto">
+          <button onClick={handleLogout} className="text-[#9CA3AF] hover:text-[#EF4444] transition-colors ml-auto">
             <LogOut className="w-4 h-4" />
-          </Link>
+          </button>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, UserCheck, UserX, Shield, Store } from 'lucide-react'
+import { Search, UserCheck, UserX, Shield, Store, KeyRound, X, Loader2 } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +26,11 @@ export default function AdminUsersPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [resetTarget, setResetTarget] = useState<Profile | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -82,7 +87,7 @@ export default function AdminUsersPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
-                    {['User', 'Email', 'Role', 'Restaurant', 'Joined'].map((h) => (
+                    {['User', 'Email', 'Role', 'Restaurant', 'Joined', ''].map((h) => (
                       <th key={h} className="text-left text-[11.5px] font-[600] text-[#9CA3AF] px-5 py-3">{h}</th>
                     ))}
                   </tr>
@@ -121,6 +126,13 @@ export default function AdminUsersPage() {
                           )}
                         </td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(u.created_at)}</td>
+                        <td className="px-5 py-3.5 text-right">
+                          <button
+                            onClick={() => { setResetTarget(u); setNewPassword(''); setResetError(''); setResetDone(false) }}
+                            className="flex items-center gap-1.5 text-[12px] font-medium text-[#7C3AED] hover:underline ml-auto">
+                            <KeyRound className="w-3.5 h-3.5" /> Reset password
+                          </button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -130,6 +142,66 @@ export default function AdminUsersPage() {
           )}
         </div>
       </main>
+
+      {resetTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setResetTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 z-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[16px] font-[800] text-[#111827]">Reset password</h2>
+              <button onClick={() => setResetTarget(null)} className="text-[#9CA3AF] hover:text-[#374151]"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-[12.5px] text-[#6B7280] mb-4">
+              For <span className="font-[600] text-[#111827]">{resetTarget.email}</span>
+            </p>
+
+            {resetDone ? (
+              <div className="px-4 py-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-[13px] text-[#15803D] mb-4">
+                Password updated.
+              </div>
+            ) : (
+              <>
+                {resetError && <p className="text-[12.5px] text-[#DC2626] mb-3">{resetError}</p>}
+                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password (min 6 characters)"
+                  className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all mb-4" />
+              </>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setResetTarget(null)}
+                className="flex-1 py-2.5 border border-[#E5E7EB] rounded-xl text-[13px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">
+                {resetDone ? 'Close' : 'Cancel'}
+              </button>
+              {!resetDone && (
+                <button
+                  disabled={resetting}
+                  onClick={async () => {
+                    setResetting(true)
+                    setResetError('')
+                    try {
+                      const res = await fetch('/api/admin/update-user-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: resetTarget.id, password: newPassword }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok) throw new Error(data.error ?? 'Failed to reset password')
+                      setResetDone(true)
+                    } catch (err: unknown) {
+                      setResetError(err instanceof Error ? err.message : 'Failed to reset password')
+                    } finally {
+                      setResetting(false)
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#7C3AED] text-white rounded-xl text-[13px] font-[700] hover:bg-[#6D28D9] transition-all disabled:opacity-60">
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update password'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

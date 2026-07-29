@@ -1,37 +1,32 @@
-// Plays a loud repeating "new order" chime using the Web Audio API (no audio file needed).
-// Browsers only allow sound after a user gesture — call unlock() from a click handler first.
+// Loops a real ringtone for new orders until explicitly stopped (e.g. by clicking
+// "Accept" on the new-order popup). Browsers only allow audio after a user gesture —
+// call unlockAudio() from a click handler once before the first startAlarm() call.
 
-let ctx: AudioContext | null = null
+let audio: HTMLAudioElement | null = null
+
+function getAudio(): HTMLAudioElement {
+  if (!audio) {
+    audio = new Audio('/sounds/new-order.mp3')
+    audio.loop = true
+  }
+  return audio
+}
 
 export function unlockAudio() {
   if (typeof window === 'undefined') return
-  if (!ctx) ctx = new AudioContext()
-  if (ctx.state === 'suspended') ctx.resume()
+  const a = getAudio()
+  a.play().then(() => a.pause()).catch(() => {})
 }
 
-function beep(at: number, freq: number, dur = 0.18) {
-  if (!ctx) return
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.type = 'square'
-  osc.frequency.value = freq
-  gain.gain.setValueAtTime(0.0001, at)
-  gain.gain.exponentialRampToValueAtTime(0.35, at + 0.02)
-  gain.gain.exponentialRampToValueAtTime(0.0001, at + dur)
-  osc.connect(gain).connect(ctx.destination)
-  osc.start(at)
-  osc.stop(at + dur)
-}
-
-export function playNewOrderAlarm() {
+export function startAlarm() {
   if (typeof window === 'undefined') return
-  if (!ctx) ctx = new AudioContext()
-  if (ctx.state === 'suspended') { ctx.resume() }
-  const t = ctx.currentTime
-  // Three rounds of a two-tone ding-dong so it's hard to miss in a busy kitchen
-  for (let round = 0; round < 3; round++) {
-    const base = t + round * 0.6
-    beep(base, 880)
-    beep(base + 0.2, 1174)
-  }
+  const a = getAudio()
+  a.currentTime = 0
+  a.play().catch(() => {})
+}
+
+export function stopAlarm() {
+  if (typeof window === 'undefined' || !audio) return
+  audio.pause()
+  audio.currentTime = 0
 }

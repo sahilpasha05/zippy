@@ -6,7 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn } from '@/lib/utils'
-import { unlockAudio, playNewOrderAlarm } from '@/lib/orderAlarm'
+import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,6 +55,7 @@ export default function SlugOrdersPage() {
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null)
   const soundOnRef = useRef(true)
   soundOnRef.current = soundOn
 
@@ -92,7 +93,18 @@ export default function SlugOrdersPage() {
           filter: `restaurant_id=eq.${rest.id}`,
         }, (payload) => {
           if (payload.eventType === 'INSERT') {
-            if (soundOnRef.current) playNewOrderAlarm()
+            const row = payload.new as Record<string, unknown>
+            setPendingOrder({
+              id: row.id as string,
+              status: row.status as string,
+              total: row.total as number,
+              customer_name: row.customer_name as string | null,
+              customer_phone: row.customer_phone as string | null,
+              placed_at: row.placed_at as string,
+              address: row.address as string | null,
+              order_items: [],
+            })
+            if (soundOnRef.current) startAlarm()
             setNewOrderFlash(true)
             setTimeout(() => setNewOrderFlash(false), 4000)
           }
@@ -105,8 +117,14 @@ export default function SlugOrdersPage() {
     return () => {
       cancelled = true
       if (channel) supabase.removeChannel(channel)
+      stopAlarm()
     }
   }, [slug, loadOrders])
+
+  function acceptPendingOrder() {
+    stopAlarm()
+    setPendingOrder(null)
+  }
 
   async function advance(orderId: string, nextStatus: string) {
     setAdvancing(orderId)
@@ -146,7 +164,7 @@ export default function SlugOrdersPage() {
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
-                onClick={() => { unlockAudio(); if (!soundOn) playNewOrderAlarm(); setSoundOn(!soundOn) }}
+                onClick={() => { unlockAudio(); if (soundOn) stopAlarm(); setSoundOn(!soundOn) }}
                 title={soundOn ? 'New-order alarm is ON — click to mute' : 'Alarm muted — click to enable'}
                 className={cn('shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
                   soundOn ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
@@ -266,6 +284,40 @@ export default function SlugOrdersPage() {
           )}
         </div>
       </main>
+
+      {pendingOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center order-success-pop">
+            <div className="w-16 h-16 bg-[#DCFCE7] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <BellRing className="w-8 h-8 text-[#16A34A]" />
+            </div>
+            <h2 className="text-[19px] font-[800] text-[#111827] mb-1">New Order!</h2>
+            <p className="text-[13px] text-[#6B7280] mb-4">{pendingOrder.customer_name ?? 'A customer'} just placed an order</p>
+            <div className="bg-[#F8FAFC] rounded-2xl p-4 mb-5 text-left space-y-1.5">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Order ID</span>
+                <span className="font-mono font-[700] text-[#111827]">{pendingOrder.id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Total</span>
+                <span className="font-[800] text-[#111827]">₹{pendingOrder.total}</span>
+              </div>
+              {pendingOrder.address && (
+                <div className="flex justify-between text-[13px] gap-3">
+                  <span className="text-[#6B7280] shrink-0">Address</span>
+                  <span className="text-[#111827] text-right line-clamp-2">{pendingOrder.address}</span>
+                </div>
+              )}
+            </div>
+            <button onClick={acceptPendingOrder}
+              className="w-full py-3.5 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(22,163,74,0.35)]">
+              Accept Order
+            </button>
+            <p className="text-[11px] text-[#9CA3AF] mt-3">The alarm will keep ringing until you accept</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

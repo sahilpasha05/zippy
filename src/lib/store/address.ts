@@ -9,6 +9,8 @@ export type SavedAddress = {
   address: string
   lat: number | null
   lng: number | null
+  contactName: string
+  contactPhone: string
 }
 
 interface AddressStore {

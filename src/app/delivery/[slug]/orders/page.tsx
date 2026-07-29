@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { unlockAudio, playNewOrderAlarm } from '@/lib/orderAlarm'
+import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,7 +93,7 @@ export default function DeliveryOrdersPage() {
         }, (payload) => {
           if (payload.eventType === 'UPDATE' && (payload.old as { delivery_partner_id?: string })?.delivery_partner_id !== p.id) {
             // newly assigned to this rider
-            if (soundOnRef.current) playNewOrderAlarm()
+            if (soundOnRef.current) startAlarm()
             setNewOrderFlash(true)
             setTimeout(() => setNewOrderFlash(false), 4000)
           }
@@ -106,6 +106,7 @@ export default function DeliveryOrdersPage() {
     return () => {
       cancelled = true
       if (channel) supabase.removeChannel(channel)
+      stopAlarm()
     }
   }, [slug, loadOrders])
 
@@ -188,7 +189,7 @@ export default function DeliveryOrdersPage() {
                 <Navigation className={cn('w-4 h-4', sharingLocation && 'animate-pulse')} />
               </button>
               <button
-                onClick={() => { unlockAudio(); if (!soundOn) playNewOrderAlarm(); setSoundOn(!soundOn) }}
+                onClick={() => { unlockAudio(); if (soundOn) stopAlarm(); setSoundOn(!soundOn) }}
                 className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
                   soundOn ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
                 {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
