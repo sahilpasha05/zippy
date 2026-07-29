@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Star, Clock, MapPin, ChevronRight, Filter } from 'lucide-react'
+import { Search, Star, Clock, ChevronRight, Filter } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ import SiteFooter from '@/components/layout/SiteFooter'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const CUISINES = ['All', 'Biryani', 'Pizza', 'South Indian', 'Chinese', 'North Indian', 'Desserts', 'Fast Food', 'Healthy', 'Beverages']
+const CUISINES = ['All', 'Biryani', 'Pizza', 'South Indian', 'Chinese', 'North Indian', 'Desserts']
 
 type Restaurant = {
   id: string
@@ -59,11 +59,9 @@ function RestaurantCard({ r }: { r: Restaurant }) {
             <span className="text-[#9CA3AF] font-normal">({r.rating_count.toLocaleString()})</span>
           </span>
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{r.delivery_time} min</span>
-          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{r.distance} km</span>
         </div>
         <div className="mt-2 pt-2 border-t border-[#F3F4F6] flex items-center justify-between text-[11.5px] text-[#9CA3AF]">
           <span>Min order ₹{r.min_order}</span>
-          <span className="text-[#16A34A] font-medium">{r.delivery_fee === 0 ? 'Free delivery' : `₹${r.delivery_fee} delivery`}</span>
         </div>
       </div>
       {!r.is_open && (
