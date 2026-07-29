@@ -133,6 +133,15 @@ export default function RestaurantDetailPage() {
     load()
   }, [slug])
 
+  function scrollToCategory(category: string) {
+    setActiveCategory(category)
+    // Deferred a frame so this runs after the re-render from setActiveCategory settles —
+    // calling scrollIntoView in the same tick could get its animation cut short by the reflow.
+    requestAnimationFrame(() => {
+      document.getElementById(`category-${category}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   const filteredMenu = menu.map((section) => ({
     ...section,
     items: section.items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())),
@@ -220,6 +229,22 @@ export default function RestaurantDetailPage() {
           </div>
         </div>
 
+        {/* Category filter bar — mobile/tablet, where the sidebar below is hidden */}
+        {menu.length > 0 && (
+          <div className="lg:hidden sticky top-[64px] z-10 bg-white border-b border-[#E5E7EB] px-4 py-3">
+            <div className="flex gap-2 overflow-x-auto">
+              {menu.map((section) => (
+                <button key={section.category} onClick={() => scrollToCategory(section.category)}
+                  className={cn('px-4 py-1.5 rounded-xl text-[12.5px] font-medium whitespace-nowrap transition-all shrink-0',
+                    activeCategory === section.category ? 'bg-[#16A34A] text-white shadow-[0_2px_6px_rgba(22,163,74,0.3)]' : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]')}>
+                  {section.category}
+                  <span className="ml-1.5 text-[10.5px] opacity-70">({section.items.length})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Content */}
         <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-8">
           <div className="flex gap-8">
@@ -228,7 +253,7 @@ export default function RestaurantDetailPage() {
               <div className="sticky top-24 bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
                 <div className="p-3">
                   {menu.map((section) => (
-                    <button key={section.category} onClick={() => setActiveCategory(section.category)}
+                    <button key={section.category} onClick={() => scrollToCategory(section.category)}
                       className={cn('w-full text-left px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all mb-1',
                         activeCategory === section.category ? 'bg-[#DCFCE7] text-[#16A34A] font-semibold' : 'text-[#374151] hover:bg-[#F8FAFC]')}>
                       {section.category}
@@ -254,7 +279,7 @@ export default function RestaurantDetailPage() {
                 </div>
               ) : (
                 filteredMenu.map((section) => (
-                  <div key={section.category} className="mb-8">
+                  <div key={section.category} id={`category-${section.category}`} className="mb-8 scroll-mt-40">
                     <h2 className="text-[18px] font-[800] text-[#111827] mb-1">{section.category}</h2>
                     <p className="text-[12.5px] text-[#9CA3AF] mb-4">{section.items.length} items</p>
                     <div className="bg-white rounded-2xl border border-[#E5E7EB] px-6">
