@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { Plus, Minus, Timer, Package } from 'lucide-react'
 import { useCartStore } from '@/lib/store/cart'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { ORDERING_ENABLED } from '@/lib/launchConfig'
 
 export type BlinkitProduct = {
   id: string
@@ -46,9 +47,9 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
             <Package className="w-10 h-10" strokeWidth={1} />
           </div>
         )}
-        {!inStock && (
+        {(!ORDERING_ENABLED || !inStock) && (
           <div className="absolute inset-0 bg-white/75 flex items-center justify-center">
-            <span className="text-[11px] font-semibold text-[#6B7280]">Out of stock</span>
+            <span className="text-[11px] font-semibold text-[#6B7280]">{!ORDERING_ENABLED ? 'Coming soon' : 'Out of stock'}</span>
           </div>
         )}
       </div>
@@ -69,7 +70,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
           <div className="text-[13px] font-[700] text-[#1F1F1F]">₹{p.price}</div>
           {discount > 0 && <div className="text-[11px] text-[#9CA3AF] line-through">₹{mrp}</div>}
         </div>
-        {inStock ? (
+        {ORDERING_ENABLED && inStock ? (
           cartItem ? (
             <div className="flex items-center bg-[#318616] rounded-lg overflow-hidden shrink-0">
               <button onClick={() => updateQuantity(p.id, cartItem.quantity - 1)}
@@ -86,7 +87,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
             </button>
           )
         ) : (
-          <span className="text-[11px] text-[#9CA3AF] shrink-0">Notify me</span>
+          <span className="text-[11px] text-[#9CA3AF] shrink-0">{!ORDERING_ENABLED ? 'Coming soon' : 'Notify me'}</span>
         )}
       </div>
     </div>

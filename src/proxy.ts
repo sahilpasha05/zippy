@@ -5,8 +5,12 @@ import { createServerClient } from '@supabase/ssr'
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
 
-  // Restaurant listing stays open; going into a specific restaurant's menu is gated.
-  if (path.startsWith('/restaurants/') || path.startsWith('/essentials')) {
+  const isLocalhost = req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1'
+
+  // Restaurants and essentials are browsable (products show a "Coming soon" label and
+  // can't be added to cart — see src/lib/launchConfig.ts). Checkout itself stays fully
+  // gated since ordering isn't open yet. Gate is skipped entirely on localhost.
+  if (!isLocalhost && path.startsWith('/checkout')) {
     return NextResponse.rewrite(new URL('/coming-soon', req.url))
   }
 
@@ -46,5 +50,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/restaurants/:path*', '/essentials/:path*'],
+  matcher: ['/admin/:path*', '/checkout/:path*'],
 }
