@@ -5,11 +5,10 @@ import { createServerClient } from '@supabase/ssr'
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
 
-  // Coming-soon gate for /restaurants and /essentials is disabled for now — re-enable
-  // by uncommenting this block when told to.
-  // if (path.startsWith('/restaurants') || path.startsWith('/essentials')) {
-  //   return NextResponse.rewrite(new URL('/coming-soon', req.url))
-  // }
+  // Restaurant listing stays open; going into a specific restaurant's menu is gated.
+  if (path.startsWith('/restaurants/') || path.startsWith('/essentials')) {
+    return NextResponse.rewrite(new URL('/coming-soon', req.url))
+  }
 
   if (!path.startsWith('/admin') || path === '/admin/login') {
     return NextResponse.next()

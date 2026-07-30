@@ -5,10 +5,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  MapPin, Search, ShoppingCart, Bell, User, ChevronDown,
+  MapPin, Search, Bell, User, ChevronDown,
   Zap, Package, UtensilsCrossed, Tag, Menu, X, ShoppingBag
 } from 'lucide-react'
-import { useCartStore } from '@/lib/store/cart'
 import { useAddressStore } from '@/lib/store/address'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
@@ -22,8 +21,6 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname()
-  const { count, toggleCart } = useCartStore()
-  const cartCount = count()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
@@ -93,14 +90,6 @@ export default function Navbar() {
               </div>
             </button>
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={toggleCart} className="relative flex items-center justify-center w-10 h-10">
-                <ShoppingCart className="w-6 h-6 text-[#1F1F1F]" strokeWidth={1.75} />
-                {cartCount > 0 && (
-                  <span className="absolute top-0.5 right-0 bg-[#16A34A] text-white text-[10px] font-[700] rounded-full flex items-center justify-center" style={{ width: 17, height: 17 }}>
-                    {cartCount > 9 ? '9+' : cartCount}
-                  </span>
-                )}
-              </button>
               <Link href="/auth/login" className="flex items-center justify-center w-10 h-10">
                 <User className="w-6 h-6 text-[#1F1F1F]" strokeWidth={1.75} />
               </Link>
@@ -204,19 +193,6 @@ export default function Navbar() {
 
             {/* Right Icons */}
             <div className="flex items-center gap-1 ml-auto lg:ml-0">
-              {/* Cart */}
-              <button
-                onClick={toggleCart}
-                className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-[#F8FAFC] transition-all group"
-              >
-                <ShoppingCart className="w-5 h-5 text-[#374151] group-hover:text-[#16A34A] transition-colors" strokeWidth={2} />
-                {cartCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-[#16A34A] text-white text-[10px] font-700 rounded-full flex items-center justify-center shadow-[0_2px_6px_rgba(22,163,74,0.4)]" style={{ fontWeight: 700, width: 18, height: 18 }}>
-                    {cartCount > 9 ? '9+' : cartCount}
-                  </span>
-                )}
-              </button>
-
               {/* Notifications */}
               <button className="relative flex items-center justify-center w-10 h-10 rounded-xl hover:bg-[#F8FAFC] transition-all group">
                 <Bell className="w-5 h-5 text-[#374151] group-hover:text-[#16A34A] transition-colors" strokeWidth={2} />

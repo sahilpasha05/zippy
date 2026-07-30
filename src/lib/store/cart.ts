@@ -42,7 +42,6 @@ export const useCartStore = create<CartStore>()(
             ],
           }))
         }
-        set({ isOpen: true })
       },
 
       removeItem: (productId) =>

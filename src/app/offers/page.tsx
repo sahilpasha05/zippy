@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import ViewCartBar from '@/components/layout/ViewCartBar'
 import SiteFooter from '@/components/layout/SiteFooter'
 
 const OFFERS = [
@@ -79,6 +80,7 @@ export default function OffersPage() {
     <>
       <Navbar />
       <CartSidebar />
+      <ViewCartBar />
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* Hero */}
         <div className="bg-gradient-to-r from-[#14532D] to-[#16A34A] text-white py-12 px-6 lg:px-10">

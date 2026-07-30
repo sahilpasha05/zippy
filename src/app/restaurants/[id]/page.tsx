@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import ViewCartBar from '@/components/layout/ViewCartBar'
 import SiteFooter from '@/components/layout/SiteFooter'
 
 const supabase = createBrowserClient(
@@ -173,6 +174,7 @@ export default function RestaurantDetailPage() {
     <>
       <Navbar />
       <CartSidebar />
+      <ViewCartBar />
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* Hero */}
         <div className="relative h-64 lg:h-80 bg-[#F8FAFC] overflow-hidden">

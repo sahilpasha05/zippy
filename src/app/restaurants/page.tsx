@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import ViewCartBar from '@/components/layout/ViewCartBar'
 import { createBrowserClient } from '@supabase/ssr'
 import SiteFooter from '@/components/layout/SiteFooter'
 
@@ -120,6 +121,7 @@ export default function RestaurantsPage() {
     <>
       <Navbar />
       <CartSidebar />
+      <ViewCartBar />
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* Header */}
         <div className="bg-white border-b border-[#E5E7EB]">

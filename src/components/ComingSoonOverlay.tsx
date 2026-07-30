@@ -52,7 +52,7 @@ export default function ComingSoonOverlay() {
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/60" />
 
-      <button onClick={dismiss} className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-full text-white transition-all z-10">
+      <button onClick={dismiss} className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center bg-white/15 hover:bg-white/25 rounded-full text-white transition-all z-20">
         <X className="w-5 h-5" />
       </button>
 

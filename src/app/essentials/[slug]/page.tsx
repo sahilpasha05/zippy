@@ -10,6 +10,7 @@ import { useCartStore } from '@/lib/store/cart'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import ViewCartBar from '@/components/layout/ViewCartBar'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
 import SiteFooter from '@/components/layout/SiteFooter'
 
@@ -82,6 +83,7 @@ export default function CategoryPage() {
     <>
       <Navbar />
       <CartSidebar />
+      <ViewCartBar />
       <div className="min-h-screen bg-[#F8FAFC]">
         <div className="max-w-[1440px] mx-auto px-4 lg:px-10 py-4 lg:py-8">
           {/* Breadcrumb — desktop only */}

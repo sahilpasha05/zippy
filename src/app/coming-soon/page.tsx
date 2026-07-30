@@ -44,7 +44,7 @@ export default function ComingSoonPage() {
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/60" />
 
-      <Link href="/" className="absolute top-5 left-5 flex items-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 rounded-full text-white text-[13px] font-[600] transition-all z-10">
+      <Link href="/" className="absolute top-5 left-5 flex items-center gap-1.5 px-3.5 py-2 bg-white/15 hover:bg-white/25 rounded-full text-white text-[13px] font-[600] transition-all z-20">
         <ArrowLeft className="w-4 h-4" /> Home
       </Link>
 

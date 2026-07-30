@@ -1,5 +1,6 @@
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import ViewCartBar from '@/components/layout/ViewCartBar'
 import HeroSection from '@/components/home/HeroSection'
 import CategoryGrid from '@/components/home/CategoryGrid'
 import BannerCarousel from '@/components/home/BannerCarousel'
@@ -17,6 +18,7 @@ export default function HomePage() {
       <ComingSoonOverlay />
       <Navbar />
       <CartSidebar />
+      <ViewCartBar />
       <HomeLocationPrompt />
 
       {/* Hero is desktop-only — mobile goes straight to categories like Blinkit */}
