@@ -45,7 +45,7 @@ function RestaurantCard({ r }: { r: Restaurant }) {
       </div>
       <div className={cn('p-4', !r.is_open && 'opacity-60')}>
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl overflow-hidden border border-[#E5E7EB] shrink-0 bg-[#F8FAFC]">
+          <div className="w-11 h-11 rounded-full overflow-hidden border border-[#E5E7EB] shrink-0 bg-[#F8FAFC]">
             {r.logo_url && <Image src={r.logo_url} alt="" width={44} height={44} unoptimized className="w-full h-full object-cover" />}
           </div>
           <div className="min-w-0">

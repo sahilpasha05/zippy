@@ -5,12 +5,11 @@ import { createServerClient } from '@supabase/ssr'
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
 
-  // Customer browsing (restaurants/essentials listings) isn't open yet — show the
-  // countdown page instead. Admin/restaurant-owner/delivery portals stay reachable
-  // so the team can keep setting things up before launch.
-  if (path.startsWith('/restaurants') || path.startsWith('/essentials')) {
-    return NextResponse.rewrite(new URL('/coming-soon', req.url))
-  }
+  // Coming-soon gate for /restaurants and /essentials is disabled for now — re-enable
+  // by uncommenting this block when told to.
+  // if (path.startsWith('/restaurants') || path.startsWith('/essentials')) {
+  //   return NextResponse.rewrite(new URL('/coming-soon', req.url))
+  // }
 
   if (!path.startsWith('/admin') || path === '/admin/login') {
     return NextResponse.next()

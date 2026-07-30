@@ -58,7 +58,7 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
         </div>
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
-        <div className="w-32 h-32 rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
+        <div className="w-32 h-32 rounded-full overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
           <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
         </div>
         {disabled ? (
@@ -180,7 +180,7 @@ export default function RestaurantDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
             <div className="flex items-end gap-4">
-              <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-white shadow-lg">
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg">
                 <Image src={logo} alt="" width={64} height={64} unoptimized className="w-full h-full object-cover" />
               </div>
               <div>
