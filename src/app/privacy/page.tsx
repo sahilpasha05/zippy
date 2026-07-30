@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
 
           <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 sm:p-8">
             <Section title="Who operates this website">
-              <p>This website is operated by <strong>CloudByte</strong> under the brand name <strong>Zippy</strong>. Any reference to &quot;Zippy&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot; in this policy refers to CloudByte.</p>
+              <p>This website is operated by <strong>Zippy</strong>. Any reference to &quot;Zippy&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot; in this policy refers to Zippy.</p>
             </Section>
 
             <Section title="Information we collect">

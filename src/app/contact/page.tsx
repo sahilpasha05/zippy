@@ -6,7 +6,7 @@ import SiteFooter from '@/components/layout/SiteFooter'
 export const metadata = { title: 'Contact Us — Zippy' }
 
 const ROWS = [
-  { icon: Building2, label: 'Business Name', value: 'CloudByte' },
+  { icon: Building2, label: 'Business Name', value: '[Add your registered business name here]', placeholder: true },
   { icon: FileText,  label: 'GST Number',    value: '[Add your GSTIN here]', placeholder: true },
   { icon: MapPin,    label: 'Business Address', value: '[Add your registered business address here]', placeholder: true },
   { icon: Mail,      label: 'Support Email', value: 'support@zippy.app', href: 'mailto:support@zippy.app' },
@@ -25,7 +25,7 @@ export default function ContactPage() {
           </div>
 
           <h1 className="text-[28px] font-[800] text-[#111827] mb-2">Contact Us</h1>
-          <p className="text-[14px] text-[#6B7280] mb-8">Zippy is a brand operated by CloudByte. Here&apos;s how to reach us.</p>
+          <p className="text-[14px] text-[#6B7280] mb-8">Here&apos;s how to reach us.</p>
 
           <div className="bg-white rounded-2xl border border-[#E5E7EB] divide-y divide-[#F3F4F6]">
             {ROWS.map(({ icon: Icon, label, value, href, placeholder }) => (

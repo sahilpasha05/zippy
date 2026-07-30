@@ -31,7 +31,7 @@ export default function TermsPage() {
 
           <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 sm:p-8">
             <Section title="Operator">
-              <p>Zippy (this website and app) is operated by <strong>CloudByte</strong>. By placing an order through Zippy, you agree to these Terms &amp; Conditions.</p>
+              <p>By placing an order through Zippy (this website and app), you agree to these Terms &amp; Conditions.</p>
             </Section>
 
             <Section title="Orders">
@@ -39,7 +39,7 @@ export default function TermsPage() {
             </Section>
 
             <Section title="Payments">
-              <p><strong>Payments for orders placed through Zippy are processed by CloudByte.</strong> When paying online, the payment gateway or your bank statement may display &quot;CloudByte&quot; as the merchant name — this is expected and reflects that CloudByte operates the Zippy platform.</p>
+              <p>Payments for orders placed through Zippy are processed securely via <strong>Cashfree</strong>. See our <Link href="/refunds" className="text-[#16A34A] hover:underline">Refunds &amp; Cancellations</Link> policy for details on eligible refunds.</p>
             </Section>
 
             <Section title="Delivery">

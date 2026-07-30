@@ -17,6 +17,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/contact`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${BASE_URL}/privacy`, changeFrequency: 'yearly', priority: 0.2 },
     { url: `${BASE_URL}/terms`, changeFrequency: 'yearly', priority: 0.2 },
+    { url: `${BASE_URL}/refunds`, changeFrequency: 'yearly', priority: 0.2 },
   ]
 
   const [{ data: restaurants }, { data: categories }] = await Promise.all([

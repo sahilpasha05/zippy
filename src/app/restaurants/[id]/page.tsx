@@ -8,7 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
-import { ORDERING_ENABLED } from '@/lib/launchConfig'
+import { useOrderingEnabled } from '@/lib/launchConfig'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
@@ -35,6 +35,7 @@ type MenuSection = { category: string; items: MenuItem[] }
 
 function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaurantId: string; disabled: boolean }) {
   const { addItem, items, updateQuantity } = useCartStore()
+  const orderingEnabled = useOrderingEnabled()
   const cartItem = items.find((i) => i.product_id === item.id)
 
   return (
@@ -49,7 +50,7 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
               <Flame className="w-3 h-3" /> Bestseller
             </span>
           )}
-          {!ORDERING_ENABLED && (
+          {!orderingEnabled && (
             <span className="text-[10.5px] font-semibold text-[#7C3AED] bg-[#F5F3FF] px-2 py-0.5 rounded-full">
               Coming soon
             </span>
@@ -68,7 +69,7 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
         <div className="w-32 h-32 rounded-full overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
           <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
         </div>
-        {!ORDERING_ENABLED ? (
+        {!orderingEnabled ? (
           <button disabled className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] text-[12px] font-[600] rounded-xl cursor-not-allowed">
             Coming soon
           </button>

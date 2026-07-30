@@ -16,13 +16,13 @@ export default function SiteFooter() {
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-[#6B7280]">
             <Link href="/privacy" className="hover:text-[#16A34A] transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-[#16A34A] transition-colors">Terms &amp; Conditions</Link>
+            <Link href="/refunds" className="hover:text-[#16A34A] transition-colors">Refunds &amp; Cancellations</Link>
             <Link href="/contact" className="hover:text-[#16A34A] transition-colors">Contact Us</Link>
           </nav>
         </div>
 
         <div className="mt-8 pt-6 border-t border-[#F3F4F6] text-[12px] text-[#9CA3AF] leading-relaxed">
           <p>© {new Date().getFullYear()} Zippy. All rights reserved.</p>
-          <p className="mt-1">Zippy is a brand operated by CloudByte.</p>
         </div>
       </div>
     </footer>

@@ -21,7 +21,8 @@ export default function ComingSoonOverlay() {
   const [remaining, setRemaining] = useState(getRemaining())
 
   useEffect(() => {
-    if (!sessionStorage.getItem('zippy-coming-soon-seen')) queueMicrotask(() => setShow(true))
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    if (!isLocalhost && !sessionStorage.getItem('zippy-coming-soon-seen')) queueMicrotask(() => setShow(true))
     const timer = setInterval(() => setRemaining(getRemaining()), 1000)
     return () => clearInterval(timer)
   }, [])

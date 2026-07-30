@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
+import { load as loadCashfree } from '@cashfreepayments/cashfree-js'
 import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -27,26 +28,6 @@ const PAYMENT_METHODS = [
 ]
 
 const LABEL_ICONS: Record<string, typeof Home> = { Home, Work: Briefcase, Other: Star }
-
-declare global {
-  interface Window {
-    PhonePeCheckout?: {
-      transact: (opts: { tokenUrl: string; callback?: (response: string) => void; type?: 'IFRAME' }) => void
-      closePage: () => void
-    }
-  }
-}
-
-function loadPhonePeScript(): Promise<void> {
-  if (window.PhonePeCheckout) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = 'https://mercury.phonepe.com/web/bundle/checkout.js'
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Could not load PhonePe checkout'))
-    document.body.appendChild(script)
-  })
-}
 
 export default function CheckoutPage() {
   const { items, total, clearCart } = useCartStore()
@@ -131,8 +112,8 @@ export default function CheckoutPage() {
         return
       }
 
-      // UPI / Card: hand off to PhonePe. Cart is only cleared once payment actually succeeds.
-      const initRes = await fetch('/api/phonepe/initiate', {
+      // UPI / Card: hand off to Cashfree. Cart is only cleared once payment actually succeeds.
+      const initRes = await fetch('/api/cashfree/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: order.id }),
@@ -140,34 +121,36 @@ export default function CheckoutPage() {
       const initData = await initRes.json()
       if (!initRes.ok) throw new Error(initData.error ?? 'Could not start payment')
 
-      await loadPhonePeScript()
-      window.PhonePeCheckout!.transact({
-        tokenUrl: initData.redirectUrl,
-        type: 'IFRAME',
-        callback: async (response: string) => {
-          if (response === 'USER_CANCEL') {
-            setPlacing(false)
-            setPlaceError('Payment was cancelled. Your cart is still saved — you can try again.')
-            return
-          }
-          // 'CONCLUDED' (or the iframe closing for any other reason) — confirm the real state server-side
-          try {
-            const statusRes = await fetch(`/api/phonepe/status/${order.id}`)
-            const statusData = await statusRes.json()
-            if (statusData.state === 'COMPLETED') {
-              setOrderId(order.id)
-              clearCart()
-              setPlaced(true)
-            } else {
-              setPlaceError('Payment was not completed. Your cart is still saved — you can try again.')
-            }
-          } catch {
-            setPlaceError('Could not confirm payment status. Please check your orders page before retrying.')
-          } finally {
-            setPlacing(false)
-          }
-        },
+      const cashfree = await loadCashfree({ mode: initData.mode })
+      if (!cashfree) throw new Error('Could not load Cashfree checkout')
+
+      const result = await cashfree.checkout({
+        paymentSessionId: initData.paymentSessionId,
+        redirectTarget: '_modal',
       })
+
+      if (result.error) {
+        setPlacing(false)
+        setPlaceError('Payment was cancelled or failed. Your cart is still saved — you can try again.')
+        return
+      }
+
+      // Modal closed without an SDK-level error — confirm the real state server-side
+      try {
+        const statusRes = await fetch(`/api/cashfree/status/${order.id}`)
+        const statusData = await statusRes.json()
+        if (statusData.state === 'COMPLETED') {
+          setOrderId(order.id)
+          clearCart()
+          setPlaced(true)
+        } else {
+          setPlaceError('Payment was not completed. Your cart is still saved — you can try again.')
+        }
+      } catch {
+        setPlaceError('Could not confirm payment status. Please check your orders page before retrying.')
+      } finally {
+        setPlacing(false)
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (err as { message?: string })?.message ?? 'Something went wrong.'
       setPlaceError(msg)
@@ -330,7 +313,7 @@ export default function CheckoutPage() {
                   ))}
                 </div>
                 <p className="text-[11.5px] text-[#9CA3AF] mt-4">
-                  Payments for Zippy orders are processed by CloudByte — your bank statement or payment app may show &quot;CloudByte&quot; as the merchant name.
+                  Payments for Zippy orders are processed securely via Cashfree.
                 </p>
               </div>
 

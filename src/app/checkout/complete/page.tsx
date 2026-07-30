@@ -9,10 +9,9 @@ import { useCartStore } from '@/lib/store/cart'
 
 type State = 'checking' | 'completed' | 'failed'
 
-// Fallback landing page for PhonePe's merchantUrls.redirectUrl — reached when the
-// PayPage does a full top-level redirect instead of staying inside the checkout iframe
-// (common on mobile UPI intent flows). The iframe flow on desktop resolves without ever
-// hitting this page.
+// Fallback landing page for Cashfree's order_meta.return_url — reached if the checkout
+// modal does a full top-level redirect instead of staying in-page (can happen on some
+// mobile UPI flows). The in-page modal flow on desktop resolves without ever hitting this page.
 export default function CheckoutCompletePage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC]" />}>
@@ -29,7 +28,7 @@ function CheckoutCompleteInner() {
 
   useEffect(() => {
     if (!orderId) { queueMicrotask(() => setState('failed')); return }
-    fetch(`/api/phonepe/status/${orderId}`)
+    fetch(`/api/cashfree/status/${orderId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.state === 'COMPLETED') { clearCart(); setState('completed') }
