@@ -4,6 +4,14 @@ import { createServerClient } from '@supabase/ssr'
 // Next.js 16 renamed middleware.ts -> proxy.ts (exports `proxy`, runs on Node.js runtime).
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
+
+  // Customer browsing (restaurants/essentials listings) isn't open yet — show the
+  // countdown page instead. Admin/restaurant-owner/delivery portals stay reachable
+  // so the team can keep setting things up before launch.
+  if (path.startsWith('/restaurants') || path.startsWith('/essentials')) {
+    return NextResponse.rewrite(new URL('/coming-soon', req.url))
+  }
+
   if (!path.startsWith('/admin') || path === '/admin/login') {
     return NextResponse.next()
   }
@@ -40,5 +48,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/restaurants/:path*', '/essentials/:path*'],
 }

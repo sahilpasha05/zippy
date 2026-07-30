@@ -58,8 +58,8 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
         </div>
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
-        <div className="w-24 h-24 rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
-          <Image src={item.image} alt={item.name} width={96} height={96} unoptimized className="w-full h-full object-cover" />
+        <div className="w-32 h-32 rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
+          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
         </div>
         {disabled ? (
           <button disabled className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] text-[12px] font-[600] rounded-xl cursor-not-allowed">
