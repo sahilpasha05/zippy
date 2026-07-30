@@ -62,18 +62,19 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     return 'Something went wrong verifying your number. Please try again.'
   }
 
-  function getRecaptchaVerifier() {
+  function getRecaptchaVerifier(activeAuth: NonNullable<typeof auth>) {
     if (!recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current!, { size: 'invisible' })
+      recaptchaVerifierRef.current = new RecaptchaVerifier(activeAuth, recaptchaContainerRef.current!, { size: 'invisible' })
     }
     return recaptchaVerifierRef.current
   }
 
   async function sendOtp() {
     if (!isValidPhone) return
+    if (!auth) { setOtpError('Phone verification is not available right now. Please try again later.'); return }
     setOtpError(''); setOtpSending(true)
     try {
-      const verifier = getRecaptchaVerifier()
+      const verifier = getRecaptchaVerifier(auth)
       const result = await signInWithPhoneNumber(auth, `+91${contactPhone}`, verifier)
       confirmationResultRef.current = result
       setOtpSentFor(contactPhone)
@@ -94,7 +95,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     try {
       await confirmationResultRef.current.confirm(otpCode.trim())
       setOtpVerifiedFor(contactPhone)
-      await auth.signOut()
+      await auth?.signOut()
     } catch (err: unknown) {
       setOtpError(mapFirebaseError(err))
     } finally {

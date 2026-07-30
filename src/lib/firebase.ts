@@ -10,15 +10,22 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Only initialize in the browser — this file gets module-evaluated during
-// server-side prerendering too, and Firebase throws synchronously if the API
-// key is missing/invalid (e.g. env vars not set in the build environment).
-// `auth` is never actually used outside client-triggered event handlers, so a
-// server-side placeholder is safe.
 function getFirebaseApp(): FirebaseApp {
   return getApps().length ? getApp() : initializeApp(firebaseConfig)
 }
 
-export const auth: Auth = typeof window !== 'undefined'
-  ? getAuth(getFirebaseApp())
-  : (null as unknown as Auth)
+// Never let a missing/invalid config crash module evaluation — this file is
+// evaluated during server-side prerendering (no window, skip entirely) and
+// can also fail client-side if the env vars aren't set in the deployment
+// (Firebase throws synchronously on a bad API key). `auth` degrades to null
+// in either case; callers must handle that instead of assuming it's ready.
+function initAuth(): Auth | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return getAuth(getFirebaseApp())
+  } catch {
+    return null
+  }
+}
+
+export const auth: Auth | null = initAuth()
