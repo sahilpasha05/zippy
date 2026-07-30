@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://zippy-cyan.vercel.app'
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.zippytarikere.com'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
