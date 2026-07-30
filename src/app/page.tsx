@@ -10,12 +10,10 @@ import OffersStrip from '@/components/home/OffersStrip'
 import QuickCategories from '@/components/home/QuickCategories'
 import SiteFooter from '@/components/layout/SiteFooter'
 import HomeLocationPrompt from '@/components/HomeLocationPrompt'
-import ComingSoonOverlay from '@/components/ComingSoonOverlay'
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
-      <ComingSoonOverlay />
       <Navbar />
       <CartSidebar />
       <ViewCartBar />
