@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation } from 'lucide-react'
+import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
@@ -21,9 +21,13 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
 }
 
 type Partner = { id: string; name: string; slug: string; vehicle_type: string | null; total_deliveries: number | null }
+type OrderItem = { name: string; quantity: number; price: number }
 type Order = {
   id: string; status: string; total: number; customer_name: string | null
   customer_phone: string | null; address: string | null; placed_at: string
+  delivery_latitude: number | null; delivery_longitude: number | null
+  accepted_at: string | null
+  order_items: OrderItem[]
   restaurants: { name: string; address: string | null } | { name: string; address: string | null }[] | null
 }
 
@@ -59,15 +63,19 @@ export default function DeliveryOrdersPage() {
   const watchIdRef = useRef<number | null>(null)
   const lastSentRef = useRef(0)
   const partnerIdRef = useRef<string | null>(null)
+  const [pendingAccept, setPendingAccept] = useState<Order[]>([])
 
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, restaurants(name, address)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, order_items(name, quantity, price), restaurants(name, address)')
       .eq('delivery_partner_id', partnerId)
       .order('placed_at', { ascending: false })
       .limit(50)
-    setOrders((data as unknown as Order[]) ?? [])
+    const fetched = (data as unknown as Order[]) ?? []
+    setOrders(fetched)
+    setPendingAccept(fetched.filter((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status)))
+    return fetched
   }, [])
 
   useEffect(() => {
@@ -81,9 +89,12 @@ export default function DeliveryOrdersPage() {
       if (!p || cancelled) { setLoading(false); return }
       setPartner(p as Partner)
       partnerIdRef.current = p.id
-      await loadOrders(p.id)
+      const fetched = await loadOrders(p.id)
       setLoading(false)
       startLocationSharing() // auto-share — the rider just needs to allow the permission prompt
+
+      const hasPendingOnLoad = fetched.some((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status))
+      if (hasPendingOnLoad && soundOnRef.current) startAlarm()
 
       channel = supabase
         .channel(`delivery-orders-${p.id}-${Date.now()}`)
@@ -115,6 +126,17 @@ export default function DeliveryOrdersPage() {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [])
 
+  // Browsers block audio without a prior user gesture — if a ring was already due on
+  // load (see init() above), the very first tap anywhere unlocks it and retries.
+  useEffect(() => {
+    function unlockOnFirstTap() {
+      unlockAudio()
+      if (pendingAccept.length > 0 && soundOnRef.current) startAlarm()
+    }
+    document.addEventListener('pointerdown', unlockOnFirstTap, { once: true })
+    return () => document.removeEventListener('pointerdown', unlockOnFirstTap)
+  }, [pendingAccept.length])
+
   function startLocationSharing() {
     if (watchIdRef.current !== null) return // already sharing
     if (!navigator.geolocation) { setLocationError('Geolocation not supported on this device'); return }
@@ -136,6 +158,16 @@ export default function DeliveryOrdersPage() {
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     )
     setSharingLocation(true)
+  }
+
+  function acceptOrder(orderId: string) {
+    setPendingAccept((prev) => {
+      const next = prev.filter((o) => o.id !== orderId)
+      if (next.length === 0) stopAlarm()
+      return next
+    })
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, accepted_at: new Date().toISOString() } : o))
+    supabase.from('orders').update({ accepted_at: new Date().toISOString() }).eq('id', orderId).then()
   }
 
   async function advance(orderId: string, nextStatus: string) {
@@ -274,6 +306,18 @@ export default function DeliveryOrdersPage() {
                     </div>
                   </div>
 
+                  {o.order_items?.length > 0 && (
+                    <div className="mb-3 space-y-1">
+                      <p className="flex items-center gap-1.5 text-[10.5px] font-[600] text-[#9CA3AF] uppercase tracking-wide"><Package className="w-3 h-3" /> Items</p>
+                      {o.order_items.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-[12px] text-[#374151]">
+                          <span>{item.name} × {item.quantity}</span>
+                          <span className="font-[600]">₹{item.price * item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
                     <div className="flex items-center gap-2">
                       <span className="text-[14px] font-[800] text-[#111827]">₹{o.total}</span>
@@ -281,6 +325,13 @@ export default function DeliveryOrdersPage() {
                         <a href={`tel:${o.customer_phone}`}
                           className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
                           <Phone className="w-3.5 h-3.5" /> Call
+                        </a>
+                      )}
+                      {o.delivery_latitude && o.delivery_longitude && (
+                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                          <Map className="w-3.5 h-3.5" /> Go to
                         </a>
                       )}
                     </div>
@@ -301,6 +352,46 @@ export default function DeliveryOrdersPage() {
           })
         )}
       </div>
+
+      {pendingAccept[0] && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center">
+            <div className="w-16 h-16 bg-[#F5F3FF] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <BellRing className="w-8 h-8 text-[#7C3AED]" />
+            </div>
+            <h2 className="text-[19px] font-[800] text-[#111827] mb-1">New Delivery!</h2>
+            <p className="text-[13px] text-[#6B7280] mb-4">{restName(pendingAccept[0])} · pickup for {pendingAccept[0].customer_name ?? 'a customer'}</p>
+            <div className="bg-[#F8FAFC] rounded-2xl p-4 mb-5 text-left space-y-1.5">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Order ID</span>
+                <span className="font-mono font-[700] text-[#111827]">{pendingAccept[0].id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Total</span>
+                <span className="font-[800] text-[#111827]">₹{pendingAccept[0].total}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Items</span>
+                <span className="text-[#111827]">{pendingAccept[0].order_items?.length ?? 0}</span>
+              </div>
+              {pendingAccept[0].address && (
+                <div className="flex justify-between text-[13px] gap-3">
+                  <span className="text-[#6B7280] shrink-0">Drop address</span>
+                  <span className="text-[#111827] text-right line-clamp-2">{pendingAccept[0].address}</span>
+                </div>
+              )}
+            </div>
+            <button onClick={() => acceptOrder(pendingAccept[0].id)}
+              className="w-full py-3.5 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(22,163,74,0.35)]">
+              Accept Delivery
+            </button>
+            <p className="text-[11px] text-[#9CA3AF] mt-3">
+              {pendingAccept.length > 1 ? `The alarm will keep ringing — 1 of ${pendingAccept.length} new deliveries` : 'The alarm will keep ringing until you accept'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

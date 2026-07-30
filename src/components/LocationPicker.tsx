@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } from 'lucide-react'
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth'
 import { cn } from '@/lib/utils'
 import { useAddressStore } from '@/lib/store/address'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
+import { auth } from '@/lib/firebase'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const LABELS = [
@@ -31,6 +33,75 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
 
+  const [otpSentFor, setOtpSentFor] = useState<string | null>(null)
+  const [otpVerifiedFor, setOtpVerifiedFor] = useState<string | null>(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [otpError, setOtpError] = useState('')
+  const recaptchaContainerRef = useRef<HTMLDivElement>(null)
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null)
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null)
+
+  const isValidPhone = /^\d{10}$/.test(contactPhone)
+  const isOtpSentForCurrent = otpSentFor === contactPhone
+  const isPhoneVerified = otpVerifiedFor === contactPhone
+
+  useEffect(() => {
+    return () => {
+      recaptchaVerifierRef.current?.clear()
+      recaptchaVerifierRef.current = null
+    }
+  }, [])
+
+  function mapFirebaseError(err: unknown): string {
+    const code = (err as { code?: string })?.code ?? ''
+    if (code === 'auth/invalid-phone-number') return "That doesn't look like a valid mobile number"
+    if (code === 'auth/invalid-verification-code' || code === 'auth/code-expired') return 'Incorrect or expired code — please try again'
+    if (code === 'auth/too-many-requests') return 'Too many attempts — please wait a bit and try again'
+    return 'Something went wrong verifying your number. Please try again.'
+  }
+
+  function getRecaptchaVerifier() {
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current!, { size: 'invisible' })
+    }
+    return recaptchaVerifierRef.current
+  }
+
+  async function sendOtp() {
+    if (!isValidPhone) return
+    setOtpError(''); setOtpSending(true)
+    try {
+      const verifier = getRecaptchaVerifier()
+      const result = await signInWithPhoneNumber(auth, `+91${contactPhone}`, verifier)
+      confirmationResultRef.current = result
+      setOtpSentFor(contactPhone)
+      setOtpCode('')
+    } catch (err: unknown) {
+      setOtpError(mapFirebaseError(err))
+      recaptchaVerifierRef.current?.clear()
+      recaptchaVerifierRef.current = null
+      if (recaptchaContainerRef.current) recaptchaContainerRef.current.innerHTML = ''
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  async function verifyOtp() {
+    if (!confirmationResultRef.current || otpCode.trim().length !== 6) return
+    setOtpError(''); setOtpVerifying(true)
+    try {
+      await confirmationResultRef.current.confirm(otpCode.trim())
+      setOtpVerifiedFor(contactPhone)
+      await auth.signOut()
+    } catch (err: unknown) {
+      setOtpError(mapFirebaseError(err))
+    } finally {
+      setOtpVerifying(false)
+    }
+  }
+
   async function handleUseCurrentLocation() {
     setLocating(true); setError('')
     try {
@@ -41,6 +112,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       setAreaLine(address ?? '')
       setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftLabel('Home')
+      setOtpSentFor(null); setOtpVerifiedFor(null); setOtpCode(''); setOtpError(''); confirmationResultRef.current = null
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not get your location')
@@ -51,6 +123,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
 
   function openManual() {
     setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setOtpSentFor(null); setOtpVerifiedFor(null); setOtpCode(''); setOtpError(''); confirmationResultRef.current = null
     setStep('manual')
   }
 
@@ -58,6 +131,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     if (!houseNo.trim() || !areaLine.trim()) { setError('Please fill in the house/flat number and area'); return }
     if (!contactName.trim()) { setError('Please enter a name for this address'); return }
     if (!/^\d{10}$/.test(contactPhone.trim())) { setError('Please enter a valid 10-digit mobile number'); return }
+    if (otpVerifiedFor !== contactPhone) { setError('Please verify your mobile number with the OTP sent to it'); return }
     const fullAddress = [houseNo.trim(), areaLine.trim(), landmark.trim() ? `near ${landmark.trim()}` : null].filter(Boolean).join(', ')
     const saved = addAddress({
       label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null,
@@ -168,12 +242,47 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 <span className="text-[13.5px] font-[600] text-[#6B7280] shrink-0">+91</span>
                 <input
                   value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onChange={(e) => {
+                    setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
+                    setOtpCode(''); setOtpError('')
+                  }}
                   placeholder="98765 43210"
                   inputMode="numeric"
+                  type="tel"
                   className="flex-1 bg-transparent text-[13.5px] outline-none min-w-0"
                 />
+                {isValidPhone && !isPhoneVerified && (
+                  <button type="button" onClick={sendOtp} disabled={otpSending}
+                    className="shrink-0 px-4 py-2 bg-[#16A34A] text-white rounded-lg text-[13px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60">
+                    {otpSending ? 'Sending...' : isOtpSentForCurrent ? 'Resend OTP' : 'Send OTP'}
+                  </button>
+                )}
+                {isPhoneVerified && (
+                  <span className="shrink-0 flex items-center gap-1 text-[12px] font-[700] text-[#16A34A]">
+                    <Check className="w-3.5 h-3.5" /> Verified
+                  </span>
+                )}
               </div>
+
+              {isValidPhone && isOtpSentForCurrent && !isPhoneVerified && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit code"
+                    inputMode="numeric"
+                    className="flex-1 px-3 py-2 border border-[#E5E7EB] rounded-lg text-[13px] outline-none focus:border-[#16A34A] transition-all"
+                  />
+                  <button type="button" onClick={verifyOtp} disabled={otpVerifying || otpCode.length !== 6}
+                    className="px-3.5 py-2 bg-[#16A34A] text-white rounded-lg text-[12.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60">
+                    {otpVerifying ? 'Verifying...' : 'Verify'}
+                  </button>
+                </div>
+              )}
+
+              {otpError && <p className="text-[11.5px] text-[#DC2626] mt-1.5">{otpError}</p>}
+
+              <div ref={recaptchaContainerRef} />
             </div>
 
             <div>
@@ -190,7 +299,10 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setStep('list')} className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Back</button>
-              <button onClick={saveDraft} className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all">Save Address</button>
+              <button onClick={saveDraft} disabled={isValidPhone && !isPhoneVerified}
+                className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 disabled:hover:bg-[#16A34A]">
+                Save Address
+              </button>
             </div>
           </div>
         )}

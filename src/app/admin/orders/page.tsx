@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap } from 'lucide-react'
+import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -22,13 +23,22 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
 
 const TABS = ['All', 'Active', 'Unassigned', 'Preparing', 'Delivered', 'Cancelled']
 
+type OrderItem = { name: string; quantity: number; price: number; image_url: string | null }
 type Order = {
-  id: string; status: string; total: number; customer_name: string | null
-  placed_at: string; address: string | null; payment_method: string | null
+  id: string; status: string; total: number; customer_name: string | null; customer_phone: string | null
+  placed_at: string; address: string | null; payment_method: string | null; payment_status: string | null
   delivery_partner_id: string | null
+  delivery_latitude: number | null; delivery_longitude: number | null
   restaurants: { name: string } | null
+  order_items: OrderItem[]
 }
 type Partner = { id: string; name: string; is_active: boolean }
+
+const PAYMENT_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  paid:    { label: 'Paid',    color: '#16A34A', bg: '#DCFCE7' },
+  pending: { label: 'Pending', color: '#D97706', bg: '#FFFBEB' },
+  failed:  { label: 'Failed',  color: '#DC2626', bg: '#FEF2F2' },
+}
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
@@ -49,12 +59,13 @@ export default function AdminOrdersPage() {
   const [autoAssignPartner, setAutoAssignPartner] = useState('')
   const [autoAssigning, setAutoAssigning] = useState(false)
   const [autoAssignMsg, setAutoAssignMsg] = useState('')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const [{ data: ords }, { data: parts }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, placed_at, address, payment_method, delivery_partner_id, restaurants(name)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, delivery_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
@@ -79,7 +90,7 @@ export default function AdminOrdersPage() {
   }, [load])
 
   async function assignOrder(orderId: string, partnerId: string) {
-    await supabase.from('orders').update({ delivery_partner_id: partnerId || null }).eq('id', orderId)
+    await supabase.from('orders').update({ delivery_partner_id: partnerId || null, accepted_at: null }).eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, delivery_partner_id: partnerId || null } : o))
   }
 
@@ -90,7 +101,7 @@ export default function AdminOrdersPage() {
       .filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status))
       .map((o) => o.id)
     if (unassignedIds.length === 0) { setAutoAssigning(false); setAutoAssignMsg('No unassigned orders'); setTimeout(() => setAutoAssignMsg(''), 2000); return }
-    await supabase.from('orders').update({ delivery_partner_id: autoAssignPartner }).in('id', unassignedIds)
+    await supabase.from('orders').update({ delivery_partner_id: autoAssignPartner, accepted_at: null }).in('id', unassignedIds)
     setOrders((prev) => prev.map((o) => unassignedIds.includes(o.id) ? { ...o, delivery_partner_id: autoAssignPartner } : o))
     setAutoAssigning(false)
     setAutoAssignMsg(`Assigned ${unassignedIds.length} order${unassignedIds.length !== 1 ? 's' : ''}!`)
@@ -106,7 +117,7 @@ export default function AdminOrdersPage() {
       tab === 'Delivered'  ? o.status === 'delivered' :
       tab === 'Cancelled'  ? o.status === 'cancelled' : true
     const q = search.toLowerCase()
-    const matchSearch = !q || (o.customer_name ?? '').toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
+    const matchSearch = !q || (o.customer_name ?? '').toLowerCase().includes(q) || (o.customer_phone ?? '').toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
     return matchTab && matchSearch
   })
 
@@ -202,17 +213,29 @@ export default function AdminOrdersPage() {
                     const Icon = cfg.icon
                     const restName = Array.isArray(o.restaurants) ? o.restaurants[0]?.name : (o.restaurants as { name: string } | null)?.name
                     const isFinal = ['delivered', 'cancelled'].includes(o.status)
+                    const isExpanded = expandedId === o.id
+                    const payCfg = o.payment_status ? (PAYMENT_STATUS_CFG[o.payment_status] ?? null) : null
                     return (
-                      <tr key={o.id} className="hover:bg-[#FAFAFA] transition-colors">
-                        <td className="px-5 py-3.5 text-[12px] font-mono text-[#6B7280]">{o.id.slice(0,8).toUpperCase()}</td>
-                        <td className="px-5 py-3.5 text-[13px] font-[600] text-[#111827]">{o.customer_name ?? '—'}</td>
+                      <Fragment key={o.id}>
+                      <tr onClick={() => setExpandedId(isExpanded ? null : o.id)}
+                        className="hover:bg-[#FAFAFA] transition-colors cursor-pointer">
+                        <td className="px-5 py-3.5 text-[12px] font-mono text-[#6B7280]">
+                          <span className="flex items-center gap-1.5">
+                            {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />}
+                            {o.id.slice(0,8).toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <p className="text-[13px] font-[600] text-[#111827]">{o.customer_name ?? '—'}</p>
+                          {o.customer_phone && <p className="text-[11.5px] text-[#9CA3AF]">{o.customer_phone}</p>}
+                        </td>
                         <td className="px-5 py-3.5 text-[12.5px] text-[#6B7280]">{restName ?? '—'}</td>
                         <td className="px-5 py-3.5">
                           <span className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full w-fit" style={{ background: cfg.bg, color: cfg.color }}>
                             <Icon className="w-3 h-3" /> {cfg.label}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                           {isFinal ? (
                             <span className="text-[12px] text-[#9CA3AF]">{partnerName(o.delivery_partner_id) ?? '—'}</span>
                           ) : (
@@ -227,6 +250,71 @@ export default function AdminOrdersPage() {
                         <td className="px-5 py-3.5 text-[13px] font-[700] text-[#111827]">₹{o.total}</td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</td>
                       </tr>
+                      {isExpanded && (
+                        <tr className="bg-[#FAFAFA]">
+                          <td colSpan={7} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
+                            <div className="grid sm:grid-cols-3 gap-4">
+                              <div>
+                                <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><Phone className="w-3 h-3" /> Contact</p>
+                                <p className="text-[13px] text-[#111827] font-medium">{o.customer_name ?? '—'}</p>
+                                <p className="text-[12.5px] text-[#6B7280]">{o.customer_phone ?? '—'}</p>
+                              </div>
+                              <div>
+                                <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><MapPin className="w-3 h-3" /> Delivery address</p>
+                                <p className="text-[12.5px] text-[#374151]">{o.address ?? '—'}</p>
+                                {o.delivery_latitude && o.delivery_longitude && (
+                                  <>
+                                    <LiveTrackingMap
+                                      riderLocation={null}
+                                      dropLocation={{ lat: o.delivery_latitude, lng: o.delivery_longitude }}
+                                      showRiderStatus={false}
+                                      className="h-32 mt-2 rounded-lg overflow-hidden"
+                                    />
+                                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
+                                      target="_blank" rel="noopener noreferrer"
+                                      className="flex items-center gap-1.5 text-[11.5px] font-[600] text-[#16A34A] hover:underline mt-1.5">
+                                      <ExternalLink className="w-3 h-3" /> Open in Maps
+                                    </a>
+                                  </>
+                                )}
+                              </div>
+                              <div>
+                                <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><CreditCard className="w-3 h-3" /> Payment</p>
+                                <p className="text-[12.5px] text-[#374151] capitalize">{o.payment_method ?? '—'}</p>
+                                {payCfg && (
+                                  <span className="inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ background: payCfg.bg, color: payCfg.color }}>
+                                    {payCfg.label}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mt-4 mb-2"><Package className="w-3 h-3" /> Items</p>
+                            {o.order_items?.length ? (
+                              <div className="space-y-2">
+                                {o.order_items.map((item, i) => (
+                                  <div key={i} className="flex items-center gap-3 bg-white border border-[#F3F4F6] rounded-lg px-3 py-2">
+                                    {item.image_url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={item.image_url} alt={item.name} className="w-9 h-9 rounded-md object-cover shrink-0" />
+                                    ) : (
+                                      <div className="w-9 h-9 rounded-md bg-[#F3F4F6] flex items-center justify-center shrink-0">
+                                        <Package className="w-4 h-4 text-[#9CA3AF]" />
+                                      </div>
+                                    )}
+                                    <span className="flex-1 text-[12.5px] text-[#111827]">{item.name}</span>
+                                    <span className="text-[12px] text-[#6B7280]">× {item.quantity}</span>
+                                    <span className="text-[12.5px] font-[600] text-[#111827] w-16 text-right">₹{item.price * item.quantity}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[12.5px] text-[#9CA3AF]">No item details recorded for this order.</p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     )
                   })}
                 </tbody>
