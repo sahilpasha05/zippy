@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
-// Launch is 31 Jul 2026, 5:00 PM IST — kept in sync with ComingSoonOverlay's countdown.
-const LAUNCH_AT = new Date('2026-07-31T17:00:00+05:30').getTime()
+// Launch is 1 Aug 2026, 11:00 AM IST — kept in sync with ComingSoonOverlay's countdown.
+const LAUNCH_AT = new Date('2026-08-01T11:00:00+05:30').getTime()
 
 function getRemaining() {
   const diff = Math.max(0, LAUNCH_AT - Date.now())
