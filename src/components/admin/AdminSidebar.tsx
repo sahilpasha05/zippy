@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike } from 'lucide-react'
+import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { href: '/admin/restaurants',  label: 'Restaurants',  icon: Store },
   { href: '/admin/products',     label: 'Products',     icon: Package },
+  { href: '/admin/quick-add',    label: 'Quick Add',    icon: PlusCircle },
   { href: '/admin/orders',       label: 'All Orders',   icon: ShoppingBag },
   { href: '/admin/delivery',     label: 'Delivery Partners', icon: Bike },
   { href: '/admin/users',        label: 'Users',        icon: Users },
