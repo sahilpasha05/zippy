@@ -7,10 +7,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, DELIVERY_FEE } from '@/lib/cartPricing'
 
 export default function CartSidebar() {
-  const { items, isOpen, closeCart, updateQuantity, removeItem, total } = useCartStore()
-  const cartTotal = total()
+  const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
+  const baseTotal = getCartBaseTotal(items)
+  const cartTotal = getCartAdjustedTotal(items)
+  const grandTotal = cartTotal + DELIVERY_FEE
   const deliveryEta = useDeliveryEta()
 
   useEffect(() => {
@@ -68,7 +71,9 @@ export default function CartSidebar() {
             </div>
           ) : (
             <div className="space-y-3">
-              {items.map((item) => (
+              {items.map((item) => {
+                const unitPrice = getAdjustedUnitPrice(item, baseTotal)
+                return (
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-[#F8FAFC] rounded-2xl group">
                   {/* Image */}
                   <div className="w-14 h-14 bg-white rounded-xl overflow-hidden shrink-0 border border-[#E5E7EB]">
@@ -84,8 +89,8 @@ export default function CartSidebar() {
                   {/* Details */}
                   <div className="flex-1 min-w-0">
                     <p className="text-[13.5px] font-600 text-[#111827] truncate" style={{ fontWeight: 600 }}>{item.name}</p>
-                    <p className="text-[12px] text-[#6B7280] mt-0.5">₹{item.price} × {item.quantity}</p>
-                    <p className="text-[13px] font-700 text-[#16A34A]" style={{ fontWeight: 700 }}>₹{(item.price * item.quantity).toFixed(0)}</p>
+                    <p className="text-[12px] text-[#6B7280] mt-0.5">₹{unitPrice} × {item.quantity}</p>
+                    <p className="text-[13px] font-700 text-[#16A34A]" style={{ fontWeight: 700 }}>₹{(unitPrice * item.quantity).toFixed(0)}</p>
                   </div>
 
                   {/* Qty Controls */}
@@ -105,7 +110,8 @@ export default function CartSidebar() {
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -127,11 +133,11 @@ export default function CartSidebar() {
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
                 <span>Delivery fee</span>
-                <span className="text-[#16A34A] font-medium">FREE</span>
+                <span>₹{DELIVERY_FEE}</span>
               </div>
               <div className="flex justify-between text-[15px] font-700 text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 700 }}>
                 <span>Total</span>
-                <span>₹{cartTotal.toFixed(0)}</span>
+                <span>₹{grandTotal.toFixed(0)}</span>
               </div>
             </div>
 

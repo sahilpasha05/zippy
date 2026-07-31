@@ -25,7 +25,7 @@ export default function NewRestaurantPage() {
 
   const [form, setForm] = useState({
     name: '', slug: '', description: '', cuisine: [] as string[],
-    cover_url: '', logo_url: '', address: '',
+    cover_url: '', logo_url: '', address: '', phone: '',
     delivery_time: 30, min_order: 149, delivery_fee: 0,
     is_open: true, is_active: true,
     owner_id: '',
@@ -71,7 +71,7 @@ export default function NewRestaurantPage() {
     const payload = {
       name: form.name, slug: form.slug, description: form.description,
       cuisine: form.cuisine, cover_url: form.cover_url || null, logo_url: form.logo_url || null,
-      address: form.address, delivery_time: form.delivery_time,
+      address: form.address, phone: form.phone || null, delivery_time: form.delivery_time,
       min_order: form.min_order, delivery_fee: form.delivery_fee,
       is_open: form.is_open, is_active: form.is_active,
       owner_id: form.owner_id || null,
@@ -142,6 +142,12 @@ export default function NewRestaurantPage() {
                     <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Address</label>
                     <input value={form.address} onChange={(e) => set('address', e.target.value)}
                       placeholder="Street, Area, City"
+                      className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Phone</label>
+                    <input value={form.phone} onChange={(e) => set('phone', e.target.value)}
+                      type="tel" placeholder="9876543210"
                       className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
                   </div>
                   <div className="col-span-2">

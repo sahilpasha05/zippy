@@ -27,7 +27,8 @@ type OrderItem = { name: string; quantity: number; price: number; image_url: str
 type Order = {
   id: string; status: string; total: number; customer_name: string | null; customer_phone: string | null
   placed_at: string; address: string | null; payment_method: string | null; payment_status: string | null
-  delivery_partner_id: string | null
+  order_type: string | null
+  delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
   restaurants: { name: string } | null
   order_items: OrderItem[]
@@ -35,9 +36,10 @@ type Order = {
 type Partner = { id: string; name: string; is_active: boolean }
 
 const PAYMENT_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
-  paid:    { label: 'Paid',    color: '#16A34A', bg: '#DCFCE7' },
-  pending: { label: 'Pending', color: '#D97706', bg: '#FFFBEB' },
-  failed:  { label: 'Failed',  color: '#DC2626', bg: '#FEF2F2' },
+  paid:            { label: 'Paid',                color: '#16A34A', bg: '#DCFCE7' },
+  partially_paid:  { label: 'Half Paid (Cash Due)', color: '#D97706', bg: '#FFFBEB' },
+  pending:         { label: 'Pending',             color: '#D97706', bg: '#FFFBEB' },
+  failed:          { label: 'Failed',               color: '#DC2626', bg: '#FEF2F2' },
 }
 
 function timeAgo(d: string) {
@@ -52,6 +54,8 @@ function timeAgo(d: string) {
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
+  const [groceryPartners, setGroceryPartners] = useState<Partner[]>([])
+  const [storePartners, setStorePartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('All')
@@ -62,18 +66,22 @@ export default function AdminOrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [{ data: ords }, { data: parts }] = await Promise.all([
+    const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, delivery_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
         .limit(100),
       supabase.from('delivery_partners').select('id, name, is_active').order('name'),
+      supabase.from('grocery_partners').select('id, name, is_active').order('name'),
+      supabase.from('store_partners').select('id, name, is_active').order('name'),
     ])
     setOrders((ords as unknown as Order[]) ?? [])
     setPartners((parts as Partner[]) ?? [])
+    setGroceryPartners((groceryParts as Partner[]) ?? [])
+    setStorePartners((storeParts as Partner[]) ?? [])
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
@@ -92,6 +100,16 @@ export default function AdminOrdersPage() {
   async function assignOrder(orderId: string, partnerId: string) {
     await supabase.from('orders').update({ delivery_partner_id: partnerId || null, accepted_at: null }).eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, delivery_partner_id: partnerId || null } : o))
+  }
+
+  async function assignGroceryPartner(orderId: string, partnerId: string) {
+    await supabase.from('orders').update({ grocery_partner_id: partnerId || null }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, grocery_partner_id: partnerId || null } : o))
+  }
+
+  async function assignStorePartner(orderId: string, partnerId: string) {
+    await supabase.from('orders').update({ store_partner_id: partnerId || null }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, store_partner_id: partnerId || null } : o))
   }
 
   async function autoAssign() {
@@ -124,6 +142,8 @@ export default function AdminOrdersPage() {
   const activeCnt = orders.filter((o) => !['delivered','cancelled'].includes(o.status)).length
   const unassignedCnt = orders.filter((o) => !o.delivery_partner_id && !['delivered','cancelled'].includes(o.status)).length
   const partnerName = (id: string | null) => partners.find((p) => p.id === id)?.name
+  const groceryPartnerName = (id: string | null) => groceryPartners.find((p) => p.id === id)?.name
+  const storePartnerName = (id: string | null) => storePartners.find((p) => p.id === id)?.name
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
@@ -202,7 +222,7 @@ export default function AdminOrdersPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
-                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Total', 'Time'].map((h) => (
+                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Grocery Partner', 'Store Partner', 'Total', 'Time'].map((h) => (
                       <th key={h} className="text-left text-[11.5px] font-[600] text-[#9CA3AF] px-5 py-3">{h}</th>
                     ))}
                   </tr>
@@ -247,12 +267,40 @@ export default function AdminOrdersPage() {
                             </select>
                           )}
                         </td>
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          {o.order_type !== 'grocery' ? (
+                            <span className="text-[12px] text-[#9CA3AF]">—</span>
+                          ) : isFinal ? (
+                            <span className="text-[12px] text-[#9CA3AF]">{groceryPartnerName(o.grocery_partner_id) ?? '—'}</span>
+                          ) : (
+                            <select value={o.grocery_partner_id ?? ''} onChange={(e) => assignGroceryPartner(o.id, e.target.value)}
+                              className={cn('px-2.5 py-1.5 border rounded-lg text-[12px] outline-none bg-white transition-all max-w-[150px]',
+                                o.grocery_partner_id ? 'border-[#BBF7D0] text-[#16A34A] font-medium' : 'border-[#FECACA] text-[#DC2626]')}>
+                              <option value="">Unassigned</option>
+                              {groceryPartners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          {o.order_type !== 'grocery' ? (
+                            <span className="text-[12px] text-[#9CA3AF]">—</span>
+                          ) : isFinal ? (
+                            <span className="text-[12px] text-[#9CA3AF]">{storePartnerName(o.store_partner_id) ?? '—'}</span>
+                          ) : (
+                            <select value={o.store_partner_id ?? ''} onChange={(e) => assignStorePartner(o.id, e.target.value)}
+                              className={cn('px-2.5 py-1.5 border rounded-lg text-[12px] outline-none bg-white transition-all max-w-[150px]',
+                                o.store_partner_id ? 'border-[#BBF7D0] text-[#16A34A] font-medium' : 'border-[#FECACA] text-[#DC2626]')}>
+                              <option value="">Unassigned</option>
+                              {storePartners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          )}
+                        </td>
                         <td className="px-5 py-3.5 text-[13px] font-[700] text-[#111827]">₹{o.total}</td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</td>
                       </tr>
                       {isExpanded && (
                         <tr className="bg-[#FAFAFA]">
-                          <td colSpan={7} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
+                          <td colSpan={9} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
                             <div className="grid sm:grid-cols-3 gap-4">
                               <div>
                                 <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><Phone className="w-3 h-3" /> Contact</p>

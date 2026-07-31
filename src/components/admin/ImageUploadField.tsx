@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { Upload, X, Loader2, ImageIcon } from 'lucide-react'
 
-export default function ImageUploadField({ label, value, onChange }: { label: string; value: string | null; onChange: (url: string | null) => void }) {
+export default function ImageUploadField({ label, value, onChange, endpoint = '/api/admin/upload-image' }: { label: string; value: string | null; onChange: (url: string | null) => void; endpoint?: string }) {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -15,7 +15,7 @@ export default function ImageUploadField({ label, value, onChange }: { label: st
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('/api/admin/upload-image', { method: 'POST', body: formData })
+      const res = await fetch(endpoint, { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
       onChange(data.url)

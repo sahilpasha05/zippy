@@ -26,7 +26,7 @@ type Order = {
   id: string; status: string; total: number; address: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
   delivery_partner_id: string | null
-  restaurants: { name: string } | { name: string }[] | null
+  restaurants: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null
 }
 type Partner = {
   id: string; name: string; phone: string | null; vehicle_type: string | null; vehicle_number: string | null
@@ -40,6 +40,11 @@ function restName(o: Order) {
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.name : o.restaurants.name
 }
 
+function restPhone(o: Order) {
+  if (!o.restaurants) return null
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.phone ?? null : o.restaurants.phone
+}
+
 export default function TrackOrderPage() {
   const { id } = useParams<{ id: string }>()
   const [order, setOrder] = useState<Order | null>(null)
@@ -50,7 +55,7 @@ export default function TrackOrderPage() {
   const loadOrder = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, restaurants(name)')
+      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, restaurants(name, phone)')
       .eq('id', id)
       .single()
     if (!data) { setNotFound(true); return null }
@@ -148,14 +153,22 @@ export default function TrackOrderPage() {
             <span className="text-[#111827]">Track</span>
           </div>
 
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h1 className="text-[19px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>
+          <div className="flex items-center justify-between mb-5 gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[19px] font-[800] text-[#111827] truncate" style={{ fontWeight: 800 }}>
                 {restName(order) ?? 'Your Order'}
               </h1>
               <p className="text-[12.5px] text-[#9CA3AF] font-mono">#{order.id.slice(0, 8).toUpperCase()}</p>
             </div>
-            <span className="text-[15px] font-[800] text-[#111827]">₹{order.total}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              {restPhone(order) && (
+                <a href={`tel:${restPhone(order)}`}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-[#F0FDF4] text-[#16A34A] rounded-xl text-[12px] font-[600] hover:bg-[#DCFCE7] transition-all">
+                  <Phone className="w-3.5 h-3.5" /> Call restaurant
+                </a>
+              )}
+              <span className="text-[15px] font-[800] text-[#111827]">₹{order.total}</span>
+            </div>
           </div>
 
           {isCancelled ? (

@@ -38,6 +38,8 @@ create table if not exists public.addresses (
   pincode text,
   latitude numeric(10,7),
   longitude numeric(10,7),
+  contact_name text,
+  contact_phone text,
   is_default boolean default false,
   created_at timestamptz default now()
 );
@@ -99,6 +101,27 @@ create index if not exists idx_grocery_products_category on public.grocery_produ
 create index if not exists idx_grocery_products_active on public.grocery_products(is_active);
 
 -- =============================================
+-- GROCERY PARTNERS
+-- =============================================
+create table if not exists public.grocery_partners (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  slug text not null unique,
+  phone text,
+  address text,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+alter table public.grocery_partners enable row level security;
+create policy "Public read active grocery partners" on public.grocery_partners
+  for select using (is_active = true);
+create policy "Admins manage grocery partners" on public.grocery_partners
+  for all using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- =============================================
 -- RESTAURANTS
 -- =============================================
 create table if not exists public.restaurants (
@@ -119,6 +142,7 @@ create table if not exists public.restaurants (
   is_open boolean default true,
   is_active boolean default true,
   address text,
+  phone text,
   latitude numeric(10,7),
   longitude numeric(10,7),
   created_at timestamptz default now()
@@ -194,7 +218,13 @@ create table if not exists public.orders (
   notes text,
   coupon_code text,
   payment_method text default 'upi',
-  payment_status text default 'pending' check (payment_status in ('pending','paid','failed','refunded')),
+  payment_status text default 'pending' check (payment_status in ('pending','partially_paid','paid','failed','refunded')),
+  online_amount numeric(10,2) default 0,
+  cod_amount numeric(10,2) default 0,
+  cash_collected_at timestamptz,
+  cash_proof_image_url text,
+  delivered_at timestamptz,
+  grocery_partner_id uuid references public.grocery_partners(id) on delete set null,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -212,6 +242,7 @@ create policy "Admins manage all orders" on public.orders for all using (
 create index if not exists idx_orders_user on public.orders(user_id);
 create index if not exists idx_orders_status on public.orders(status);
 create index if not exists idx_orders_created on public.orders(created_at desc);
+create index if not exists idx_orders_grocery_partner on public.orders(grocery_partner_id);
 
 -- =============================================
 -- ORDER ITEMS

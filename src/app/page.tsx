@@ -9,7 +9,7 @@ import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
 import OffersStrip from '@/components/home/OffersStrip'
 import QuickCategories from '@/components/home/QuickCategories'
 import SiteFooter from '@/components/layout/SiteFooter'
-import HomeLocationPrompt from '@/components/HomeLocationPrompt'
+import HomeAuthPrompt from '@/components/HomeAuthPrompt'
 import ComingSoonOverlay from '@/components/ComingSoonOverlay'
 
 export default function HomePage() {
@@ -19,7 +19,7 @@ export default function HomePage() {
       <Navbar />
       <CartSidebar />
       <ViewCartBar />
-      <HomeLocationPrompt />
+      <HomeAuthPrompt />
 
       {/* Hero is desktop-only — mobile goes straight to categories like Blinkit */}
       <div className="hidden lg:block">

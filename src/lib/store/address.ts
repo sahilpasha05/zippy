@@ -19,6 +19,7 @@ interface AddressStore {
   addAddress: (a: Omit<SavedAddress, 'id'>) => SavedAddress
   removeAddress: (id: string) => void
   selectAddress: (id: string) => void
+  clearAddresses: () => void
   getSelected: () => SavedAddress | null
 }
 
@@ -41,6 +42,8 @@ export const useAddressStore = create<AddressStore>()(
         })),
 
       selectAddress: (id) => set({ selectedId: id }),
+
+      clearAddresses: () => set({ addresses: [], selectedId: null }),
 
       getSelected: () => get().addresses.find((a) => a.id === get().selectedId) ?? null,
     }),

@@ -3,9 +3,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package } from 'lucide-react'
+import Link from 'next/link'
+import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,8 +29,13 @@ type Order = {
   customer_phone: string | null; address: string | null; placed_at: string
   delivery_latitude: number | null; delivery_longitude: number | null
   accepted_at: string | null
+  online_amount: number | null; cod_amount: number | null
   order_items: OrderItem[]
-  restaurants: { name: string; address: string | null } | { name: string; address: string | null }[] | null
+  restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
+}
+
+function isSplitOrder(o: Order) {
+  return (o.online_amount ?? 0) > 0 && (o.cod_amount ?? 0) > 0
 }
 
 function timeAgo(d: string) {
@@ -45,6 +52,10 @@ function restName(o: Order) {
 function restAddress(o: Order) {
   if (!o.restaurants) return null
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.address : o.restaurants.address
+}
+function restPhone(o: Order) {
+  if (!o.restaurants) return null
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.phone ?? null : o.restaurants.phone
 }
 
 export default function DeliveryOrdersPage() {
@@ -64,11 +75,16 @@ export default function DeliveryOrdersPage() {
   const lastSentRef = useRef(0)
   const partnerIdRef = useRef<string | null>(null)
   const [pendingAccept, setPendingAccept] = useState<Order[]>([])
+  const [mapOrder, setMapOrder] = useState<Order | null>(null)
+  const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null)
+  const [proofError, setProofError] = useState<{ orderId: string; message: string } | null>(null)
+  const proofInputOrderRef = useRef<string | null>(null)
+  const proofFileInputRef = useRef<HTMLInputElement>(null)
 
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, order_items(name, quantity, price), restaurants(name, address)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, online_amount, cod_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
       .order('placed_at', { ascending: false })
       .limit(50)
@@ -172,13 +188,62 @@ export default function DeliveryOrdersPage() {
 
   async function advance(orderId: string, nextStatus: string) {
     setAdvancing(orderId)
-    await supabase.from('orders').update({ status: nextStatus }).eq('id', orderId)
+    const update: { status: string; delivered_at?: string; payment_status?: string } = { status: nextStatus }
+    if (nextStatus === 'delivered') {
+      update.delivered_at = new Date().toISOString()
+      const order = orders.find((o) => o.id === orderId)
+      // Cash was fully collected on a plain COD order — record it in the ledger.
+      if (order && (order.cod_amount ?? 0) > 0 && !isSplitOrder(order)) update.payment_status = 'paid'
+    }
+    await supabase.from('orders').update(update).eq('id', orderId)
     if (nextStatus === 'delivered' && partner) {
       await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
       setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
     }
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: nextStatus } : o))
     setAdvancing(null)
+  }
+
+  function triggerProofCapture(orderId: string) {
+    proofInputOrderRef.current = orderId
+    setProofError(null)
+    proofFileInputRef.current?.click()
+  }
+
+  async function handleProofFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const orderId = proofInputOrderRef.current
+    e.target.value = ''
+    if (!file || !orderId) return
+
+    setUploadingProofFor(orderId)
+    setProofError(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/delivery/upload-cash-proof', { method: 'POST', body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Could not upload photo')
+
+      const now = new Date().toISOString()
+      await supabase.from('orders').update({
+        status: 'delivered',
+        delivered_at: now,
+        payment_status: 'paid',
+        cash_collected_at: now,
+        cash_proof_image_url: data.url,
+      }).eq('id', orderId)
+
+      if (partner) {
+        await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
+        setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
+      }
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'delivered' } : o))
+    } catch (err: unknown) {
+      setProofError({ orderId, message: err instanceof Error ? err.message : 'Could not upload photo. Please try again.' })
+    } finally {
+      setUploadingProofFor(null)
+    }
   }
 
   if (loading) return (
@@ -213,6 +278,11 @@ export default function DeliveryOrdersPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Link href={`/delivery/${slug}/analytics`}
+                title="Analytics"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#E5E7EB] text-[#9CA3AF] hover:text-[#7C3AED] hover:border-[#DDD6FE] transition-all">
+                <BarChart3 className="w-4 h-4" />
+              </Link>
               <button
                 onClick={startLocationSharing}
                 title={sharingLocation ? 'Sharing your live location with customers' : locationError || 'Tap to allow location sharing'}
@@ -292,8 +362,13 @@ export default function DeliveryOrdersPage() {
                   <div className="space-y-2 mb-3">
                     <div className="flex items-start gap-2 text-[12.5px]">
                       <MapPin className="w-3.5 h-3.5 text-[#7C3AED] mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-[600] text-[#111827]">Pickup: {restName(o)}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-[600] text-[#111827]">Pickup: {restName(o)}</p>
+                          {restPhone(o) && (
+                            <a href={`tel:${restPhone(o)}`} className="text-[11px] font-[600] text-[#7C3AED] hover:underline shrink-0">Call restaurant</a>
+                          )}
+                        </div>
                         {restAddress(o) && <p className="text-[#6B7280]">{restAddress(o)}</p>}
                       </div>
                     </div>
@@ -328,14 +403,28 @@ export default function DeliveryOrdersPage() {
                         </a>
                       )}
                       {o.delivery_latitude && o.delivery_longitude && (
-                        <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
-                          <Map className="w-3.5 h-3.5" /> Go to
-                        </a>
+                        <>
+                          <button onClick={() => setMapOrder(o)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                            <Map className="w-3.5 h-3.5" /> Map
+                          </button>
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                            <Navigation className="w-3.5 h-3.5" /> Go to
+                          </a>
+                        </>
                       )}
                     </div>
-                    {isReady && (
+                    {isReady && isSplitOrder(o) && (
+                      <button onClick={() => triggerProofCapture(o.id)} disabled={uploadingProofFor === o.id}
+                        title={`Collect ₹${o.cod_amount} cash, then capture proof`}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
+                        {uploadingProofFor === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                        {uploadingProofFor === o.id ? 'Uploading...' : `Collect ₹${o.cod_amount} & Capture Proof`}
+                      </button>
+                    )}
+                    {isReady && !isSplitOrder(o) && (
                       <button onClick={() => advance(o.id, 'delivered')} disabled={advancing === o.id}
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
                         {advancing === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
@@ -346,6 +435,9 @@ export default function DeliveryOrdersPage() {
                       <span className="text-[11.5px] text-[#9CA3AF]">Waiting on restaurant</span>
                     )}
                   </div>
+                  {proofError?.orderId === o.id && (
+                    <p className="text-[11.5px] text-[#DC2626] mt-2">{proofError.message}</p>
+                  )}
                 </div>
               </div>
             )
@@ -392,6 +484,38 @@ export default function DeliveryOrdersPage() {
           </div>
         </div>
       )}
+
+      {mapOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMapOrder(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6]">
+              <h2 className="text-[15px] font-[800] text-[#111827]">Drop Location</h2>
+              <button onClick={() => setMapOrder(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
+                <X className="w-4 h-4 text-[#6B7280]" />
+              </button>
+            </div>
+            <LiveTrackingMap
+              riderLocation={null}
+              showRiderStatus={false}
+              dropLocation={mapOrder.delivery_latitude != null && mapOrder.delivery_longitude != null
+                ? { lat: mapOrder.delivery_latitude, lng: mapOrder.delivery_longitude }
+                : null}
+              className="h-64"
+            />
+            {mapOrder.address && <p className="text-[12.5px] text-[#374151] p-4">{mapOrder.address}</p>}
+          </div>
+        </div>
+      )}
+
+      <input
+        ref={proofFileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleProofFileSelected}
+      />
     </div>
   )
 }

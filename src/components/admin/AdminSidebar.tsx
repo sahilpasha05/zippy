@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle } from 'lucide-react'
+import { LayoutDashboard, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Wallet, Warehouse, ShoppingBasket, ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -14,11 +14,15 @@ const supabase = createBrowserClient(
 
 const NAV = [
   { href: '/admin/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/admin/banners',      label: 'Home Banners', icon: ImageIcon },
   { href: '/admin/restaurants',  label: 'Restaurants',  icon: Store },
   { href: '/admin/products',     label: 'Products',     icon: Package },
   { href: '/admin/quick-add',    label: 'Quick Add',    icon: PlusCircle },
   { href: '/admin/orders',       label: 'All Orders',   icon: ShoppingBag },
+  { href: '/admin/ledger',       label: 'Ledger',       icon: Wallet },
   { href: '/admin/delivery',     label: 'Delivery Partners', icon: Bike },
+  { href: '/admin/grocery-partners', label: 'Grocery Partners', icon: Warehouse },
+  { href: '/admin/store-partners', label: 'Store Partners', icon: ShoppingBasket },
   { href: '/admin/users',        label: 'Users',        icon: Users },
   { href: '/admin/analytics',    label: 'Analytics',    icon: BarChart3 },
   { href: '/admin/settings',     label: 'Settings',     icon: Settings },

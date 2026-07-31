@@ -23,11 +23,13 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
 
   if (paymentStatus === 'SUCCESS') {
+    const { data: existing } = await admin.from('orders').select('cod_amount').eq('id', orderId).single()
+    const newPaymentStatus = (existing?.cod_amount ?? 0) > 0 ? 'partially_paid' : 'paid'
     await admin
       .from('orders')
-      .update({ payment_status: 'paid', status: 'confirmed', cf_order_id: cfOrderId ?? null })
+      .update({ payment_status: newPaymentStatus, status: 'confirmed', cf_order_id: cfOrderId ?? null })
       .eq('id', orderId)
-      .neq('payment_status', 'paid')
+      .not('payment_status', 'in', '(paid,partially_paid)')
   } else if (paymentStatus === 'FAILED' || paymentStatus === 'USER_DROPPED') {
     await admin.from('orders').update({ payment_status: 'failed' }).eq('id', orderId)
   }

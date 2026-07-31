@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import Image from 'next/image'
-import { Plus, Search, Trash2, ToggleLeft, ToggleRight, Loader2, CheckCircle, AlertCircle, Package, Flame, X, Star, Save, Calendar, Hash, Tag as TagIcon } from 'lucide-react'
+import { Plus, Search, Trash2, ToggleLeft, ToggleRight, Loader2, CheckCircle, AlertCircle, Package, Flame, X, Star, Save, Calendar, Hash, Tag as TagIcon, IndianRupee } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
@@ -172,6 +173,10 @@ export default function AdminProductsPage() {
                   placeholder="Search products..."
                   className="bg-transparent text-[13px] outline-none w-40 placeholder:text-[#9CA3AF]" />
               </div>
+              <Link href="/admin/products/pricing"
+                className="flex items-center gap-2 px-4 py-2 border border-[#E5E7EB] text-[#374151] text-[13px] font-[600] rounded-xl hover:border-[#7C3AED] hover:text-[#7C3AED] transition-all">
+                <IndianRupee className="w-4 h-4" /> Bulk Edit Prices
+              </Link>
               <button onClick={() => setShowModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-[#7C3AED] text-white text-[13px] font-[600] rounded-xl hover:bg-[#6D28D9] transition-all shadow-[0_2px_8px_rgba(124,58,237,0.3)]">
                 <Plus className="w-4 h-4" /> Add Product

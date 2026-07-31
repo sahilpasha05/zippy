@@ -8,7 +8,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
-import { useAddressStore } from '@/lib/store/address'
+import { useAddresses } from '@/lib/hooks/useAddresses'
+import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
@@ -22,19 +23,20 @@ const supabase = createBrowserClient(
 )
 
 const PAYMENT_METHODS = [
-  { id: 'upi',  label: 'UPI',                  icon: Smartphone,  desc: 'Pay via any UPI app' },
-  { id: 'card', label: 'Credit / Debit Card',   icon: CreditCard,  desc: 'Visa, Mastercard, Rupay' },
-  { id: 'cod',  label: 'Cash on Delivery',      icon: Banknote,    desc: 'Pay when delivered' },
+  { id: 'upi',  label: 'UPI',                  icon: Smartphone,  desc: 'Pay 50% now via UPI, 50% cash on delivery' },
+  { id: 'card', label: 'Credit / Debit Card',   icon: CreditCard,  desc: 'Pay 50% now by card, 50% cash on delivery' },
+  { id: 'cod',  label: 'Cash on Delivery',      icon: Banknote,    desc: 'Pay the full amount when delivered' },
 ]
 
 const LABEL_ICONS: Record<string, typeof Home> = { Home, Work: Briefcase, Other: Star }
 
 export default function CheckoutPage() {
-  const { items, total, clearCart } = useCartStore()
-  const { addresses, selectedId } = useAddressStore()
+  const { items, clearCart } = useCartStore()
+  const { addresses, selectedId, selectAddress, ready: addressesReady } = useAddresses()
   const deliveryEta = useDeliveryEta()
   const [mounted, setMounted] = useState(false)
-  const cartTotal = total()
+  const baseTotal = getCartBaseTotal(items)
+  const cartTotal = getCartAdjustedTotal(items)
   const [selectedPayment, setSelectedPayment] = useState('upi')
   const [coupon, setCoupon] = useState('')
   const [couponApplied, setCouponApplied] = useState(false)
@@ -44,21 +46,32 @@ export default function CheckoutPage() {
   const [placeError, setPlaceError] = useState('')
   const [showLocationPicker, setShowLocationPicker] = useState(false)
 
-  // Hydrate persisted stores before rendering
+  // Hydrate persisted cart store before rendering (addresses handle their own readiness via useAddresses)
   useEffect(() => {
     useCartStore.persist.rehydrate()
-    useAddressStore.persist.rehydrate()
     setMounted(true)
   }, [])
 
   const selectedAddress = addresses.find((a) => a.id === selectedId) ?? null
 
   const discount = couponApplied ? Math.min(cartTotal * 0.1, 100) : 0
-  const deliveryFee = cartTotal > 199 ? 0 : 29
+  const deliveryFee = DELIVERY_FEE
   const grandTotal = cartTotal - discount + deliveryFee
+  const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
+  const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
+  const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
   const handlePlace = async () => {
     if (items.length === 0 || !selectedAddress) return
+
+    if (selectedPayment !== 'cod') {
+      const normalizedPhone = (selectedAddress.contactPhone ?? '').replace(/^\+91/, '').slice(-10)
+      if (!/^\d{10}$/.test(normalizedPhone)) {
+        setPlaceError('This address is missing a verified mobile number. Please remove it and add it again before paying online.')
+        return
+      }
+    }
+
     setPlacing(true)
     setPlaceError('')
 
@@ -76,6 +89,8 @@ export default function CheckoutPage() {
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount,
+          online_amount: onlineAmount,
+          cod_amount: codAmount,
           address: selectedAddress.address,
           delivery_latitude: selectedAddress.lat,
           delivery_longitude: selectedAddress.lng,
@@ -97,7 +112,7 @@ export default function CheckoutPage() {
         product_type: item.product_type,
         name: item.name,
         image_url: item.image_url ?? null,
-        price: item.price,
+        price: getAdjustedUnitPrice(item, baseTotal),
         quantity: item.quantity,
       }))
 
@@ -177,6 +192,12 @@ export default function CheckoutPage() {
               {orderId && (
                 <p className="text-[11.5px] text-[#9CA3AF] font-mono">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
               )}
+              {isSplitPayment && (
+                <div className="mt-4 pt-4 border-t border-[#F3F4F6] text-left space-y-1">
+                  <div className="flex justify-between text-[13px] text-[#16A34A] font-medium"><span>Paid online</span><span>₹{onlineAmount.toFixed(0)}</span></div>
+                  <div className="flex justify-between text-[13px] text-[#D97706] font-medium"><span>Cash due on delivery</span><span>₹{codAmount.toFixed(0)}</span></div>
+                </div>
+              )}
             </div>
 
             {/* Live tracking preview — same as Blinkit/Zepto's post-order map */}
@@ -240,7 +261,7 @@ export default function CheckoutPage() {
                   <h3 className="text-[16px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>Delivery Address</h3>
                 </div>
 
-                {!mounted ? (
+                {!mounted || !addressesReady ? (
                   <div className="h-20 bg-[#F3F4F6] rounded-xl animate-pulse" />
                 ) : addresses.length === 0 ? (
                   <div className="text-center py-6">
@@ -257,7 +278,7 @@ export default function CheckoutPage() {
                       return (
                         <button
                           key={addr.id}
-                          onClick={() => useAddressStore.getState().selectAddress(addr.id)}
+                          onClick={() => selectAddress(addr.id)}
                           className={cn(
                             'w-full text-left flex items-start gap-3 p-4 rounded-xl border-2 transition-all',
                             selectedId === addr.id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]'
@@ -378,7 +399,7 @@ export default function CheckoutPage() {
                           <p className="text-[12.5px] font-[600] text-[#111827] truncate" style={{ fontWeight: 600 }}>{item.name}</p>
                           <p className="text-[11.5px] text-[#6B7280]">×{item.quantity}</p>
                         </div>
-                        <p className="text-[13px] font-[700] text-[#111827] shrink-0" style={{ fontWeight: 700 }}>₹{(item.price * item.quantity).toFixed(0)}</p>
+                        <p className="text-[13px] font-[700] text-[#111827] shrink-0" style={{ fontWeight: 700 }}>₹{(getAdjustedUnitPrice(item, baseTotal) * item.quantity).toFixed(0)}</p>
                       </div>
                     ))}
                   </div>
@@ -389,11 +410,17 @@ export default function CheckoutPage() {
                   {couponApplied && <div className="flex justify-between text-[13px] text-[#16A34A]"><span>Coupon discount</span><span>−₹{discount.toFixed(0)}</span></div>}
                   <div className="flex justify-between text-[13px] text-[#6B7280]">
                     <span>Delivery fee</span>
-                    <span className={deliveryFee === 0 ? 'text-[#16A34A] font-medium' : ''}>{deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}</span>
+                    <span>₹{deliveryFee}</span>
                   </div>
                   <div className="flex justify-between text-[16px] font-[800] text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 800 }}>
                     <span>Total</span><span>₹{grandTotal.toFixed(0)}</span>
                   </div>
+                  {isSplitPayment && (
+                    <div className="pt-2 border-t border-dashed border-[#E5E7EB] space-y-1">
+                      <div className="flex justify-between text-[12.5px] text-[#16A34A] font-medium"><span>Pay online now</span><span>₹{onlineAmount.toFixed(0)}</span></div>
+                      <div className="flex justify-between text-[12.5px] text-[#D97706] font-medium"><span>Cash on delivery</span><span>₹{codAmount.toFixed(0)}</span></div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 p-3 bg-[#DCFCE7] rounded-xl flex items-center gap-2">
@@ -413,7 +440,7 @@ export default function CheckoutPage() {
                   ) : !selectedAddress ? (
                     <>Select a delivery address</>
                   ) : (
-                    <>Place Order • ₹{grandTotal.toFixed(0)}</>
+                    <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
                   )}
                 </button>
               </div>
@@ -434,7 +461,7 @@ export default function CheckoutPage() {
           ) : !selectedAddress ? (
             <>Select a delivery address</>
           ) : (
-            <>Place Order • ₹{grandTotal.toFixed(0)}</>
+            <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}
         </button>
       </div>

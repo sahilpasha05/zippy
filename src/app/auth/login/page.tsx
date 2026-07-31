@@ -5,6 +5,7 @@ import { Eye, EyeOff, Zap, ArrowRight, Mail, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import PhoneAuthModal from '@/components/PhoneAuthModal'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -146,11 +148,13 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {[{ name: 'Google', emoji: '🔵' }, { name: 'Phone', emoji: '📱' }].map(({ name, emoji }) => (
-              <button key={name} className="flex items-center justify-center gap-2.5 py-3 bg-white border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:border-[#D1D5DB] hover:bg-[#F8FAFC] transition-all">
-                <span>{emoji}</span> {name}
-              </button>
-            ))}
+            <button className="flex items-center justify-center gap-2.5 py-3 bg-white border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:border-[#D1D5DB] hover:bg-[#F8FAFC] transition-all">
+              <span>🔵</span> Google
+            </button>
+            <button onClick={() => setShowPhoneModal(true)}
+              className="flex items-center justify-center gap-2.5 py-3 bg-white border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:border-[#D1D5DB] hover:bg-[#F8FAFC] transition-all">
+              <span>📱</span> Phone
+            </button>
           </div>
 
           <p className="text-center text-[13.5px] text-[#6B7280] mt-6">
@@ -161,6 +165,16 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {showPhoneModal && (
+        <PhoneAuthModal
+          onClose={() => setShowPhoneModal(false)}
+          onSuccess={() => {
+            setShowPhoneModal(false)
+            router.push('/')
+          }}
+        />
+      )}
     </div>
   )
 }

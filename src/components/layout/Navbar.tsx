@@ -3,14 +3,17 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   MapPin, Search, Bell, User, ChevronDown,
-  Zap, Package, UtensilsCrossed, Tag, Menu, X, ShoppingBag
+  Zap, Package, UtensilsCrossed, Tag, Menu, X, ShoppingBag, LogOut, History
 } from 'lucide-react'
+import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
+import { useCartStore } from '@/lib/store/cart'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { createClient } from '@/lib/supabase/client'
 import LocationPicker from '@/components/LocationPicker'
 
 const navLinks = [
@@ -21,19 +24,17 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showLocationPicker, setShowLocationPicker] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false)
+  const [user, setUser] = useState<{ id: string; phone?: string; email?: string } | null>(null)
   const deliveryEta = useDeliveryEta()
-  const { addresses, selectedId } = useAddressStore()
-  const [hydrated, setHydrated] = useState(false)
-
-  useEffect(() => {
-    useAddressStore.persist.rehydrate()
-    setHydrated(true)
-  }, [])
+  const { addresses, selectedId, ready: addressesReady } = useAddresses()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10)
@@ -41,7 +42,30 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const selectedAddress = hydrated ? addresses.find((a) => a.id === selectedId) ?? null : null
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null))
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  async function handleSignOut() {
+    await createClient().auth.signOut()
+    // Both are anonymous/local-only stores — clear them so a logged-out session
+    // doesn't show whatever was cached from this account or earlier testing.
+    useCartStore.getState().clearCart()
+    useAddressStore.getState().clearAddresses()
+    setProfileMenuOpen(false)
+    setConfirmingSignOut(false)
+    router.refresh()
+  }
+
+  function closeProfileMenu() {
+    setProfileMenuOpen(false)
+    setConfirmingSignOut(false)
+  }
+
+  const selectedAddress = addressesReady ? addresses.find((a) => a.id === selectedId) ?? null : null
   const locationLabel = selectedAddress ? selectedAddress.address : 'Tarikere, Karnataka'
   const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
 
@@ -90,9 +114,17 @@ export default function Navbar() {
               </div>
             </button>
             <div className="flex items-center gap-1 shrink-0">
-              <Link href="/auth/login" className="flex items-center justify-center w-10 h-10">
-                <User className="w-6 h-6 text-[#1F1F1F]" strokeWidth={1.75} />
-              </Link>
+              {user ? (
+                <button onClick={() => setProfileMenuOpen((v) => !v)} className="flex items-center justify-center w-10 h-10">
+                  <div className="w-7 h-7 rounded-full bg-[#DCFCE7] flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-[#16A34A]" strokeWidth={2} />
+                  </div>
+                </button>
+              ) : (
+                <Link href="/auth/login" className="flex items-center justify-center w-10 h-10">
+                  <User className="w-6 h-6 text-[#1F1F1F]" strokeWidth={1.75} />
+                </Link>
+              )}
             </div>
           </div>
           {/* Full-width search */}
@@ -200,12 +232,23 @@ export default function Navbar() {
               </button>
 
               {/* Profile */}
-              <Link href="/auth/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#F8FAFC] transition-all ml-1 group">
-                <div className="w-7 h-7 rounded-full bg-[#DCFCE7] flex items-center justify-center">
-                  <User className="w-3.5 h-3.5 text-[#16A34A]" strokeWidth={2} />
-                </div>
-                <span className="hidden md:block text-[13px] font-medium text-[#374151] group-hover:text-[#111827]">Sign in</span>
-              </Link>
+              {user ? (
+                <button onClick={() => setProfileMenuOpen((v) => !v)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#F8FAFC] transition-all ml-1 group">
+                  <div className="w-7 h-7 rounded-full bg-[#DCFCE7] flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-[#16A34A]" strokeWidth={2} />
+                  </div>
+                  <span className="hidden md:block text-[13px] font-medium text-[#374151] group-hover:text-[#111827]">
+                    {user.phone ?? user.email}
+                  </span>
+                </button>
+              ) : (
+                <Link href="/auth/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#F8FAFC] transition-all ml-1 group">
+                  <div className="w-7 h-7 rounded-full bg-[#DCFCE7] flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-[#16A34A]" strokeWidth={2} />
+                  </div>
+                  <span className="hidden md:block text-[13px] font-medium text-[#374151] group-hover:text-[#111827]">Sign in</span>
+                </Link>
+              )}
 
               {/* Mobile menu */}
               <button
@@ -245,6 +288,54 @@ export default function Navbar() {
 
       {/* Spacer */}
       <div className="h-[168px] lg:h-16" />
+
+      {profileMenuOpen && user && (
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={closeProfileMenu} />
+          <div className="fixed top-16 right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
+            <div className="px-3 py-2.5 border-b border-[#F3F4F6] mb-1">
+              <p className="text-[12px] text-[#9CA3AF]">Signed in as</p>
+              <p className="text-[13.5px] font-[700] text-[#111827] truncate">{user.phone ?? user.email}</p>
+            </div>
+
+            {!confirmingSignOut ? (
+              <>
+                <Link
+                  href="/orders"
+                  onClick={closeProfileMenu}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-colors"
+                >
+                  <History className="w-4 h-4" /> Order History
+                </Link>
+                <button
+                  onClick={() => setConfirmingSignOut(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-[#DC2626] hover:bg-[#FEF2F2] transition-colors"
+                >
+                  <LogOut className="w-4 h-4" /> Sign out
+                </button>
+              </>
+            ) : (
+              <div className="px-2 py-1.5">
+                <p className="text-[12.5px] text-[#374151] px-1 mb-2">Sign out of Zippy?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmingSignOut(false)}
+                    className="flex-1 py-2 rounded-xl text-[12.5px] font-medium text-[#374151] border border-[#E5E7EB] hover:bg-[#F8FAFC] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex-1 py-2 rounded-xl text-[12.5px] font-[700] text-white bg-[#DC2626] hover:bg-[#B91C1C] transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
     </>

@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: order, error } = await supabase
     .from('orders')
-    .select('id, user_id, total, payment_status, customer_name, customer_phone')
+    .select('id, user_id, total, online_amount, payment_status, customer_name, customer_phone')
     .eq('id', orderId)
     .single()
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (order.user_id && order.user_id !== user?.id) {
     return NextResponse.json({ error: 'Not authorized for this order' }, { status: 403 })
   }
-  if (order.payment_status === 'paid') {
+  if (order.payment_status === 'paid' || order.payment_status === 'partially_paid') {
     return NextResponse.json({ error: 'Order is already paid' }, { status: 409 })
   }
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   try {
     const cfOrder = await createCashfreeOrder({
       orderId,
-      orderAmount: Number(order.total),
+      orderAmount: Number(order.online_amount) > 0 ? Number(order.online_amount) : Number(order.total),
       customerId: order.user_id ?? order.id,
       customerPhone,
       customerName: order.customer_name ?? undefined,

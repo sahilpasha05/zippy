@@ -13,7 +13,7 @@ const supabase = createBrowserClient(
 type Category = { id: string; name: string }
 type RecentProduct = { id: string; name: string; price: number; mrp: number | null; category_id: string; created_at: string }
 
-const EMPTY_FORM = { category_id: '', name: '', price: '', offerPrice: '' }
+const EMPTY_FORM = { category_id: '', name: '', price: '', offerPrice: '', weight: '' }
 const INPUT = 'w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all'
 
 export default function QuickAddProductPage() {
@@ -46,6 +46,7 @@ export default function QuickAddProductPage() {
       name: form.name,
       price: form.offerPrice ? +form.offerPrice : +form.price,
       mrp: +form.price,
+      weight: form.weight || null,
       in_stock: true,
       is_active: true,
     })
@@ -70,7 +71,7 @@ export default function QuickAddProductPage() {
             </div>
             <div>
               <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Quick Add Product</h1>
-              <p className="text-[12.5px] text-[#9CA3AF]">Name, price, offer price, category — that's it.</p>
+              <p className="text-[12.5px] text-[#9CA3AF]">Name, price, offer price, category — plus optional weight.</p>
             </div>
           </div>
 
@@ -99,6 +100,11 @@ export default function QuickAddProductPage() {
               <div>
                 <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Product Name *</label>
                 <input value={form.name} onChange={(e) => setF('name', e.target.value)} placeholder="e.g. Amul Butter" required className={INPUT} />
+              </div>
+
+              <div>
+                <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Weight / Size</label>
+                <input value={form.weight} onChange={(e) => setF('weight', e.target.value)} placeholder="500 g (optional)" className={INPUT} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

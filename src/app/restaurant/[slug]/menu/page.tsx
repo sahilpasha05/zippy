@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Plus, Search, Edit2, Trash2, ToggleLeft, ToggleRight, Star, Award, Loader2 } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
+import ImageUploadField from '@/components/admin/ImageUploadField'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -20,6 +21,7 @@ type MenuItem = {
   category_name: string | null
   name: string
   description: string | null
+  image_url: string | null
   price: number
   mrp: number | null
   is_veg: boolean
@@ -40,6 +42,7 @@ export default function SlugMenuPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formImage, setFormImage] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -60,6 +63,7 @@ export default function SlugMenuPage() {
           category_name: (p.restaurant_categories as { name: string } | null)?.name ?? null,
           name: p.name,
           description: p.description,
+          image_url: p.image_url,
           price: Number(p.price),
           mrp: p.mrp !== null ? Number(p.mrp) : null,
           is_veg: p.is_veg,
@@ -129,20 +133,20 @@ export default function SlugMenuPage() {
       if (editItem) {
         const { error } = await supabase
           .from('restaurant_products')
-          .update({ name, description, price, mrp, category_id: category?.id ?? null, is_veg: isVeg, is_bestseller: isBestseller })
+          .update({ name, description, image_url: formImage, price, mrp, category_id: category?.id ?? null, is_veg: isVeg, is_bestseller: isBestseller })
           .eq('id', editItem.id)
         if (error) throw error
         setItems((prev) =>
           prev.map((i) =>
             i.id === editItem.id
-              ? { ...i, name, description, price, mrp, category_id: category?.id ?? null, category_name: category?.name ?? null, is_veg: isVeg, is_bestseller: isBestseller }
+              ? { ...i, name, description, image_url: formImage, price, mrp, category_id: category?.id ?? null, category_name: category?.name ?? null, is_veg: isVeg, is_bestseller: isBestseller }
               : i
           )
         )
       } else {
         const { data, error } = await supabase
           .from('restaurant_products')
-          .insert({ restaurant_id: restaurant.id, name, description, price, mrp, category_id: category?.id ?? null, is_veg: isVeg, is_bestseller: isBestseller })
+          .insert({ restaurant_id: restaurant.id, name, description, image_url: formImage, price, mrp, category_id: category?.id ?? null, is_veg: isVeg, is_bestseller: isBestseller })
           .select()
           .single()
         if (error || !data) throw error ?? new Error('Failed to add item')
@@ -153,6 +157,7 @@ export default function SlugMenuPage() {
             category_name: category?.name ?? null,
             name: data.name,
             description: data.description,
+            image_url: data.image_url,
             price: Number(data.price),
             mrp: data.mrp !== null ? Number(data.mrp) : null,
             is_veg: data.is_veg,
@@ -165,6 +170,7 @@ export default function SlugMenuPage() {
       }
       setShowAddModal(false)
       setEditItem(null)
+      setFormImage(null)
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -203,7 +209,7 @@ export default function SlugMenuPage() {
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items..."
                   className="bg-transparent text-[13px] outline-none w-36 placeholder:text-[#9CA3AF]" />
               </div>
-              <button onClick={() => { setFormError(''); setShowAddModal(true) }}
+              <button onClick={() => { setFormError(''); setFormImage(null); setShowAddModal(true) }}
                 className="flex items-center gap-2 px-4 py-2 bg-[#16A34A] text-white text-[13px] font-[600] rounded-xl hover:bg-[#15803D] transition-all shadow-[0_2px_8px_rgba(22,163,74,0.3)]">
                 <Plus className="w-4 h-4" /> Add Item
               </button>
@@ -234,6 +240,12 @@ export default function SlugMenuPage() {
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {filtered.map((item) => (
                 <div key={item.id} className={cn('bg-white rounded-2xl border transition-all', item.is_available ? 'border-[#E5E7EB] shadow-zippy-sm' : 'border-[#E5E7EB] opacity-60')}>
+                  {item.image_url && (
+                    <div className="h-32 rounded-t-2xl overflow-hidden bg-[#F8FAFC]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1 min-w-0">
@@ -264,7 +276,7 @@ export default function SlugMenuPage() {
                       <span className="flex items-center gap-0.5 text-[11.5px] text-[#D97706]"><Star className="w-3 h-3 fill-[#D97706]" /> {item.rating.toFixed(1)}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#F3F4F6]">
-                      <button onClick={() => { setFormError(''); setEditItem(item) }}
+                      <button onClick={() => { setFormError(''); setFormImage(item.image_url); setEditItem(item) }}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A] transition-all">
                         <Edit2 className="w-3.5 h-3.5" /> Edit
                       </button>
@@ -283,7 +295,7 @@ export default function SlugMenuPage() {
 
       {(showAddModal || editItem) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditItem(null) }} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowAddModal(false); setEditItem(null); setFormImage(null) }} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 z-10 max-h-[90vh] overflow-y-auto">
             <h2 className="text-[17px] font-[800] text-[#111827] mb-5">{editItem ? 'Edit Item' : 'Add New Item'}</h2>
             {formError && <p className="text-[12.5px] text-[#DC2626] mb-3">{formError}</p>}
@@ -293,6 +305,7 @@ export default function SlugMenuPage() {
                 <input name="name" defaultValue={editItem?.name ?? ''} placeholder="e.g. Chicken Biryani"
                   className="w-full px-4 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all" />
               </div>
+              <ImageUploadField label="Item Photo" value={formImage} onChange={setFormImage} />
               <div>
                 <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Description</label>
                 <textarea name="description" defaultValue={editItem?.description ?? ''} placeholder="Short description..." rows={2}
@@ -329,7 +342,7 @@ export default function SlugMenuPage() {
                 </label>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowAddModal(false); setEditItem(null) }}
+                <button type="button" onClick={() => { setShowAddModal(false); setEditItem(null); setFormImage(null) }}
                   className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Cancel</button>
                 <button type="submit" disabled={saving}
                   className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60">

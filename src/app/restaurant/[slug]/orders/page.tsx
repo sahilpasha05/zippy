@@ -3,8 +3,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing } from 'lucide-react'
+import Image from 'next/image'
+import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing, MapPin, Bike, X } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { cn } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
@@ -24,13 +26,16 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
 
 const TABS = ['All', 'Active', 'Preparing', 'Delivered', 'Cancelled']
 
-type OrderItem = { name: string; quantity: number; price: number }
+type OrderItem = { name: string; quantity: number; price: number; image_url: string | null }
 type Order = {
   id: string; status: string; total: number; customer_name: string | null
   customer_phone: string | null; placed_at: string; address: string | null
+  delivery_latitude: number | null; delivery_longitude: number | null
+  delivery_partner_id: string | null
   order_items: OrderItem[]
 }
 type Restaurant = { id: string; name: string; slug: string }
+type DeliveryPartner = { id: string; name: string; phone: string | null }
 
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
@@ -56,13 +61,17 @@ export default function SlugOrdersPage() {
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null)
+  const [partners, setPartners] = useState<DeliveryPartner[]>([])
+  const [mapOrder, setMapOrder] = useState<Order | null>(null)
   const soundOnRef = useRef(true)
   soundOnRef.current = soundOn
+
+  const partnerFor = useCallback((id: string | null) => partners.find((p) => p.id === id) ?? null, [partners])
 
   const loadOrders = useCallback(async (restaurantId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, placed_at, address, order_items(name, quantity, price)')
+      .select('id, status, total, customer_name, customer_phone, placed_at, address, delivery_latitude, delivery_longitude, delivery_partner_id, order_items(name, quantity, price, image_url)')
       .eq('restaurant_id', restaurantId)
       // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
       .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
@@ -83,7 +92,11 @@ export default function SlugOrdersPage() {
         .single()
       if (!rest || cancelled) { setLoading(false); return }
       setRestaurant(rest as Restaurant)
-      await loadOrders(rest.id)
+      const [{ data: partnerRows }] = await Promise.all([
+        supabase.from('delivery_partners').select('id, name, phone'),
+        loadOrders(rest.id),
+      ])
+      setPartners((partnerRows as DeliveryPartner[]) ?? [])
       setLoading(false)
 
       channel = supabase
@@ -102,6 +115,9 @@ export default function SlugOrdersPage() {
               customer_phone: row.customer_phone as string | null,
               placed_at: row.placed_at as string,
               address: row.address as string | null,
+              delivery_latitude: row.delivery_latitude as number | null,
+              delivery_longitude: row.delivery_longitude as number | null,
+              delivery_partner_id: row.delivery_partner_id as string | null,
               order_items: [],
             })
             if (soundOnRef.current) startAlarm()
@@ -246,13 +262,47 @@ export default function SlugOrdersPage() {
                       </div>
 
                       {items.length > 0 && (
-                        <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3 space-y-1.5">
+                        <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3 space-y-2">
                           {items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-[12.5px]">
-                              <span className="text-[#374151]">{item.name} <span className="text-[#9CA3AF]">× {item.quantity}</span></span>
-                              <span className="text-[#111827] font-medium">₹{item.price * item.quantity}</span>
+                            <div key={idx} className="flex items-center justify-between gap-2 text-[12.5px]">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-md overflow-hidden bg-white border border-[#E5E7EB] shrink-0">
+                                  {item.image_url && (
+                                    <Image src={item.image_url} alt={item.name} width={28} height={28} unoptimized className="w-full h-full object-cover" />
+                                  )}
+                                </div>
+                                <span className="text-[#374151] truncate">{item.name} <span className="text-[#9CA3AF]">× {item.quantity}</span></span>
+                              </div>
+                              <span className="text-[#111827] font-medium shrink-0">₹{item.price * item.quantity}</span>
                             </div>
                           ))}
+                        </div>
+                      )}
+
+                      {(o.address || o.delivery_partner_id) && (
+                        <div className="border border-[#E5E7EB] rounded-xl p-3 mb-3 space-y-2">
+                          {o.address && (
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-3.5 h-3.5 text-[#9CA3AF] mt-0.5 shrink-0" />
+                              <p className="text-[12px] text-[#374151] flex-1 line-clamp-2">{o.address}</p>
+                              {o.delivery_latitude != null && o.delivery_longitude != null && (
+                                <button onClick={() => setMapOrder(o)} className="text-[11px] font-[600] text-[#16A34A] hover:underline shrink-0">Map</button>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Bike className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
+                            {partnerFor(o.delivery_partner_id) ? (
+                              <>
+                                <span className="text-[12px] text-[#374151] flex-1">{partnerFor(o.delivery_partner_id)!.name}</span>
+                                {partnerFor(o.delivery_partner_id)!.phone && (
+                                  <a href={`tel:${partnerFor(o.delivery_partner_id)!.phone}`} className="text-[11px] font-[600] text-[#16A34A] hover:underline shrink-0">Call rider</a>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[12px] text-[#9CA3AF] flex-1">No rider assigned yet</span>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -315,6 +365,29 @@ export default function SlugOrdersPage() {
               Accept Order
             </button>
             <p className="text-[11px] text-[#9CA3AF] mt-3">The alarm will keep ringing until you accept</p>
+          </div>
+        </div>
+      )}
+
+      {mapOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMapOrder(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6]">
+              <h2 className="text-[15px] font-[800] text-[#111827]">Delivery Location</h2>
+              <button onClick={() => setMapOrder(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
+                <X className="w-4 h-4 text-[#6B7280]" />
+              </button>
+            </div>
+            <LiveTrackingMap
+              riderLocation={null}
+              showRiderStatus={false}
+              dropLocation={mapOrder.delivery_latitude != null && mapOrder.delivery_longitude != null
+                ? { lat: mapOrder.delivery_latitude, lng: mapOrder.delivery_longitude }
+                : null}
+              className="h-64"
+            />
+            {mapOrder.address && <p className="text-[12.5px] text-[#374151] p-4">{mapOrder.address}</p>}
           </div>
         </div>
       )}

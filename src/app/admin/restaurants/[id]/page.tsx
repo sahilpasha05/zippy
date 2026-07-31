@@ -15,7 +15,7 @@ const supabase = createBrowserClient(
 
 type Restaurant = {
   id: string; name: string; slug: string; cuisine: string[]; description: string
-  cover_url: string | null; logo_url: string | null; address: string
+  cover_url: string | null; logo_url: string | null; address: string; phone: string | null
   delivery_time: number; min_order: number; delivery_fee: number
   is_open: boolean; is_active: boolean; owner_id: string | null
 }
@@ -79,7 +79,7 @@ export default function ManageRestaurantPage() {
     const { error: err } = await supabase.from('restaurants').update({
       name: restaurant.name, slug: restaurant.slug, description: restaurant.description,
       cuisine: restaurant.cuisine, cover_url: restaurant.cover_url, logo_url: restaurant.logo_url,
-      address: restaurant.address, delivery_time: restaurant.delivery_time,
+      address: restaurant.address, phone: restaurant.phone, delivery_time: restaurant.delivery_time,
       min_order: restaurant.min_order, delivery_fee: restaurant.delivery_fee,
       is_open: restaurant.is_open, is_active: restaurant.is_active, owner_id: restaurant.owner_id,
     }).eq('id', id)
@@ -176,6 +176,12 @@ export default function ManageRestaurantPage() {
               <div>
                 <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Address</label>
                 <input value={restaurant.address ?? ''} onChange={(e) => setField('address', e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Phone</label>
+                <input value={restaurant.phone ?? ''} onChange={(e) => setField('phone', e.target.value)}
+                  type="tel" placeholder="9876543210"
                   className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
               </div>
               <div className="col-span-2">

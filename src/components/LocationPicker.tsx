@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } from 'lucide-react'
 import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth'
 import { cn } from '@/lib/utils'
-import { useAddressStore } from '@/lib/store/address'
+import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
+import { isWithinDeliveryZone } from '@/lib/deliveryZone'
 import { auth } from '@/lib/firebase'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
@@ -20,7 +21,7 @@ type Step = 'list' | 'confirm' | 'manual'
 const INPUT = 'w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all'
 
 export default function LocationPicker({ onClose }: { onClose: () => void }) {
-  const { addresses, selectedId, addAddress, selectAddress, removeAddress } = useAddressStore()
+  const { addresses, selectedId, addAddress, selectAddress, removeAddress } = useAddresses()
   const [step, setStep] = useState<Step>('list')
   const [locating, setLocating] = useState(false)
   const [error, setError] = useState('')
@@ -108,6 +109,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     try {
       const pos = await getCurrentPosition()
       const { latitude, longitude } = pos.coords
+      if (!isWithinDeliveryZone(latitude, longitude)) {
+        setError('We don’t deliver to this location yet. Contact us at support@zippy.app to request service in your area.')
+        setLocating(false)
+        return
+      }
       const address = await reverseGeocode(latitude, longitude)
       setDraftCoords({ lat: latitude, lng: longitude })
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
@@ -128,18 +134,22 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     setStep('manual')
   }
 
-  function saveDraft() {
+  async function saveDraft() {
     if (!houseNo.trim() || !areaLine.trim()) { setError('Please fill in the house/flat number and area'); return }
     if (!contactName.trim()) { setError('Please enter a name for this address'); return }
     if (!/^\d{10}$/.test(contactPhone.trim())) { setError('Please enter a valid 10-digit mobile number'); return }
     if (otpVerifiedFor !== contactPhone) { setError('Please verify your mobile number with the OTP sent to it'); return }
     const fullAddress = [houseNo.trim(), areaLine.trim(), landmark.trim() ? `near ${landmark.trim()}` : null].filter(Boolean).join(', ')
-    const saved = addAddress({
-      label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null,
-      contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
-    })
-    selectAddress(saved.id)
-    onClose()
+    try {
+      const saved = await addAddress({
+        label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null,
+        contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
+      })
+      await selectAddress(saved.id)
+      onClose()
+    } catch {
+      setError('Could not save this address. Please try again.')
+    }
   }
 
   return (
