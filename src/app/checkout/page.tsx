@@ -16,6 +16,7 @@ import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
 import LocationPicker from '@/components/LocationPicker'
+import PhoneLoginModal from '@/components/PhoneLoginModal'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const supabase = createBrowserClient(
@@ -44,11 +45,21 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState('')
   const [showLocationPicker, setShowLocationPicker] = useState(false)
+  // Ordering requires an account: it is what carries the delivery number, the
+  // order history, tracking and reviews. A guest order would have none of those.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  const [showAuth, setShowAuth] = useState(false)
 
   // Hydrate persisted cart store before rendering (addresses handle their own readiness via useAddresses)
   useEffect(() => {
     useCartStore.persist.rehydrate()
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(!!session?.user))
+    return () => sub.subscription.unsubscribe()
   }, [])
 
   const selectedAddress = addresses.find((a) => a.id === selectedId) ?? null
@@ -73,6 +84,8 @@ export default function CheckoutPage() {
 
   const handlePlace = async () => {
     if (items.length === 0 || !selectedAddress) return
+
+    if (!signedIn) { setShowAuth(true); return }
 
     if (addressBlocked) {
       setPlaceError(addressOutOfZone
@@ -533,6 +546,8 @@ export default function CheckoutPage() {
         >
           {placing ? (
             <><Loader2 className="w-5 h-5 animate-spin" />Placing order...</>
+          ) : signedIn === false ? (
+            <>Sign in to place order</>
           ) : !selectedAddress ? (
             <>Select a delivery address</>
           ) : addressBlocked ? (
@@ -544,6 +559,13 @@ export default function CheckoutPage() {
       </div>
 
       {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
+
+      {showAuth && (
+        <PhoneLoginModal
+          onClose={() => setShowAuth(false)}
+          onSuccess={() => { setShowAuth(false); setSignedIn(true) }}
+        />
+      )}
       <SiteFooter />
     </>
   )

@@ -72,7 +72,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       setDraftCoords({ lat: latitude, lng: longitude })
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       setAreaLine(address ?? '')
-      setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(''); setContactPhone2(''); setDraftLabel('Home')
+      setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftLabel('Home')
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not get your location')
@@ -86,7 +86,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   // their area by hand. If they decline we still open the form and explain at
   // save time why the location is needed.
   async function openManual() {
-    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setContactPhone2(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftCoords(null); setDraftLabel('Home'); setError('')
 
     setLocating(true)
     try {
