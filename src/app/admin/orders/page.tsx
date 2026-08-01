@@ -32,6 +32,7 @@ type Order = {
   order_type: string | null
   delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
+  restaurant_id: string | null
   restaurants: { name: string } | null
   order_items: OrderItem[]
 }
@@ -70,6 +71,7 @@ export default function AdminOrdersPage() {
   const [partners, setPartners] = useState<Partner[]>([])
   const [groceryPartners, setGroceryPartners] = useState<Partner[]>([])
   const [storePartners, setStorePartners] = useState<Partner[]>([])
+  const [restaurantList, setRestaurantList] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('All')
@@ -80,10 +82,10 @@ export default function AdminOrdersPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }] = await Promise.all([
+    const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }, { data: rests }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
@@ -94,11 +96,13 @@ export default function AdminOrdersPage() {
       supabase.from('delivery_partners').select('id, name, is_active').order('name'),
       supabase.from('grocery_partners').select('id, name, is_active').order('name'),
       supabase.from('store_partners').select('id, name, is_active').order('name'),
+      supabase.from('restaurants').select('id, name, is_active').order('name'),
     ])
     setOrders((ords as unknown as Order[]) ?? [])
     setPartners((parts as Partner[]) ?? [])
     setGroceryPartners((groceryParts as Partner[]) ?? [])
     setStorePartners((storeParts as Partner[]) ?? [])
+    setRestaurantList((rests as Partner[]) ?? [])
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
@@ -113,6 +117,15 @@ export default function AdminOrdersPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [load])
+
+  // Lets an admin move an order to a different kitchen, or clear it when the
+  // restaurant can't take it — the order itself stays on file either way.
+  async function assignRestaurant(orderId: string, restaurantId: string) {
+    await supabase.from('orders').update({ restaurant_id: restaurantId || null }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId
+      ? { ...o, restaurant_id: restaurantId || null, restaurants: restaurantId ? { name: restaurantList.find((r) => r.id === restaurantId)?.name ?? '' } : null }
+      : o))
+  }
 
   async function saveNote(orderId: string, note: string) {
     await supabase.from('orders').update({ notes: note || null }).eq('id', orderId)
@@ -315,7 +328,18 @@ export default function AdminOrdersPage() {
                           <p className="text-[13px] font-[600] text-[#111827]">{o.customer_name ?? '—'}</p>
                           {o.customer_phone && <p className="text-[11.5px] text-[#9CA3AF]">{o.customer_phone}</p>}
                         </td>
-                        <td className="px-5 py-3.5 text-[12.5px] text-[#6B7280]">{restName ?? '—'}</td>
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          {isFinal ? (
+                            <span className="text-[12.5px] text-[#6B7280]">{restName ?? '—'}</span>
+                          ) : (
+                            <select value={o.restaurant_id ?? ''} onChange={(e) => assignRestaurant(o.id, e.target.value)}
+                              className={cn('px-2 py-1 border rounded-lg text-[12px] bg-white outline-none focus:border-[#7C3AED] max-w-[150px]',
+                                o.restaurant_id ? 'border-[#E5E7EB] text-[#374151]' : 'border-[#FECACA] text-[#DC2626]')}>
+                              <option value="">Unassigned</option>
+                              {restaurantList.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                          )}
+                        </td>
                         <td className="px-5 py-3.5">
                           <span className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full w-fit" style={{ background: cfg.bg, color: cfg.color }}>
                             <Icon className="w-3 h-3" /> {cfg.label}
