@@ -82,7 +82,7 @@ export default function CheckoutPage() {
     if (selectedPayment !== 'cod') {
       const normalizedPhone = (selectedAddress.contactPhone ?? '').replace(/^\+91/, '').slice(-10)
       if (!/^\d{10}$/.test(normalizedPhone)) {
-        setPlaceError('This address is missing a verified mobile number. Please remove it and add it again before paying online.')
+        setPlaceError('This address is missing a valid 10-digit mobile number. Please edit it and add one before paying online.')
         return
       }
     }
