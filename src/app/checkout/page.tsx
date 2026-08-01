@@ -96,9 +96,26 @@ export default function CheckoutPage() {
       const { data: { user } } = await supabase.auth.getUser()
       const restaurantId = items.find((i) => i.restaurant_id)?.restaurant_id ?? null
 
-      const { data: order, error: orderErr } = await supabase
-        .from('orders')
-        .insert({
+      // A retried payment must not become a second order. The row is written
+      // before the customer is sent to Cashfree, so every "try again" used to
+      // create another one and the kitchen saw each attempt as a separate order.
+      // If this browser already has an unpaid order for the exact same cart from
+      // the last 30 minutes, that row is reused instead.
+      const cartSignature = JSON.stringify({
+        r: restaurantId,
+        t: grandTotal,
+        i: items.map((i) => `${i.product_id}x${i.quantity}`).sort(),
+      })
+      let reuseId: string | null = null
+      try {
+        const saved = JSON.parse(localStorage.getItem('zippy-pending-order') ?? 'null') as
+          { id: string; sig: string; at: number } | null
+        if (saved && saved.sig === cartSignature && new Date().getTime() - saved.at < 30 * 60 * 1000) {
+          reuseId = saved.id
+        }
+      } catch { /* no usable record — fall through and create one */ }
+
+      const orderPayload = {
           user_id: user?.id ?? null,
           restaurant_id: restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',
@@ -117,11 +134,39 @@ export default function CheckoutPage() {
           customer_name: selectedAddress.contactName || user?.user_metadata?.full_name || null,
           customer_phone: selectedAddress.contactPhone || null,
           placed_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single()
+      }
+
+      let order: { id: string } | null = null
+      let orderErr: unknown = null
+
+      if (reuseId) {
+        // Only reuse while it is still unpaid — if that attempt actually
+        // succeeded, fall through and create a fresh order.
+        const { data: updated, error } = await supabase
+          .from('orders')
+          .update(orderPayload)
+          .eq('id', reuseId)
+          .in('payment_status', ['pending', 'failed'])
+          .select('id')
+          .maybeSingle()
+        if (!error && updated) {
+          order = updated
+          // Items are rewritten below, so clear the previous attempt's lines.
+          await supabase.from('order_items').delete().eq('order_id', updated.id)
+        }
+      }
+
+      if (!order) {
+        const { data: created, error } = await supabase.from('orders').insert(orderPayload).select('id').single()
+        order = created
+        orderErr = error
+      }
 
       if (orderErr || !order) throw orderErr ?? new Error('Failed to create order')
+
+      try {
+        localStorage.setItem('zippy-pending-order', JSON.stringify({ id: order.id, sig: cartSignature, at: new Date().getTime() }))
+      } catch { /* non-fatal */ }
 
       const orderItems = items.map((item) => ({
         order_id: order.id,
@@ -153,6 +198,7 @@ export default function CheckoutPage() {
 
       if (selectedPayment === 'cod') {
         setOrderId(order.id)
+        try { localStorage.removeItem('zippy-pending-order') } catch {}
         clearCart()
         setPlaced(true)
         setPlacing(false)
@@ -188,6 +234,7 @@ export default function CheckoutPage() {
         const statusData = await statusRes.json()
         if (statusData.state === 'COMPLETED') {
           setOrderId(order.id)
+          try { localStorage.removeItem('zippy-pending-order') } catch {}
           clearCart()
           setPlaced(true)
         } else {
