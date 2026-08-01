@@ -59,7 +59,9 @@ export default function CheckoutPage() {
   const addressUnverified = !!selectedAddress && (selectedAddress.lat == null || selectedAddress.lng == null)
   const addressOutOfZone = !!selectedAddress && !addressUnverified
     && !isWithinDeliveryZone(selectedAddress.lat as number, selectedAddress.lng as number)
-  const addressBlocked = addressUnverified || addressOutOfZone
+  // An address with no coordinates (location was denied) is allowed through;
+  // only a confirmed out-of-area one is refused.
+  const addressBlocked = addressOutOfZone
 
   const deliveryFee = DELIVERY_FEE
   const platformFee = getPlatformFee(cartTotal)

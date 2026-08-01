@@ -293,7 +293,7 @@ export default function Navbar() {
       {profileMenuOpen && user && (
         <>
           <div className="fixed inset-0 z-[90]" onClick={closeProfileMenu} />
-          <div className="fixed top-16 right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
+          <div className="fixed top-[172px] lg:top-16 right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
             <div className="px-3 py-2.5 border-b border-[#F3F4F6] mb-1">
               <p className="text-[12px] text-[#9CA3AF]">Signed in as</p>
               <p className="text-[13.5px] font-[700] text-[#111827] truncate">{user.phone ?? user.email}</p>
