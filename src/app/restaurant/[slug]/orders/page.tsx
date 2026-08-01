@@ -54,6 +54,39 @@ function etaMinutes(placedAt: string, status: string) {
   return eta !== null && eta > 0 ? `${eta} min` : null
 }
 
+
+// Announced orders are remembered per browser so reopening the panel — or a tab
+// left open since yesterday — doesn't replay the alarm for orders already seen.
+const ANNOUNCED_KEY = 'zippy-announced-orders'
+
+function loadAnnounced(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(ANNOUNCED_KEY) ?? '[]') as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+function rememberAnnounced(id: string) {
+  try {
+    const next = [...loadAnnounced(), id].slice(-500) // bounded
+    localStorage.setItem(ANNOUNCED_KEY, JSON.stringify(next))
+  } catch {
+    // storage unavailable — the in-memory guard still applies for this session
+  }
+}
+
+
+// The stages a shop controls. "delivered" is deliberately absent — completing an
+// order is the rider's call and stamps delivery/payment fields this panel can't set.
+const SHOP_STAGES: { value: string; label: string }[] = [
+  { value: 'pending',          label: 'New order' },
+  { value: 'confirmed',        label: 'Confirmed' },
+  { value: 'preparing',        label: 'Preparing' },
+  { value: 'out_for_delivery', label: 'Ready for pickup' },
+  { value: 'cancelled',        label: 'Cancelled' },
+]
+
 export default function SlugOrdersPage() {
   const { slug } = useParams<{ slug: string }>()
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
@@ -82,7 +115,9 @@ export default function SlugOrdersPage() {
       // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
       .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('placed_at', { ascending: false })
-      .limit(50)
+      // A busy day runs well past 50 orders; capping here made them vanish
+      // from the panel entirely.
+      .limit(500)
     const rows = (data as unknown as Order[]) ?? []
     setOrders(rows)
     return rows
@@ -111,9 +146,19 @@ export default function SlugOrdersPage() {
       // nothing: the popup only fired on a live INSERT, so anything placed while
       // the tab was shut stayed silent. Ring for whatever is still un-actioned
       // at load, the way the rider panel already does.
-      const waiting = loaded.find((o) => o.status === 'pending')
+      // Only ring for something genuinely new. Matching on status alone meant a
+      // stale order sitting in "pending" from days ago re-triggered the alarm
+      // every single time the panel was opened, including in an old tab. It has
+      // to be recent AND not already announced on this device.
+      const FRESH_MS = 30 * 60 * 1000
+      const seen = loadAnnounced()
+      const waiting = loaded.find((o) =>
+        o.status === 'pending' &&
+        Date.now() - new Date(o.placed_at).getTime() < FRESH_MS &&
+        !seen.has(o.id)
+      )
       if (waiting) {
-        poppedRef.current.add(waiting.id)
+        rememberAnnounced(waiting.id)
         setPendingOrder(waiting)
         if (soundOnRef.current) startAlarm('New order')
       }
@@ -337,6 +382,22 @@ export default function SlugOrdersPage() {
                             <MessageSquare className="w-3.5 h-3.5" /> Chat
                           </button>
                         </div>
+                        {/* Any stage can be picked directly — an order that was
+                            missed or advanced by mistake can be put back where it
+                            belongs. The change reaches the rider and admin panels
+                            through the same orders row they both read. */}
+                        {!['delivered', 'cancelled'].includes(o.status) && (
+                          <select
+                            value={o.status}
+                            disabled={advancing === o.id}
+                            onChange={(e) => advance(o.id, e.target.value)}
+                            className="px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-[600] text-[#374151] bg-white outline-none focus:border-[#16A34A] disabled:opacity-60"
+                          >
+                            {SHOP_STAGES.map((st) => (
+                              <option key={st.value} value={st.value}>{st.label}</option>
+                            ))}
+                          </select>
+                        )}
                         {cfg.next && (
                           <button onClick={() => advance(o.id, cfg.next!)} disabled={advancing === o.id}
                             className="flex items-center gap-1.5 px-4 py-1.5 bg-[#16A34A] text-white text-[12px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
