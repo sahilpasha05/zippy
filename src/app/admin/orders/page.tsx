@@ -28,6 +28,7 @@ type Order = {
   id: string; status: string; total: number; customer_name: string | null; customer_phone: string | null
   placed_at: string; address: string | null; payment_method: string | null; payment_status: string | null
   online_amount: number | null; cod_amount: number | null; cash_collected_at: string | null
+  notes: string | null
   order_type: string | null
   delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
@@ -52,6 +53,18 @@ function timeAgo(d: string) {
   return `${Math.floor(h / 24)}d ago`
 }
 
+
+// Why an order never really got placed, or null if it is fine. The row is
+// written before the customer is redirected to Cashfree, so an online leg that
+// was never settled means the payment did not go through.
+function notPlaced(o: { payment_status: string | null; online_amount: number | null; status: string }): string | null {
+  if (o.status === 'cancelled' || o.status === 'delivered') return null
+  if ((o.online_amount ?? 0) <= 0) return null
+  if (o.payment_status === 'failed') return 'payment failed'
+  if (o.payment_status === 'pending') return 'payment not completed'
+  return null
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
@@ -70,7 +83,7 @@ export default function AdminOrdersPage() {
     const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
@@ -101,6 +114,19 @@ export default function AdminOrdersPage() {
     return () => { supabase.removeChannel(channel) }
   }, [load])
 
+  async function saveNote(orderId: string, note: string) {
+    await supabase.from('orders').update({ notes: note || null }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, notes: note || null } : o))
+  }
+
+  // Cancelling clears the rider too — a cancelled order shouldn't sit on
+  // anyone's run sheet.
+  async function cancelOrder(orderId: string) {
+    await supabase.from('orders').update({ status: 'cancelled', delivery_partner_id: null }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'cancelled', delivery_partner_id: null } : o))
+    setConfirmCancel(null)
+  }
+
   async function assignOrder(orderId: string, partnerId: string) {
     await supabase.from('orders').update({ delivery_partner_id: partnerId || null, accepted_at: null }).eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, delivery_partner_id: partnerId || null } : o))
@@ -116,6 +142,7 @@ export default function AdminOrdersPage() {
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, store_partner_id: partnerId || null } : o))
   }
 
+  const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const [reconciling, setReconciling] = useState(false)
   const [reconcileMsg, setReconcileMsg] = useState('')
 
@@ -261,7 +288,7 @@ export default function AdminOrdersPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
-                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Grocery Partner', 'Store Partner', 'Paid online', 'Cash on delivery', 'Pending', 'Total', 'Time'].map((h) => (
+                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Grocery Partner', 'Store Partner', 'Paid online', 'Cash on delivery', 'Pending', 'Total', 'Note', 'Time'].map((h) => (
                       <th key={h} className="text-left text-[11.5px] font-[600] text-[#9CA3AF] px-5 py-3">{h}</th>
                     ))}
                   </tr>
@@ -293,6 +320,15 @@ export default function AdminOrdersPage() {
                           <span className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full w-fit" style={{ background: cfg.bg, color: cfg.color }}>
                             <Icon className="w-3 h-3" /> {cfg.label}
                           </span>
+                          {/* The order row is always written before the customer
+                              is sent to Cashfree, so an unpaid online leg means
+                              money never arrived — flag it rather than let it
+                              read like a normal pending order. */}
+                          {notPlaced(o) && (
+                            <span className="block mt-1 text-[10.5px] font-[600] text-[#DC2626] leading-tight">
+                              Not placed · {notPlaced(o)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                           {isFinal ? (
@@ -366,11 +402,19 @@ export default function AdminOrdersPage() {
                           })()}
                         </td>
                         <td className="px-5 py-3.5 text-[13px] font-[700] text-[#111827]">₹{formatMoney(o.total)}</td>
+                        <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            defaultValue={o.notes ?? ''}
+                            onBlur={(e) => { if (e.target.value !== (o.notes ?? '')) saveNote(o.id, e.target.value.trim()) }}
+                            placeholder="Add note..."
+                            className="w-36 px-2 py-1 border border-[#E5E7EB] rounded-lg text-[12px] outline-none focus:border-[#7C3AED] bg-white"
+                          />
+                        </td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</td>
                       </tr>
                       {isExpanded && (
                         <tr className="bg-[#FAFAFA]">
-                          <td colSpan={9} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
+                          <td colSpan={13} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
                             <div className="grid sm:grid-cols-3 gap-4">
                               <div>
                                 <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><Phone className="w-3 h-3" /> Contact</p>
@@ -428,6 +472,35 @@ export default function AdminOrdersPage() {
                               </div>
                             ) : (
                               <p className="text-[12.5px] text-[#9CA3AF]">No item details recorded for this order.</p>
+                            )}
+
+                            {!['delivered', 'cancelled'].includes(o.status) && (
+                              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[#F3F4F6]">
+                                {o.delivery_partner_id && (
+                                  <button onClick={() => assignOrder(o.id, '')}
+                                    className="px-3 py-1.5 border border-[#E5E7EB] rounded-lg text-[12px] font-[600] text-[#374151] hover:bg-white transition-all">
+                                    Unassign rider
+                                  </button>
+                                )}
+                                {confirmCancel === o.id ? (
+                                  <>
+                                    <span className="text-[12px] text-[#6B7280]">Cancel this order?</span>
+                                    <button onClick={() => cancelOrder(o.id)}
+                                      className="px-3 py-1.5 bg-[#DC2626] text-white rounded-lg text-[12px] font-[700] hover:bg-[#B91C1C] transition-all">
+                                      Yes, cancel
+                                    </button>
+                                    <button onClick={() => setConfirmCancel(null)}
+                                      className="px-3 py-1.5 border border-[#E5E7EB] rounded-lg text-[12px] font-[600] text-[#374151] hover:bg-white transition-all">
+                                      Keep
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button onClick={() => setConfirmCancel(o.id)}
+                                    className="px-3 py-1.5 border border-[#FECACA] text-[#DC2626] rounded-lg text-[12px] font-[600] hover:bg-[#FEF2F2] transition-all">
+                                    Cancel order
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>
