@@ -41,7 +41,20 @@ export default function ImageUploadField({ label, value, onChange, endpoint = '/
         <div className="relative w-full h-32 rounded-xl overflow-hidden border border-[#E5E7EB] bg-[#F8FAFC] group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+
+          {/* Touch devices have no hover, so the hover overlay below is
+              unreachable on a phone. These two controls are always on screen
+              under lg and hidden on desktop, where the overlay takes over. */}
+          <button type="button" onClick={() => onChange(null)} aria-label="Remove image"
+            className="lg:hidden absolute top-2 right-2 w-8 h-8 flex items-center justify-center bg-white rounded-full text-[#DC2626] shadow-[0_2px_8px_rgba(0,0,0,0.25)] active:scale-95 transition-all">
+            <X className="w-4 h-4" />
+          </button>
+          <button type="button" onClick={() => inputRef.current?.click()}
+            className="lg:hidden absolute bottom-2 left-2 px-3 py-1.5 bg-white rounded-lg text-[12px] font-[600] text-[#374151] shadow-[0_2px_8px_rgba(0,0,0,0.25)] active:scale-95 transition-all">
+            Change photo
+          </button>
+
+          <div className="hidden lg:flex absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
             <button type="button" onClick={() => inputRef.current?.click()}
               className="px-3 py-1.5 bg-white rounded-lg text-[12px] font-[600] text-[#374151] hover:bg-[#F3F4F6]">Replace</button>
             <button type="button" onClick={() => onChange(null)}
