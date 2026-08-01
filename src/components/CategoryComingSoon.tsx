@@ -24,11 +24,11 @@ export default function CategoryComingSoon({
           <Clock className="w-5 h-5 text-[#7C3AED]" strokeWidth={2} />
         </div>
         <h2 className="text-[16px] font-[800] text-[#111827] mb-1.5" style={{ fontWeight: 800 }}>
-          {categoryName} — coming soon
+          {categoryName}
         </h2>
         <p className="text-[13px] text-[#6B7280] leading-relaxed mb-5">
-          We&apos;re still stocking this aisle. Groceries open in Tarikere shortly — restaurant
-          food is available to order right now.
+          We&apos;re currently unavailable in this category — we&apos;ll be opening it soon.
+          Restaurant food is available to order right now.
         </p>
         <button
           onClick={onClose}
