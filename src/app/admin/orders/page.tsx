@@ -74,7 +74,10 @@ export default function AdminOrdersPage() {
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
-        .limit(100),
+        // The header counts (active / unassigned) and every tab are derived
+        // from this list, so capping at 100 under-reported them once there were
+        // more orders than that.
+        .limit(2000),
       supabase.from('delivery_partners').select('id, name, is_active').order('name'),
       supabase.from('grocery_partners').select('id, name, is_active').order('name'),
       supabase.from('store_partners').select('id, name, is_active').order('name'),

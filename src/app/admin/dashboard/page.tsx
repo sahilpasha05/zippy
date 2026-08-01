@@ -34,9 +34,13 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     async function load() {
+      // The stats below are computed from this list, so it has to be every
+      // order — capping it at 10 made "Total Revenue" the sum of the last ten
+      // orders and "Total Orders" always read 10. The table further down slices
+      // the first few for display.
       const [{ data: ords }, { data: rests }] = await Promise.all([
-        supabase.from('orders').select('id, status, total, customer_name, placed_at, restaurants(name)').order('placed_at', { ascending: false }).limit(10),
-        supabase.from('restaurants').select('id, name, is_active, rating, owner_id').eq('is_active', true).order('created_at', { ascending: false }).limit(5),
+        supabase.from('orders').select('id, status, total, customer_name, placed_at, restaurants(name)').order('placed_at', { ascending: false }).limit(5000),
+        supabase.from('restaurants').select('id, name, is_active, rating, owner_id').eq('is_active', true).order('created_at', { ascending: false }),
       ])
       setOrders((ords as unknown as Order[]) ?? [])
       setRestaurants((rests as Restaurant[]) ?? [])
@@ -46,13 +50,14 @@ export default function AdminDashboardPage() {
   }, [])
 
   const activeOrders = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status)).length
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0)
+  // Revenue counts delivered orders only — pending and cancelled ones aren't money.
+  const totalRevenue = orders.filter((o) => o.status === 'delivered').reduce((s, o) => s + Number(o.total), 0)
 
   const stats = [
-    { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, sub: 'from recent orders', icon: TrendingUp, color: '#7C3AED', bg: '#F5F3FF' },
+    { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, sub: 'from delivered orders', icon: TrendingUp, color: '#7C3AED', bg: '#F5F3FF' },
     { label: 'Active Orders', value: activeOrders, sub: 'being processed now', icon: ShoppingBag, color: '#D97706', bg: '#FFFBEB' },
     { label: 'Restaurants', value: restaurants.length, sub: 'active listings', icon: Store, color: '#0891B2', bg: '#ECFEFF' },
-    { label: 'Total Orders', value: orders.length, sub: 'loaded in view', icon: Users, color: '#16A34A', bg: '#DCFCE7' },
+    { label: 'Total Orders', value: orders.length, sub: 'all time', icon: Users, color: '#16A34A', bg: '#DCFCE7' },
   ]
 
   return (
@@ -115,7 +120,7 @@ export default function AdminDashboardPage() {
                 </div>
               ) : (
                 <div className="divide-y divide-[#F3F4F6]">
-                  {orders.map((o) => {
+                  {orders.slice(0, 10).map((o) => {
                     const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.pending
                     const Icon = cfg.icon
                     return (
