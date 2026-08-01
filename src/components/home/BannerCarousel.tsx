@@ -91,13 +91,13 @@ export default function BannerCarousel() {
           <>
             <button
               onClick={prev}
-              className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/35 transition-all opacity-0 group-hover:opacity-100 z-10"
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 z-10"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={next}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/35 transition-all opacity-0 group-hover:opacity-100 z-10"
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/35 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-black/50 transition-all opacity-100 lg:opacity-0 lg:group-hover:opacity-100 z-10"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
