@@ -116,6 +116,28 @@ export default function AdminOrdersPage() {
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, store_partner_id: partnerId || null } : o))
   }
 
+  const [reconciling, setReconciling] = useState(false)
+  const [reconcileMsg, setReconcileMsg] = useState('')
+
+  async function reconcile() {
+    setReconciling(true); setReconcileMsg('')
+    try {
+      const res = await fetch('/api/cashfree/reconcile', { method: 'POST' })
+      const d = await res.json()
+      if (!res.ok) { setReconcileMsg(d.error ?? 'Could not verify payments'); return }
+      setReconcileMsg(
+        d.settled > 0
+          ? `Settled ${d.settled} order${d.settled === 1 ? '' : 's'} — ₹${d.settledAmount} recovered`
+          : `Checked ${d.checked} — all up to date`
+      )
+      await load()
+    } catch {
+      setReconcileMsg('Could not reach the server')
+    } finally {
+      setReconciling(false)
+    }
+  }
+
   async function autoAssign() {
     if (!autoAssignPartner) return
     setAutoAssigning(true)
@@ -192,6 +214,19 @@ export default function AdminOrdersPage() {
               {autoAssigning ? 'Assigning...' : `Assign all ${unassignedCnt}`}
             </button>
             {autoAssignMsg && <span className="text-[12px] text-[#16A34A] font-medium">{autoAssignMsg}</span>}
+          </div>
+
+          {/* Re-asks Cashfree about every order still marked unpaid and settles
+              the ones that actually went through — covers payments whose webhook
+              never arrived or whose customer closed the tab mid-payment. */}
+          <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl">
+            <RefreshCw className="w-4 h-4 text-[#16A34A] shrink-0" />
+            <span className="text-[12.5px] text-[#15803D] font-medium shrink-0">Verify payments with Cashfree</span>
+            <button onClick={reconcile} disabled={reconciling}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#16A34A] text-white text-[12px] font-[600] rounded-lg hover:bg-[#15803D] transition-all disabled:opacity-50 shrink-0">
+              {reconciling ? 'Checking...' : 'Check now'}
+            </button>
+            {reconcileMsg && <span className="text-[12px] text-[#15803D] font-medium">{reconcileMsg}</span>}
           </div>
 
           <div className="flex gap-1 overflow-x-auto">
