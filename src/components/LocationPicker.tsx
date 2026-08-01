@@ -61,6 +61,18 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     return () => resetRecaptcha()
   }, [])
 
+  // The number is collected first and left alone; a few seconds after a valid
+  // 10-digit number is typed, the code is sent automatically so the customer is
+  // asked to verify rather than having to hunt for a button. Debounced so it
+  // doesn't fire while they are still typing, and guarded so one number is only
+  // ever sent once.
+  useEffect(() => {
+    if (!isValidPhone || isOtpSentForCurrent || isPhoneVerified || otpSending) return
+    const t = setTimeout(() => { sendOtp() }, 3500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactPhone, isValidPhone, isOtpSentForCurrent, isPhoneVerified])
+
   function mapFirebaseError(err: unknown): string {
     const code = (err as { code?: string })?.code ?? ''
     if (code === 'auth/invalid-phone-number') return "That doesn't look like a valid mobile number"

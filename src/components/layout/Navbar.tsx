@@ -8,6 +8,7 @@ import {
   MapPin, Search, Bell, User, ChevronDown,
   Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History
 } from 'lucide-react'
+import PhoneAuthModal from '@/components/PhoneAuthModal'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
 import { useCartStore } from '@/lib/store/cart'
@@ -22,6 +23,7 @@ const navLinks = [
 ]
 
 export default function Navbar() {
+  const [showAuth, setShowAuth] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
@@ -120,9 +122,9 @@ export default function Navbar() {
                   </div>
                 </button>
               ) : (
-                <Link href="/auth/login" className="flex items-center justify-center w-10 h-10">
+                <button onClick={() => setShowAuth(true)} className="flex items-center justify-center w-10 h-10">
                   <User className="w-6 h-6 text-[#1F1F1F]" strokeWidth={1.75} />
-                </Link>
+                </button>
               )}
             </div>
           </div>
@@ -241,12 +243,12 @@ export default function Navbar() {
                   </span>
                 </button>
               ) : (
-                <Link href="/auth/login" className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#F8FAFC] transition-all ml-1 group">
+                <button onClick={() => setShowAuth(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#F8FAFC] transition-all ml-1 group">
                   <div className="w-7 h-7 rounded-full bg-[#DCFCE7] flex items-center justify-center">
                     <User className="w-3.5 h-3.5 text-[#16A34A]" strokeWidth={2} />
                   </div>
                   <span className="hidden md:block text-[13px] font-medium text-[#374151] group-hover:text-[#111827]">Sign in</span>
-                </Link>
+                </button>
               )}
 
               {/* Mobile menu */}
@@ -337,6 +339,14 @@ export default function Navbar() {
       )}
 
       {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
+
+      {/* Sign-in is phone OTP — the old /auth/login email+password page is gone. */}
+      {showAuth && (
+        <PhoneAuthModal
+          onClose={() => setShowAuth(false)}
+          onSuccess={() => { setShowAuth(false); router.refresh() }}
+        />
+      )}
     </>
   )
 }
