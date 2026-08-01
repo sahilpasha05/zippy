@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
@@ -30,6 +31,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactPhone2, setContactPhone2] = useState('')
+  // Set when signed in: the account's number is used for the address rather than
+  // whatever gets typed, so deliveries reach the number we can actually reach.
+  const [accountPhone, setAccountPhone] = useState('')
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -41,6 +45,18 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
 
 
 
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => {
+      const raw = data.user?.phone ?? ''
+      const local = raw.replace(/\D/g, '').slice(-10)
+      if (/^\d{10}$/.test(local)) {
+        setAccountPhone(local)
+        setContactPhone(local)
+        setContactPhone2(local)
+      }
+    })
+  }, [])
 
   async function handleUseCurrentLocation() {
     setLocating(true); setError('')
@@ -228,10 +244,17 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                   placeholder="98765 43210"
                   inputMode="numeric"
                   type="tel"
-                  className="flex-1 bg-transparent text-[13.5px] outline-none min-w-0"
+                  readOnly={!!accountPhone}
+                  className={cn('flex-1 bg-transparent text-[13.5px] outline-none min-w-0', accountPhone && 'text-[#6B7280]')}
                 />
+                {accountPhone && (
+                  <span className="shrink-0 flex items-center gap-1 text-[11.5px] font-[600] text-[#16A34A]">
+                    <Check className="w-3.5 h-3.5" /> Your number
+                  </span>
+                )}
               </div>
             </div>
+            {!accountPhone && (
             <div>
               {/* Typed twice instead of an OTP: the number is never verified, so
                   this is the only guard against a typo leaving an order with a
@@ -259,6 +282,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 <p className="text-[11.5px] text-[#DC2626] mt-1.5">Numbers don&apos;t match yet.</p>
               )}
             </div>
+            )}
 
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Save as</label>

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2 } from 'lucide-react'
+import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import ReviewModal from '@/components/ReviewModal'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
@@ -33,6 +34,8 @@ const CLOSED = ['delivered', 'cancelled']
 type Rel<T> = T | T[] | null
 type OrderRow = {
   id: string
+  restaurant_id: string | null
+  reviews: { id: string }[] | null
   order_type: string
   status: string
   total: number
@@ -47,7 +50,7 @@ function restName(o: OrderRow): string | null {
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.name ?? null : o.restaurants.name
 }
 
-function OrderCard({ order, eta }: { order: OrderRow; eta: number }) {
+function OrderCard({ order, eta, onReview }: { order: OrderRow; eta: number; onReview: (o: OrderRow) => void }) {
   const config = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
   const isActive = !CLOSED.includes(order.status)
   const currentStep = STEPS.indexOf(order.status)
@@ -140,9 +143,23 @@ function OrderCard({ order, eta }: { order: OrderRow; eta: number }) {
             <MapPin className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{order.address ?? 'No address on file'}</span>
           </span>
-          <Link href={`/orders/${order.id}/track`} className="flex items-center gap-1 text-[12.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors shrink-0">
-            Details <ChevronRight className="w-3.5 h-3.5" />
-          </Link>
+          <div className="flex items-center gap-3 shrink-0">
+            {order.status === 'delivered' && (
+              order.reviews?.length ? (
+                <span className="flex items-center gap-1 text-[12.5px] font-medium text-[#D97706]">
+                  <Star className="w-3.5 h-3.5 fill-[#D97706]" /> Reviewed
+                </span>
+              ) : (
+                <button onClick={() => onReview(order)}
+                  className="flex items-center gap-1 text-[12.5px] font-medium text-[#D97706] hover:text-[#B45309] transition-colors">
+                  <Star className="w-3.5 h-3.5" /> Write a review
+                </button>
+              )
+            )}
+            <Link href={`/orders/${order.id}/track`} className="flex items-center gap-1 text-[12.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
+              Details <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>
@@ -154,6 +171,7 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [signedIn, setSignedIn] = useState(true)
+  const [reviewing, setReviewing] = useState<OrderRow | null>(null)
   const eta = useDeliveryEta()
 
   useEffect(() => {
@@ -165,7 +183,7 @@ export default function OrdersPage() {
       // query honest about its intent rather than relying on the policy alone.
       const { data } = await supabase
         .from('orders')
-        .select('id, order_type, status, total, address, created_at, restaurants(name), order_items(name, quantity)')
+        .select('id, order_type, status, total, address, created_at, restaurant_id, restaurants(name), order_items(name, quantity), reviews(id)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
@@ -227,11 +245,23 @@ export default function OrdersPage() {
                 </Link>
               </div>
             ) : (
-              shown.map((o) => <OrderCard key={o.id} order={o} eta={eta} />)
+              shown.map((o) => <OrderCard key={o.id} order={o} eta={eta} onReview={setReviewing} />)
             )}
           </div>
         </div>
       </div>
+      {reviewing && (
+        <ReviewModal
+          orderId={reviewing.id}
+          restaurantId={reviewing.restaurant_id}
+          restaurantName={restName(reviewing)}
+          onClose={() => setReviewing(null)}
+          onSaved={() => {
+            setOrders((prev) => prev.map((o) => o.id === reviewing.id ? { ...o, reviews: [{ id: 'new' }] } : o))
+            setReviewing(null)
+          }}
+        />
+      )}
       <SiteFooter />
     </>
   )

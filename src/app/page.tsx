@@ -7,7 +7,7 @@ import TrendingProducts from '@/components/home/TrendingProducts'
 import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
 import QuickCategories from '@/components/home/QuickCategories'
 import SiteFooter from '@/components/layout/SiteFooter'
-import LocationPermissionPrompt from '@/components/LocationPermissionPrompt'
+import HomeSignInPrompt from '@/components/HomeSignInPrompt'
 
 export default function HomePage() {
   return (
@@ -15,7 +15,7 @@ export default function HomePage() {
       <Navbar />
       <CartSidebar />
       <ViewCartBar />
-      <LocationPermissionPrompt />
+      <HomeSignInPrompt />
 
       {/* Hero is desktop-only — mobile goes straight to categories like Blinkit */}
       <div className="hidden lg:block">
