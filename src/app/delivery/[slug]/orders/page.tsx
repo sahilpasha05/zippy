@@ -30,6 +30,7 @@ type Order = {
   delivery_latitude: number | null; delivery_longitude: number | null
   accepted_at: string | null
   online_amount: number | null; cod_amount: number | null
+  payment_status: string | null; cash_collected_at: string | null
   order_items: OrderItem[]
   restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
 }
@@ -52,6 +53,21 @@ function restAddress(o: Order) {
 function restPhone(o: Order) {
   if (!o.restaurants) return null
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.phone ?? null : o.restaurants.phone
+}
+
+
+// What the rider must actually take at the door. A split order only leaves the
+// cash half outstanding once the online half has really been received — if that
+// payment never completed, the whole total is still owed, and telling the rider
+// to collect only the cash half hands the difference away.
+function amountToCollect(o: { total: number; online_amount: number | null; cod_amount: number | null; payment_status: string | null; cash_collected_at: string | null }) {
+  const onlinePaid = ['partially_paid', 'paid'].includes(o.payment_status ?? '') ? Number(o.online_amount ?? 0) : 0
+  const cashPaid = (o.payment_status === 'paid' || o.cash_collected_at) ? Number(o.cod_amount ?? 0) : 0
+  return Math.max(0, Number(o.total) - onlinePaid - cashPaid)
+}
+
+function onlineSettled(o: { online_amount: number | null; payment_status: string | null }) {
+  return (o.online_amount ?? 0) > 0 && ['partially_paid', 'paid'].includes(o.payment_status ?? '')
 }
 
 export default function DeliveryOrdersPage() {
@@ -84,7 +100,7 @@ export default function DeliveryOrdersPage() {
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, online_amount, cod_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, online_amount, cod_amount, payment_status, cash_collected_at, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
@@ -235,7 +251,7 @@ export default function DeliveryOrdersPage() {
 
       const now = new Date().toISOString()
       const order = orders.find((o) => o.id === orderId)
-      const collectsCash = (order?.cod_amount ?? 0) > 0
+      const collectsCash = order ? amountToCollect(order) > 0 : false
 
       // Every delivery captures a photo; only the ones that actually hand over
       // cash also settle the payment and stamp the cash-collection time.
@@ -433,6 +449,27 @@ export default function DeliveryOrdersPage() {
                     </div>
                   )}
 
+                  {/* The rider has to know what has already been received, or they
+                      will collect the cash half of a split order whose online half
+                      never went through. */}
+                  {!['delivered', 'cancelled'].includes(o.status) && (
+                    <div className={cn('flex items-center gap-2 rounded-xl px-3 py-2 mb-3 text-[12px] font-[600]',
+                      amountToCollect(o) > 0 ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#DCFCE7] text-[#15803D]')}>
+                      <span>
+                        {amountToCollect(o) > 0
+                          ? <>Collect <strong>₹{amountToCollect(o)}</strong> from the customer</>
+                          : <>Fully paid — collect nothing</>}
+                      </span>
+                      <span className="ml-auto text-[11px] font-[500] opacity-80">
+                        {onlineSettled(o)
+                          ? `₹${o.online_amount} received online`
+                          : (o.online_amount ?? 0) > 0
+                            ? 'online payment not received'
+                            : 'cash on delivery'}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
                     <div className="flex items-center gap-2">
                       <span className="text-[14px] font-[800] text-[#111827]">₹{o.total}</span>
@@ -460,12 +497,12 @@ export default function DeliveryOrdersPage() {
                         the photo is the delivery record, cash or no cash. */}
                     {isReady && (
                       <button onClick={() => triggerProofCapture(o.id)} disabled={uploadingProofFor === o.id}
-                        title={(o.cod_amount ?? 0) > 0 ? `Collect ₹${o.cod_amount} cash, then take the delivery photo` : 'Take the delivery photo to complete this order'}
+                        title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then take the delivery photo` : 'Take the delivery photo to complete this order'}
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
                         {uploadingProofFor === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                         {uploadingProofFor === o.id
                           ? 'Uploading...'
-                          : (o.cod_amount ?? 0) > 0 ? `Collect ₹${o.cod_amount} & Photo` : 'Delivered — Take Photo'}
+                          : amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Photo` : 'Delivered — Take Photo'}
                       </button>
                     )}
                     {!isReady && o.status !== 'delivered' && (
