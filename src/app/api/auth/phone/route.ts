@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-import { verifyPhoneIdToken } from '@/lib/firebase-admin'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server'
 
@@ -8,32 +7,25 @@ function generatePassword(): string {
   return randomBytes(24).toString('base64url') // random, never stored/shown to the user
 }
 
+// NOTE: the phone number is NOT verified. Firebase OTP was removed for launch,
+// so whoever types a number is signed straight into that account. Restore the
+// idToken check here to close that off.
 export async function POST(req: NextRequest) {
-  let body: { idToken?: string }
+  let body: { phone?: string }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
-  const { idToken } = body
-  if (!idToken) {
-    return NextResponse.json({ error: 'Missing idToken' }, { status: 400 })
+  // Accept 10-digit Indian numbers with or without a +91 / 91 prefix.
+  const digits = (body.phone ?? '').replace(/\D/g, '')
+  const local = digits.length > 10 ? digits.slice(-10) : digits
+  if (!/^[6-9]\d{9}$/.test(local)) {
+    return NextResponse.json({ error: 'Please enter a valid 10-digit mobile number' }, { status: 400 })
   }
-
-  let phone: string
-  try {
-    const verifiedPhone = await verifyPhoneIdToken(idToken)
-    // Supabase stores/matches phone numbers without the leading "+" — normalize
-    // to that format so lookups against profiles.phone actually match.
-    phone = verifiedPhone.replace(/^\+/, '')
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    if (message.startsWith('Firebase Admin is not configured')) {
-      return NextResponse.json({ error: 'Phone sign-in is not configured on the server yet.' }, { status: 503 })
-    }
-    return NextResponse.json({ error: 'Could not verify your phone number. Please try again.' }, { status: 401 })
-  }
+  // Supabase stores/matches phone numbers without the leading "+".
+  const phone = `91${local}`
 
   const admin = createAdminClient()
   const password = generatePassword()

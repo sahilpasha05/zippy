@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, LocateFixed, MapPin, Plus, Loader2, Check, Home, Briefcase, Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAddresses } from '@/lib/hooks/useAddresses'
@@ -29,6 +29,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const [landmark, setLandmark] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactPhone, setContactPhone] = useState('')
+  const [phoneConfirmed, setPhoneConfirmed] = useState(false)
+  const [confirmIn, setConfirmIn] = useState(0)
+  const [confirmDeadline, setConfirmDeadline] = useState<number | null>(null)
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
 
@@ -40,6 +43,25 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
 
 
 
+
+  // No OTP is sent. A valid number gets a 3-second window to be corrected and is
+  // then locked in, because it is what the rider and the shop will call and it
+  // cannot be edited once the address is saved. The deadline is set from the
+  // change handler so nothing writes state synchronously inside this effect.
+  useEffect(() => {
+    if (phoneConfirmed || confirmDeadline === null) return
+    const tick = setInterval(() => {
+      const left = Math.ceil((confirmDeadline - Date.now()) / 1000)
+      if (left <= 0) {
+        clearInterval(tick)
+        setConfirmIn(0)
+        setPhoneConfirmed(true)
+      } else {
+        setConfirmIn(left)
+      }
+    }, 200)
+    return () => clearInterval(tick)
+  }, [confirmDeadline, phoneConfirmed])
 
   async function handleUseCurrentLocation() {
     setLocating(true); setError('')
@@ -55,7 +77,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       setDraftCoords({ lat: latitude, lng: longitude })
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       setAreaLine(address ?? '')
-      setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftLabel('Home')
+      setHouseNo(''); setLandmark(''); setContactName(''); setContactPhone(''); setPhoneConfirmed(false); setConfirmIn(0); setConfirmDeadline(null); setDraftLabel('Home')
       setStep('confirm')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not get your location')
@@ -69,7 +91,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   // their area by hand. If they decline we still open the form and explain at
   // save time why the location is needed.
   async function openManual() {
-    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setPhoneConfirmed(false); setConfirmIn(0); setConfirmDeadline(null); setDraftCoords(null); setDraftLabel('Home'); setError('')
 
     setLocating(true)
     try {
@@ -223,14 +245,33 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 <input
                   value={contactPhone}
                   onChange={(e) => {
-                    setContactPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
+                    const v = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    setContactPhone(v)
+                    setConfirmDeadline(/^\d{10}$/.test(v) ? Date.now() + 3000 : null)
+                    setConfirmIn(0)
                   }}
                   placeholder="98765 43210"
                   inputMode="numeric"
                   type="tel"
-                  className="flex-1 bg-transparent text-[13.5px] outline-none min-w-0"
+                  readOnly={phoneConfirmed}
+                  className={cn('flex-1 bg-transparent text-[13.5px] outline-none min-w-0', phoneConfirmed && 'text-[#6B7280]')}
                 />
+                {phoneConfirmed && (
+                  <span className="shrink-0 flex items-center gap-1 text-[12px] font-[700] text-[#16A34A]">
+                    <Check className="w-3.5 h-3.5" /> Confirmed
+                  </span>
+                )}
               </div>
+              {confirmIn > 0 && !phoneConfirmed && (
+                <p className="text-[11.5px] text-[#B45309] mt-1.5">
+                  Check this number — it can&apos;t be changed after {confirmIn}s.
+                </p>
+              )}
+              {phoneConfirmed && (
+                <p className="text-[11.5px] text-[#9CA3AF] mt-1.5">
+                  This number is locked in. Go back and add the address again if it&apos;s wrong.
+                </p>
+              )}
             </div>
 
             <div>
