@@ -16,7 +16,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState({
     platformName: 'Zippy',
-    supportEmail: 'support@zippy.app',
+    supportEmail: 'zippytarikere@gmail.com',
     deliveryMinutes: '10',
     maxDeliveryFee: '99',
     minOrderValue: '49',

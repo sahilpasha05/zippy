@@ -59,7 +59,7 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <Section title="Contact us">
-              <p>Questions about this Privacy Policy can be sent to <a href="mailto:support@zippy.app" className="text-[#16A34A] hover:underline">support@zippy.app</a>, or see our <Link href="/contact" className="text-[#16A34A] hover:underline">Contact page</Link> for full business details.</p>
+              <p>Questions about this Privacy Policy can be sent to <a href="mailto:zippytarikere@gmail.com" className="text-[#16A34A] hover:underline">zippytarikere@gmail.com</a>, or see our <Link href="/contact" className="text-[#16A34A] hover:underline">Contact page</Link> for full business details.</p>
             </Section>
           </div>
         </div>

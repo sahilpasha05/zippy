@@ -5,14 +5,8 @@ import { createServerClient } from '@supabase/ssr'
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname
 
-  const isLocalhost = req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1'
-
-  // Restaurants and essentials are browsable (products show a "Coming soon" label and
-  // can't be added to cart — see src/lib/launchConfig.ts). Checkout itself stays fully
-  // gated since ordering isn't open yet. Gate is skipped entirely on localhost.
-  if (!isLocalhost && path.startsWith('/checkout')) {
-    return NextResponse.rewrite(new URL('/coming-soon', req.url))
-  }
+  // Checkout used to be rewritten to a "coming soon" splash before launch.
+  // Ordering is open now, so the only thing this proxy still guards is /admin.
 
   if (!path.startsWith('/admin') || path === '/admin/login') {
     return NextResponse.next()

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin } from 'lucide-react'
+import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin, Store } from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import LiveTrackingMap, { type LatLng } from '@/components/LiveTrackingMap'
@@ -22,11 +22,16 @@ const STEPS = [
   { key: 'delivered',        label: 'Delivered',   icon: CheckCircle },
 ]
 
+type OrderItem = { name: string; quantity: number; price: number; image_url: string | null }
 type Order = {
   id: string; status: string; total: number; address: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
   delivery_partner_id: string | null
-  restaurants: { name: string; phone: string | null } | { name: string; phone: string | null }[] | null
+  created_at: string; order_type: string
+  delivery_fee: number | null; discount: number | null
+  payment_method: string | null; payment_status: string | null
+  restaurants: { name: string; phone: string | null; address: string | null } | { name: string; phone: string | null; address: string | null }[] | null
+  order_items: OrderItem[] | null
 }
 type Partner = {
   id: string; name: string; phone: string | null; vehicle_type: string | null; vehicle_number: string | null
@@ -45,6 +50,11 @@ function restPhone(o: Order) {
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.phone ?? null : o.restaurants.phone
 }
 
+function restAddress(o: Order) {
+  if (!o.restaurants) return null
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.address ?? null : o.restaurants.address
+}
+
 export default function TrackOrderPage() {
   const { id } = useParams<{ id: string }>()
   const [order, setOrder] = useState<Order | null>(null)
@@ -55,7 +65,7 @@ export default function TrackOrderPage() {
   const loadOrder = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, restaurants(name, phone)')
+      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, created_at, order_type, delivery_fee, discount, payment_method, payment_status, restaurants(name, phone, address), order_items(name, quantity, price, image_url)')
       .eq('id', id)
       .single()
     if (!data) { setNotFound(true); return null }
@@ -142,6 +152,13 @@ export default function TrackOrderPage() {
   const riderLocation: LatLng | null = partner?.current_latitude && partner?.current_longitude
     ? { lat: partner.current_latitude, lng: partner.current_longitude } : null
 
+  const items = order.order_items ?? []
+  const itemsSubtotal = items.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0)
+  const otherCharges = Math.max(
+    0,
+    Number(order.total) - itemsSubtotal - Number(order.delivery_fee ?? 0) + Number(order.discount ?? 0)
+  )
+
   return (
     <>
       <Navbar />
@@ -224,6 +241,60 @@ export default function TrackOrderPage() {
                 </div>
               )}
             </>
+          )}
+
+          {items.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 mb-4">
+              <p className="text-[13px] font-[700] text-[#111827] mb-3">Order details</p>
+              <div className="space-y-2.5">
+                {items.map((it, i) => (
+                  <div key={`${it.name}-${i}`} className="flex items-start justify-between gap-3 text-[12.5px]">
+                    <span className="text-[#374151] min-w-0">
+                      <span className="text-[#9CA3AF] font-mono mr-1.5">{it.quantity}×</span>
+                      {it.name}
+                    </span>
+                    <span className="text-[#111827] font-[600] shrink-0">
+                      {Number(it.price) === 0 ? 'FREE' : `₹${(Number(it.price) * it.quantity).toFixed(0)}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-1.5 text-[12.5px]">
+                <div className="flex justify-between text-[#6B7280]">
+                  <span>Items subtotal</span><span>₹{itemsSubtotal.toFixed(0)}</span>
+                </div>
+                {order.discount ? (
+                  <div className="flex justify-between text-[#16A34A]"><span>Discount</span><span>−₹{Number(order.discount).toFixed(0)}</span></div>
+                ) : null}
+                {order.delivery_fee ? (
+                  <div className="flex justify-between text-[#6B7280]"><span>Delivery fee</span><span>₹{Number(order.delivery_fee).toFixed(0)}</span></div>
+                ) : null}
+                {/* Whatever the recorded lines don't account for — today that's the
+                    platform fee, which has no column of its own until the migration runs. */}
+                {otherCharges > 0 && (
+                  <div className="flex justify-between text-[#6B7280]"><span>Other charges</span><span>₹{otherCharges.toFixed(0)}</span></div>
+                )}
+                <div className="flex justify-between pt-1.5 border-t border-[#F3F4F6] text-[14px] font-[800] text-[#111827]">
+                  <span>Total paid</span><span>₹{Number(order.total).toFixed(0)}</span>
+                </div>
+              </div>
+              <p className="text-[11.5px] text-[#9CA3AF] mt-3 capitalize">
+                {order.payment_method ?? '—'} · {order.payment_status ?? 'pending'} · placed {new Date(order.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          )}
+
+          {(restName(order) || restAddress(order)) && (
+            <div className="flex items-start gap-2 bg-white rounded-2xl border border-[#E5E7EB] p-4 text-[12.5px] mb-4">
+              <Store className="w-4 h-4 text-[#16A34A] mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="font-[600] text-[#111827] mb-0.5">{restName(order) ?? 'Restaurant'}</p>
+                {restAddress(order) && <p className="text-[#6B7280]">{restAddress(order)}</p>}
+                {restPhone(order) && (
+                  <a href={`tel:${restPhone(order)}`} className="text-[#16A34A] font-[600] hover:underline">{restPhone(order)}</a>
+                )}
+              </div>
+            </div>
           )}
 
           {order.address && (

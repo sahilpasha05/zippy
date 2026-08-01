@@ -1,15 +1,27 @@
 import Link from 'next/link'
-import { ChevronRight, Mail, MapPin, FileText, Building2 } from 'lucide-react'
+import { ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import SiteFooter from '@/components/layout/SiteFooter'
 
 export const metadata = { title: 'Contact Us — Zippy' }
 
+const WHATSAPP_NUMBER = '8277802605'
+
 const ROWS = [
-  { icon: Building2, label: 'Business Name', value: '[Add your registered business name here]', placeholder: true },
-  { icon: FileText,  label: 'GST Number',    value: '[Add your GSTIN here]', placeholder: true },
-  { icon: MapPin,    label: 'Business Address', value: '[Add your registered business address here]', placeholder: true },
-  { icon: Mail,      label: 'Support Email', value: 'support@zippy.app', href: 'mailto:support@zippy.app' },
+  {
+    icon: Mail,
+    label: 'Email',
+    value: 'zippytarikere@gmail.com',
+    href: 'mailto:zippytarikere@gmail.com',
+    note: null,
+  },
+  {
+    icon: MessageCircle,
+    label: 'WhatsApp',
+    value: `+91 ${WHATSAPP_NUMBER}`,
+    href: `https://wa.me/91${WHATSAPP_NUMBER}`,
+    note: 'WhatsApp calls and messages only — this number does not take regular calls or SMS.',
+  },
 ]
 
 export default function ContactPage() {
@@ -25,29 +37,31 @@ export default function ContactPage() {
           </div>
 
           <h1 className="text-[28px] font-[800] text-[#111827] mb-2">Contact Us</h1>
-          <p className="text-[14px] text-[#6B7280] mb-8">Here&apos;s how to reach us.</p>
+          <p className="text-[14px] text-[#6B7280] mb-8">
+            Have a question about an order? Reach us either way below and we&apos;ll get back to you.
+          </p>
 
           <div className="bg-white rounded-2xl border border-[#E5E7EB] divide-y divide-[#F3F4F6]">
-            {ROWS.map(({ icon: Icon, label, value, href, placeholder }) => (
+            {ROWS.map(({ icon: Icon, label, value, href, note }) => (
               <div key={label} className="flex items-start gap-4 p-5">
                 <div className="w-10 h-10 rounded-xl bg-[#F0FDF4] flex items-center justify-center shrink-0">
                   <Icon className="w-4.5 h-4.5 text-[#16A34A]" />
                 </div>
                 <div>
                   <p className="text-[12px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-0.5">{label}</p>
-                  {href ? (
-                    <a href={href} className="text-[14.5px] font-[600] text-[#16A34A] hover:underline">{value}</a>
-                  ) : (
-                    <p className={placeholder ? 'text-[14.5px] font-[500] text-[#D97706] italic' : 'text-[14.5px] font-[600] text-[#111827]'}>{value}</p>
-                  )}
+                  <a
+                    href={href}
+                    target={href.startsWith('http') ? '_blank' : undefined}
+                    rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    className="text-[14.5px] font-[600] text-[#16A34A] hover:underline"
+                  >
+                    {value}
+                  </a>
+                  {note && <p className="text-[12.5px] text-[#6B7280] mt-1 leading-relaxed">{note}</p>}
                 </div>
               </div>
             ))}
           </div>
-
-          <p className="text-[12px] text-[#9CA3AF] mt-4">
-            Fields in orange are placeholders — update them in <code className="font-mono">src/app/contact/page.tsx</code> with your real GST number and registered business address before going live.
-          </p>
         </div>
         <SiteFooter />
       </div>

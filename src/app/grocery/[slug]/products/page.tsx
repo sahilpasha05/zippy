@@ -14,8 +14,9 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// This portal is scoped to a single fixed category — partners add fruit items only.
-const FRUITS_CATEGORY_ID = '2f6d345d-f640-4da1-acd5-db9f19ff2041'
+// This portal is scoped to a single fixed category — partners add produce only.
+// Points at "Vegetables & Fruits"; the old fruits-only category is retired.
+const PRODUCE_CATEGORY_ID = 'beec9b69-bce0-436c-9d3b-e6260ba88ef4'
 
 type Partner = { id: string; name: string; slug: string }
 type Product = {
@@ -110,7 +111,7 @@ export default function GrocerySlugProductsPage() {
         .from('grocery_products')
         .insert({
           grocery_partner_id: partner.id,
-          category_id: FRUITS_CATEGORY_ID,
+          category_id: PRODUCE_CATEGORY_ID,
           name: form.name,
           price, mrp,
           weight: form.weight || null,
@@ -149,7 +150,7 @@ export default function GrocerySlugProductsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-[18px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>My Products</h1>
-              <p className="text-[12.5px] text-[#9CA3AF]">{products.length} fruit items · {products.filter((p) => p.is_active).length} live</p>
+              <p className="text-[12.5px] text-[#9CA3AF]">{products.length} items · {products.filter((p) => p.is_active).length} live</p>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="flex-1 sm:flex-none flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#16A34A] transition-all">
@@ -159,7 +160,7 @@ export default function GrocerySlugProductsPage() {
               </div>
               <button onClick={openAdd}
                 className="flex items-center gap-2 px-4 py-2 bg-[#16A34A] text-white text-[13px] font-[600] rounded-xl hover:bg-[#15803D] transition-all shadow-[0_2px_8px_rgba(22,163,74,0.3)] shrink-0">
-                <Plus className="w-4 h-4" /> Add Fruit
+                <Plus className="w-4 h-4" /> Add Item
               </button>
             </div>
           </div>
@@ -179,7 +180,7 @@ export default function GrocerySlugProductsPage() {
             <div className="flex flex-col items-center gap-3 py-20 text-[#9CA3AF]">
               <Package className="w-12 h-12" strokeWidth={1} />
               <p className="text-[15px] font-semibold text-[#374151]">No products yet</p>
-              <button onClick={openAdd} className="text-[13px] text-[#16A34A] font-medium">+ Add your first fruit</button>
+              <button onClick={openAdd} className="text-[13px] text-[#16A34A] font-medium">+ Add your first item</button>
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -226,7 +227,7 @@ export default function GrocerySlugProductsPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md z-10 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#F3F4F6] sticky top-0 bg-white z-10">
-              <h2 className="text-[16px] font-[800] text-[#111827]">{editItem ? 'Edit Fruit' : 'Add New Fruit'}</h2>
+              <h2 className="text-[16px] font-[800] text-[#111827]">{editItem ? 'Edit Item' : 'Add New Item'}</h2>
               <button onClick={closeModal} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
                 <X className="w-4 h-4 text-[#6B7280]" />
               </button>
@@ -240,7 +241,7 @@ export default function GrocerySlugProductsPage() {
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <ImageUploadField label="Photo" value={formImage} onChange={setFormImage} endpoint="/api/grocery/upload-image" />
                 <div>
-                  <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Fruit Name</label>
+                  <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Item Name</label>
                   <input value={form.name} onChange={(e) => setF('name', e.target.value)} placeholder="e.g. Alphonso Mango"
                     className="w-full px-4 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all" />
                 </div>
@@ -267,7 +268,7 @@ export default function GrocerySlugProductsPage() {
                   <button type="submit" disabled={saving}
                     className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 flex items-center justify-center gap-2">
                     {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {editItem ? 'Save Changes' : 'Add Fruit'}
+                    {editItem ? 'Save Changes' : 'Add Item'}
                   </button>
                 </div>
               </form>

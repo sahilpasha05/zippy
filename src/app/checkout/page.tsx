@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { load as loadCashfree } from '@cashfreepayments/cashfree-js'
-import { MapPin, CreditCard, Tag, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
+import { MapPin, CreditCard, ChevronRight, Plus, Check, Zap, Gift, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, getPlatformFee, getFreeFriesProgress, FREE_FRIES_OFFER, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
@@ -38,8 +39,6 @@ export default function CheckoutPage() {
   const baseTotal = getCartBaseTotal(items)
   const cartTotal = getCartAdjustedTotal(items)
   const [selectedPayment, setSelectedPayment] = useState('upi')
-  const [coupon, setCoupon] = useState('')
-  const [couponApplied, setCouponApplied] = useState(false)
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(false)
   const [orderId, setOrderId] = useState<string | null>(null)
@@ -54,15 +53,31 @@ export default function CheckoutPage() {
 
   const selectedAddress = addresses.find((a) => a.id === selectedId) ?? null
 
-  const discount = couponApplied ? Math.min(cartTotal * 0.1, 100) : 0
+  // Last gate before payment. Addresses saved before the zone check existed have
+  // no coordinates, so they can't be confirmed as inside the area and are
+  // treated the same as out-of-area rather than waved through.
+  const addressUnverified = !!selectedAddress && (selectedAddress.lat == null || selectedAddress.lng == null)
+  const addressOutOfZone = !!selectedAddress && !addressUnverified
+    && !isWithinDeliveryZone(selectedAddress.lat as number, selectedAddress.lng as number)
+  const addressBlocked = addressUnverified || addressOutOfZone
+
   const deliveryFee = DELIVERY_FEE
-  const grandTotal = cartTotal - discount + deliveryFee
+  const platformFee = getPlatformFee(cartTotal)
+  const friesProgress = getFreeFriesProgress(items)
+  const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
   const handlePlace = async () => {
     if (items.length === 0 || !selectedAddress) return
+
+    if (addressBlocked) {
+      setPlaceError(addressOutOfZone
+        ? OUT_OF_ZONE_MESSAGE
+        : 'We can’t confirm this address is inside our delivery area. Please remove it and add it again using “Use current location”.')
+      return
+    }
 
     if (selectedPayment !== 'cod') {
       const normalizedPhone = (selectedAddress.contactPhone ?? '').replace(/^\+91/, '').slice(-10)
@@ -88,13 +103,13 @@ export default function CheckoutPage() {
           status: selectedPayment === 'cod' ? 'confirmed' : 'pending',
           total: grandTotal,
           delivery_fee: deliveryFee,
-          discount,
+          discount: 0,
           online_amount: onlineAmount,
           cod_amount: codAmount,
           address: selectedAddress.address,
           delivery_latitude: selectedAddress.lat,
           delivery_longitude: selectedAddress.lng,
-          coupon_code: couponApplied ? coupon : null,
+          coupon_code: null,
           payment_method: selectedPayment,
           payment_status: 'pending',
           customer_name: selectedAddress.contactName || user?.user_metadata?.full_name || null,
@@ -115,6 +130,21 @@ export default function CheckoutPage() {
         price: getAdjustedUnitPrice(item, baseTotal),
         quantity: item.quantity,
       }))
+
+      // The reward is earned by the cart, never added by the customer, so it is
+      // appended here at ₹0 — the threshold is re-checked at the moment of
+      // placing rather than trusted from whenever the cart was last touched.
+      if (getFreeFriesProgress(items).unlocked) {
+        orderItems.push({
+          order_id: order.id,
+          product_id: FREE_FRIES_OFFER.rewardProductId,
+          product_type: 'restaurant',
+          name: `${FREE_FRIES_OFFER.reward} (FREE — order above ₹${FREE_FRIES_OFFER.threshold})`,
+          image_url: FREE_FRIES_OFFER.rewardImageUrl,
+          price: 0,
+          quantity: 1,
+        })
+      }
 
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
@@ -249,6 +279,16 @@ export default function CheckoutPage() {
             </div>
           )}
 
+          {/* The place-order button is disabled in this state, so the reason has
+              to be visible here or it would look broken for no apparent reason. */}
+          {addressBlocked && (
+            <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
+              {addressOutOfZone
+                ? OUT_OF_ZONE_MESSAGE
+                : 'We can’t confirm this address is inside our delivery area. Please remove it and add it again using “Use current location”.'}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left column */}
             <div className="lg:col-span-2 space-y-5">
@@ -338,37 +378,6 @@ export default function CheckoutPage() {
                 </p>
               </div>
 
-              {/* Coupon */}
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 bg-[#DCFCE7] rounded-xl flex items-center justify-center">
-                    <Tag className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
-                  </div>
-                  <h3 className="text-[16px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>Coupon Code</h3>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value.toUpperCase())}
-                    placeholder="Enter coupon code (try ZIPPY50)"
-                    className="flex-1 px-4 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-colors placeholder:text-[#9CA3AF] font-mono"
-                    disabled={couponApplied}
-                  />
-                  <button
-                    onClick={() => { if (coupon) setCouponApplied(!couponApplied) }}
-                    className={cn('px-5 py-3 rounded-xl text-[13px] font-[700] transition-all', couponApplied ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#16A34A] text-white hover:bg-[#15803D]')}
-                    style={{ fontWeight: 700 }}
-                  >
-                    {couponApplied ? '✓ Applied' : 'Apply'}
-                  </button>
-                </div>
-                {couponApplied && (
-                  <div className="mt-3 flex items-center gap-2 text-[12.5px] text-[#16A34A]">
-                    <Check className="w-3.5 h-3.5" />
-                    Coupon applied! You save ₹{discount.toFixed(0)}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Order Summary */}
@@ -405,12 +414,29 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                {friesProgress.spend > 0 && (
+                  <div className={cn(
+                    'flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-[600] mb-4',
+                    friesProgress.unlocked ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FFFBEB] text-[#B45309]'
+                  )}>
+                    <Gift className="w-4 h-4 shrink-0 mt-px" />
+                    <span>
+                      {friesProgress.unlocked
+                        ? `Free ${FREE_FRIES_OFFER.reward} unlocked — included with this order.`
+                        : `Add ₹${friesProgress.remaining.toFixed(0)} more from Smiley Cafe to unlock free ${FREE_FRIES_OFFER.reward}.`}
+                    </span>
+                  </div>
+                )}
+
                 <div className="border-t border-[#E5E7EB] pt-4 space-y-2.5">
                   <div className="flex justify-between text-[13px] text-[#6B7280]"><span>Subtotal</span><span>₹{cartTotal.toFixed(0)}</span></div>
-                  {couponApplied && <div className="flex justify-between text-[13px] text-[#16A34A]"><span>Coupon discount</span><span>−₹{discount.toFixed(0)}</span></div>}
                   <div className="flex justify-between text-[13px] text-[#6B7280]">
                     <span>Delivery fee</span>
                     <span>₹{deliveryFee}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] text-[#6B7280]">
+                    <span>Platform fee</span>
+                    <span>₹{platformFee}</span>
                   </div>
                   <div className="flex justify-between text-[16px] font-[800] text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 800 }}>
                     <span>Total</span><span>₹{grandTotal.toFixed(0)}</span>
@@ -431,7 +457,7 @@ export default function CheckoutPage() {
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
                   onClick={handlePlace}
-                  disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+                  disabled={placing || !mounted || items.length === 0 || !selectedAddress || addressBlocked}
                   className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
                 >
@@ -453,13 +479,15 @@ export default function CheckoutPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <button
           onClick={handlePlace}
-          disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+          disabled={placing || !mounted || items.length === 0 || !selectedAddress || addressBlocked}
           className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
         >
           {placing ? (
             <><Loader2 className="w-5 h-5 animate-spin" />Placing order...</>
           ) : !selectedAddress ? (
             <>Select a delivery address</>
+          ) : addressBlocked ? (
+            <>Outside our delivery area</>
           ) : (
             <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}

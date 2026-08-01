@@ -2,18 +2,20 @@
 
 import { useEffect } from 'react'
 import { useCartStore } from '@/lib/store/cart'
-import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
+import { X, ShoppingCart, Plus, Minus, Trash2, Zap, Gift, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, getPlatformFee, getFreeFriesProgress, FREE_FRIES_OFFER, DELIVERY_FEE } from '@/lib/cartPricing'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
   const baseTotal = getCartBaseTotal(items)
   const cartTotal = getCartAdjustedTotal(items)
-  const grandTotal = cartTotal + DELIVERY_FEE
+  const platformFee = getPlatformFee(cartTotal)
+  const grandTotal = cartTotal + DELIVERY_FEE + platformFee
+  const friesProgress = getFreeFriesProgress(items)
   const deliveryEta = useDeliveryEta()
 
   useEffect(() => {
@@ -125,6 +127,20 @@ export default function CartSidebar() {
               <p className="text-[12.5px] font-medium text-[#14532D]">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
             </div>
 
+            {friesProgress.spend > 0 && (
+              <div className={cn(
+                'flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-[600]',
+                friesProgress.unlocked ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FFFBEB] text-[#B45309]'
+              )}>
+                <Gift className="w-4 h-4 shrink-0 mt-px" />
+                <span>
+                  {friesProgress.unlocked
+                    ? `Free ${FREE_FRIES_OFFER.reward} unlocked — added to your order.`
+                    : `Add ₹${friesProgress.remaining.toFixed(0)} more from Smiley Cafe to unlock free ${FREE_FRIES_OFFER.reward}.`}
+                </span>
+              </div>
+            )}
+
             {/* Bill Summary */}
             <div className="space-y-2">
               <div className="flex justify-between text-[13px] text-[#6B7280]">
@@ -134,6 +150,10 @@ export default function CartSidebar() {
               <div className="flex justify-between text-[13px] text-[#6B7280]">
                 <span>Delivery fee</span>
                 <span>₹{DELIVERY_FEE}</span>
+              </div>
+              <div className="flex justify-between text-[13px] text-[#6B7280]">
+                <span>Platform fee</span>
+                <span>₹{platformFee}</span>
               </div>
               <div className="flex justify-between text-[15px] font-700 text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 700 }}>
                 <span>Total</span>

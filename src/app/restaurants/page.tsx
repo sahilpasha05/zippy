@@ -16,6 +16,16 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 const CUISINES = ['All', 'Biryani', 'Pizza', 'South Indian', 'Chinese', 'North Indian', 'Desserts']
 
+// Hand-picked running order for the launch lineup, by slug:
+// Golden cafe → Smiley cafe → Jai hind restaurant → Hotel Mayur & Residency → Neelgiri Cake's.
+// Anything not listed sorts in after these, still highest-rated first.
+const DISPLAY_ORDER = ['g', 's', 'j', 'h', 'n']
+
+function displayRank(slug: string) {
+  const i = DISPLAY_ORDER.indexOf(slug)
+  return i === -1 ? DISPLAY_ORDER.length : i
+}
+
 type Restaurant = {
   id: string
   name: string
@@ -106,7 +116,8 @@ export default function RestaurantsPage() {
       .eq('is_active', true)
       .order('rating', { ascending: false })
       .then(({ data }) => {
-        if (data) setRestaurants(data as Restaurant[])
+        // Sort is stable, so unlisted restaurants keep the rating order above.
+        if (data) setRestaurants([...(data as Restaurant[])].sort((a, b) => displayRank(a.slug) - displayRank(b.slug)))
         setLoading(false)
       })
   }, [])

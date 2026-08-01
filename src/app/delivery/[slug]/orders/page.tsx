@@ -34,10 +34,6 @@ type Order = {
   restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
 }
 
-function isSplitOrder(o: Order) {
-  return (o.online_amount ?? 0) > 0 && (o.cod_amount ?? 0) > 0
-}
-
 function timeAgo(d: string) {
   const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
   if (m < 1) return 'just now'
@@ -64,7 +60,6 @@ export default function DeliveryOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'delivered'>('active')
-  const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const soundOnRef = useRef(true)
@@ -75,6 +70,8 @@ export default function DeliveryOrdersPage() {
   const lastSentRef = useRef(0)
   const partnerIdRef = useRef<string | null>(null)
   const [pendingAccept, setPendingAccept] = useState<Order[]>([])
+  const pendingAcceptRef = useRef<Order[]>([])
+  pendingAcceptRef.current = pendingAccept
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
   const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null)
   const [proofError, setProofError] = useState<{ orderId: string; message: string } | null>(null)
@@ -90,7 +87,12 @@ export default function DeliveryOrdersPage() {
       .limit(50)
     const fetched = (data as unknown as Order[]) ?? []
     setOrders(fetched)
-    setPendingAccept(fetched.filter((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status)))
+    const pending = fetched.filter((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status))
+    setPendingAccept(pending)
+    // Authoritative: if the server says nothing is waiting to be accepted, the
+    // alarm has nothing to ring about. Guarantees it stops after an accept even
+    // if some other path started it.
+    if (pending.length === 0) stopAlarm()
     return fetched
   }, [])
 
@@ -118,9 +120,17 @@ export default function DeliveryOrdersPage() {
           event: '*', schema: 'public', table: 'orders',
           filter: `delivery_partner_id=eq.${p.id}`,
         }, (payload) => {
-          if (payload.eventType === 'UPDATE' && (payload.old as { delivery_partner_id?: string })?.delivery_partner_id !== p.id) {
-            // newly assigned to this rider
-            if (soundOnRef.current) startAlarm()
+          // Don't test payload.old: Postgres only ships the previous values of
+          // REPLICA IDENTITY columns (the primary key by default), so
+          // old.delivery_partner_id is undefined on every update — which made
+          // `old.delivery_partner_id !== p.id` true even for the rider's own
+          // "accepted_at" write, restarting the alarm the instant they accepted.
+          // Ring on what the row now says instead: still unaccepted and live.
+          const row = payload.new as { accepted_at?: string | null; status?: string } | undefined
+          const awaitingAccept = !!row && row.accepted_at == null
+            && !['delivered', 'cancelled'].includes(row.status ?? '')
+          if (awaitingAccept) {
+            if (soundOnRef.current) startAlarm('New delivery')
             setNewOrderFlash(true)
             setTimeout(() => setNewOrderFlash(false), 4000)
           }
@@ -144,10 +154,15 @@ export default function DeliveryOrdersPage() {
 
   // Browsers block audio without a prior user gesture — if a ring was already due on
   // load (see init() above), the very first tap anywhere unlocks it and retries.
+  // The retry is deferred because pointerdown precedes click: if that first tap
+  // is the Accept button itself, checking synchronously would still see the
+  // order as pending and restart the alarm the rider is dismissing.
   useEffect(() => {
     function unlockOnFirstTap() {
       unlockAudio()
-      if (pendingAccept.length > 0 && soundOnRef.current) startAlarm()
+      setTimeout(() => {
+        if (pendingAcceptRef.current.length > 0 && soundOnRef.current) startAlarm('New delivery')
+      }, 400)
     }
     document.addEventListener('pointerdown', unlockOnFirstTap, { once: true })
     return () => document.removeEventListener('pointerdown', unlockOnFirstTap)
@@ -186,24 +201,6 @@ export default function DeliveryOrdersPage() {
     supabase.from('orders').update({ accepted_at: new Date().toISOString() }).eq('id', orderId).then()
   }
 
-  async function advance(orderId: string, nextStatus: string) {
-    setAdvancing(orderId)
-    const update: { status: string; delivered_at?: string; payment_status?: string } = { status: nextStatus }
-    if (nextStatus === 'delivered') {
-      update.delivered_at = new Date().toISOString()
-      const order = orders.find((o) => o.id === orderId)
-      // Cash was fully collected on a plain COD order — record it in the ledger.
-      if (order && (order.cod_amount ?? 0) > 0 && !isSplitOrder(order)) update.payment_status = 'paid'
-    }
-    await supabase.from('orders').update(update).eq('id', orderId)
-    if (nextStatus === 'delivered' && partner) {
-      await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
-      setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
-    }
-    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: nextStatus } : o))
-    setAdvancing(null)
-  }
-
   function triggerProofCapture(orderId: string) {
     proofInputOrderRef.current = orderId
     setProofError(null)
@@ -226,12 +223,16 @@ export default function DeliveryOrdersPage() {
       if (!res.ok) throw new Error(data.error ?? 'Could not upload photo')
 
       const now = new Date().toISOString()
+      const order = orders.find((o) => o.id === orderId)
+      const collectsCash = (order?.cod_amount ?? 0) > 0
+
+      // Every delivery captures a photo; only the ones that actually hand over
+      // cash also settle the payment and stamp the cash-collection time.
       await supabase.from('orders').update({
         status: 'delivered',
         delivered_at: now,
-        payment_status: 'paid',
-        cash_collected_at: now,
         cash_proof_image_url: data.url,
+        ...(collectsCash ? { payment_status: 'paid', cash_collected_at: now } : {}),
       }).eq('id', orderId)
 
       if (partner) {
@@ -416,19 +417,16 @@ export default function DeliveryOrdersPage() {
                         </>
                       )}
                     </div>
-                    {isReady && isSplitOrder(o) && (
+                    {/* Completing a delivery always goes through the camera —
+                        the photo is the delivery record, cash or no cash. */}
+                    {isReady && (
                       <button onClick={() => triggerProofCapture(o.id)} disabled={uploadingProofFor === o.id}
-                        title={`Collect ₹${o.cod_amount} cash, then capture proof`}
+                        title={(o.cod_amount ?? 0) > 0 ? `Collect ₹${o.cod_amount} cash, then take the delivery photo` : 'Take the delivery photo to complete this order'}
                         className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
                         {uploadingProofFor === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                        {uploadingProofFor === o.id ? 'Uploading...' : `Collect ₹${o.cod_amount} & Capture Proof`}
-                      </button>
-                    )}
-                    {isReady && !isSplitOrder(o) && (
-                      <button onClick={() => advance(o.id, 'delivered')} disabled={advancing === o.id}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
-                        {advancing === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                        Mark Delivered
+                        {uploadingProofFor === o.id
+                          ? 'Uploading...'
+                          : (o.cod_amount ?? 0) > 0 ? `Collect ₹${o.cod_amount} & Photo` : 'Delivered — Take Photo'}
                       </button>
                     )}
                     {!isReady && o.status !== 'delivered' && (

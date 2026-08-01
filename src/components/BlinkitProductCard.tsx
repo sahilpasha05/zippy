@@ -2,7 +2,9 @@
 
 import Image from 'next/image'
 import { Plus, Minus, Timer, Package } from 'lucide-react'
-import { useCartStore } from '@/lib/store/cart'
+import { useState } from 'react'
+import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
+import CartConflictDialog from '@/components/CartConflictDialog'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { useOrderingEnabled } from '@/lib/launchConfig'
 
@@ -19,7 +21,15 @@ export type BlinkitProduct = {
 // Blinkit-style product card: blue OFF ribbon, contained image, "X MINS" chip,
 // name, weight, price + green outlined ADD button.
 export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
-  const { addItem, items, updateQuantity } = useCartStore()
+  const { addItem, replaceCartWith, items, updateQuantity } = useCartStore()
+  const [askReplace, setAskReplace] = useState(false)
+
+  const draft = { product_id: p.id, product_type: 'grocery' as const, restaurant_id: null, name: p.name, image_url: p.image_url ?? null, price: p.price, quantity: 1 }
+
+  function handleAdd() {
+    if (conflictsWithCart(items, null)) { setAskReplace(true); return }
+    addItem(draft)
+  }
   const deliveryEta = useDeliveryEta()
   const orderingEnabled = useOrderingEnabled()
   const cartItem = items.find((i) => i.product_id === p.id)
@@ -82,7 +92,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
             </div>
           ) : (
             <button
-              onClick={() => addItem({ product_id: p.id, product_type: 'grocery', restaurant_id: null, name: p.name, image_url: p.image_url ?? null, price: p.price, quantity: 1 })}
+              onClick={handleAdd}
               className="px-5 py-1.5 border border-[#318616] text-[#318616] bg-[#F7FFF9] text-[13px] font-[700] rounded-lg hover:bg-[#318616] hover:text-white active:scale-95 transition-all shrink-0 uppercase">
               Add
             </button>
@@ -91,6 +101,12 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
           <span className="text-[11px] text-[#9CA3AF] shrink-0">{!orderingEnabled ? 'Coming soon' : 'Notify me'}</span>
         )}
       </div>
+      {askReplace && (
+        <CartConflictDialog
+          onCancel={() => setAskReplace(false)}
+          onReplace={() => { replaceCartWith(draft); setAskReplace(false) }}
+        />
+      )}
     </div>
   )
 }

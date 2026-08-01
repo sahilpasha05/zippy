@@ -5,8 +5,14 @@ import { cn } from '@/lib/utils'
 
 export type DateRange = { from: string; to: string }
 
+// Must be the LOCAL calendar date, not the UTC one. toISOString() would return
+// the UTC day, which in IST is still "yesterday" until 05:30 — while every
+// consumer turns these strings back into instants with `new Date(from +
+// 'T00:00:00')`, which parses as local time. That mismatch shifted the whole
+// window by the UTC offset and hid the day's most recent orders.
 function toDateInput(d: Date) {
-  return d.toISOString().slice(0, 10)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export function presetRange(days: number | 'all'): DateRange {

@@ -31,11 +31,17 @@ export default function PhoneAuthModal({
   const isValidPhone = /^\d{10}$/.test(contactPhone)
   const isOtpSentForCurrent = otpSentFor === contactPhone
 
+  // An invisible reCAPTCHA token is single-use, so a spent verifier has to be
+  // torn down and rebuilt before the next send — reusing one makes Firebase
+  // reject sendVerificationCode outright.
+  function resetRecaptcha() {
+    recaptchaVerifierRef.current?.clear()
+    recaptchaVerifierRef.current = null
+    if (recaptchaContainerRef.current) recaptchaContainerRef.current.innerHTML = ''
+  }
+
   useEffect(() => {
-    return () => {
-      recaptchaVerifierRef.current?.clear()
-      recaptchaVerifierRef.current = null
-    }
+    return () => resetRecaptcha()
   }, [])
 
   function mapFirebaseError(err: unknown): string {
@@ -43,6 +49,10 @@ export default function PhoneAuthModal({
     if (code === 'auth/invalid-phone-number') return "That doesn't look like a valid mobile number"
     if (code === 'auth/invalid-verification-code' || code === 'auth/code-expired') return 'Incorrect or expired code — please try again'
     if (code === 'auth/too-many-requests') return 'Too many attempts — please wait a bit and try again'
+    // Not a user error: Firebase rejected the reCAPTCHA token, which means this
+    // domain isn't authorised in the Firebase project (or the API key is
+    // referrer-restricted). Nothing the customer does will fix it.
+    if (code === 'auth/invalid-app-credential') return 'Phone verification is not set up for this site yet. Please contact support.'
     return 'Something went wrong verifying your number. Please try again.'
   }
 
@@ -64,11 +74,11 @@ export default function PhoneAuthModal({
       setOtpSentFor(contactPhone)
       setOtpCode('')
     } catch (err: unknown) {
+      console.error('[zippy] sendOtp failed', err)
       setOtpError(mapFirebaseError(err))
-      recaptchaVerifierRef.current?.clear()
-      recaptchaVerifierRef.current = null
-      if (recaptchaContainerRef.current) recaptchaContainerRef.current.innerHTML = ''
     } finally {
+      // Rebuild the verifier after every attempt, succeeded or not.
+      resetRecaptcha()
       setOtpSending(false)
     }
   }

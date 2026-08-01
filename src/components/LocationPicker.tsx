@@ -6,7 +6,7 @@ import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } fro
 import { cn } from '@/lib/utils'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
-import { isWithinDeliveryZone } from '@/lib/deliveryZone'
+import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import { auth } from '@/lib/firebase'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
@@ -48,11 +48,17 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const isOtpSentForCurrent = otpSentFor === contactPhone
   const isPhoneVerified = otpVerifiedFor === contactPhone
 
+  // An invisible reCAPTCHA token is single-use, so a spent verifier has to be
+  // torn down and rebuilt before the next send — reusing one makes Firebase
+  // reject sendVerificationCode outright.
+  function resetRecaptcha() {
+    recaptchaVerifierRef.current?.clear()
+    recaptchaVerifierRef.current = null
+    if (recaptchaContainerRef.current) recaptchaContainerRef.current.innerHTML = ''
+  }
+
   useEffect(() => {
-    return () => {
-      recaptchaVerifierRef.current?.clear()
-      recaptchaVerifierRef.current = null
-    }
+    return () => resetRecaptcha()
   }, [])
 
   function mapFirebaseError(err: unknown): string {
@@ -60,6 +66,10 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     if (code === 'auth/invalid-phone-number') return "That doesn't look like a valid mobile number"
     if (code === 'auth/invalid-verification-code' || code === 'auth/code-expired') return 'Incorrect or expired code — please try again'
     if (code === 'auth/too-many-requests') return 'Too many attempts — please wait a bit and try again'
+    // Not a user error: Firebase rejected the reCAPTCHA token, which means this
+    // domain isn't authorised in the Firebase project (or the API key is
+    // referrer-restricted). Nothing the customer does will fix it.
+    if (code === 'auth/invalid-app-credential') return 'Phone verification is not set up for this site yet. Please contact support.'
     return 'Something went wrong verifying your number. Please try again.'
   }
 
@@ -81,11 +91,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       setOtpSentFor(contactPhone)
       setOtpCode('')
     } catch (err: unknown) {
+      console.error('[zippy] sendOtp failed', err)
       setOtpError(mapFirebaseError(err))
-      recaptchaVerifierRef.current?.clear()
-      recaptchaVerifierRef.current = null
-      if (recaptchaContainerRef.current) recaptchaContainerRef.current.innerHTML = ''
     } finally {
+      // Rebuild the verifier after every attempt, succeeded or not.
+      resetRecaptcha()
       setOtpSending(false)
     }
   }
@@ -110,7 +120,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
       const pos = await getCurrentPosition()
       const { latitude, longitude } = pos.coords
       if (!isWithinDeliveryZone(latitude, longitude)) {
-        setError('We don’t deliver to this location yet. Contact us at support@zippy.app to request service in your area.')
+        setError(OUT_OF_ZONE_MESSAGE)
         setLocating(false)
         return
       }
@@ -128,9 +138,32 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function openManual() {
+  // Opening the form asks for live location first: GPS is the only reliable way
+  // to confirm the delivery area here, and it also saves the customer typing
+  // their area by hand. If they decline we still open the form and explain at
+  // save time why the location is needed.
+  async function openManual() {
     setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(''); setDraftCoords(null); setDraftLabel('Home'); setError('')
     setOtpSentFor(null); setOtpVerifiedFor(null); setOtpCode(''); setOtpError(''); confirmationResultRef.current = null
+
+    setLocating(true)
+    try {
+      const pos = await getCurrentPosition()
+      const { latitude, longitude } = pos.coords
+      if (!isWithinDeliveryZone(latitude, longitude)) {
+        setError(OUT_OF_ZONE_MESSAGE)
+        setLocating(false)
+        return // stay on the list — there is nothing to add an address for
+      }
+      const address = await reverseGeocode(latitude, longitude)
+      setDraftCoords({ lat: latitude, lng: longitude })
+      setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+      setAreaLine(address ?? '')
+    } catch {
+      // Declined or unavailable — saveDraft explains what's needed.
+    } finally {
+      setLocating(false)
+    }
     setStep('manual')
   }
 
@@ -140,9 +173,21 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     if (!/^\d{10}$/.test(contactPhone.trim())) { setError('Please enter a valid 10-digit mobile number'); return }
     if (otpVerifiedFor !== contactPhone) { setError('Please verify your mobile number with the OTP sent to it'); return }
     const fullAddress = [houseNo.trim(), areaLine.trim(), landmark.trim() ? `near ${landmark.trim()}` : null].filter(Boolean).join(', ')
+
+    // Forward-geocoding a typed street was tried and abandoned: Mapbox has no
+    // reliable street data for Tarikere and resolved real local addresses to
+    // Tumakuru and Shivamogga, which rejected genuine customers. Device GPS is
+    // the only trustworthy signal, so that is what the zone check runs on.
+    const coords = draftCoords
+    if (!coords) {
+      setError('We need your location to confirm you’re inside our delivery area. Please tap “Use current location” above and allow access.')
+      return
+    }
+    if (!isWithinDeliveryZone(coords.lat, coords.lng)) { setError(OUT_OF_ZONE_MESSAGE); return }
+
     try {
       const saved = await addAddress({
-        label: draftLabel, address: fullAddress, lat: draftCoords?.lat ?? null, lng: draftCoords?.lng ?? null,
+        label: draftLabel, address: fullAddress, lat: coords.lat, lng: coords.lng,
         contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
       })
       await selectAddress(saved.id)
@@ -310,9 +355,10 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
             </div>
             <div className="flex gap-3 pt-2">
               <button onClick={() => setStep('list')} className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Back</button>
-              <button onClick={saveDraft} disabled={isValidPhone && !isPhoneVerified}
-                className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 disabled:hover:bg-[#16A34A]">
-                Save Address
+              <button onClick={saveDraft} disabled={locating || (isValidPhone && !isPhoneVerified)}
+                className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 disabled:hover:bg-[#16A34A] flex items-center justify-center gap-2">
+                {locating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {locating ? 'Finding you...' : 'Save Address'}
               </button>
             </div>
           </div>

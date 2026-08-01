@@ -15,7 +15,11 @@ const supabase = createBrowserClient(
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof ChefHat; next?: string; nextLabel?: string }> = {
   confirmed:        { label: 'Confirmed',   color: '#0891B2', bg: '#ECFEFF', icon: AlertCircle, next: 'preparing',        nextLabel: 'Start Preparing' },
   preparing:        { label: 'Preparing',   color: '#D97706', bg: '#FFFBEB', icon: ChefHat,     next: 'out_for_delivery', nextLabel: 'Ready for Pickup' },
-  out_for_delivery: { label: 'On the way',  color: '#7C3AED', bg: '#F5F3FF', icon: Truck,       next: 'delivered',        nextLabel: 'Mark Delivered'   },
+  // Deliberately has no `next`: completing an order is the delivery partner's
+  // call, not the kitchen's. The rider's own panel stamps delivered_at, settles
+  // COD payment status and credits the rider — none of which happened when a
+  // restaurant marked it delivered from here.
+  out_for_delivery: { label: 'With rider' ,  color: '#7C3AED', bg: '#F5F3FF', icon: Truck   },
   delivered:        { label: 'Delivered',   color: '#16A34A', bg: '#DCFCE7', icon: CheckCircle },
   cancelled:        { label: 'Cancelled',   color: '#DC2626', bg: '#FEF2F2', icon: XCircle },
   pending:          { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6', icon: Clock, next: 'confirmed', nextLabel: 'Confirm Order' },
@@ -54,6 +58,8 @@ export default function RestaurantOrdersPage() {
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null)
+  // Orders already shown in the popup, so later updates don't re-pop them.
+  const poppedRef = useRef<Set<string>>(new Set())
   const soundOnRef = useRef(true)
   soundOnRef.current = soundOn
 
@@ -66,7 +72,9 @@ export default function RestaurantOrdersPage() {
       .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('placed_at', { ascending: false })
       .limit(50)
-    setOrders((data as unknown as Order[]) ?? [])
+    const rows = (data as unknown as Order[]) ?? []
+    setOrders(rows)
+    return rows
   }, [])
 
   useEffect(() => {
@@ -81,8 +89,19 @@ export default function RestaurantOrdersPage() {
       const { data: rest } = await query
       if (!rest || cancelled) { setLoading(false); return }
       setRestaurant(rest as Restaurant)
-      await loadOrders(rest.id)
+      const loaded = await loadOrders(rest.id)
       setLoading(false)
+
+      // A shop that opens the panel after an order arrived would otherwise see
+      // nothing: the popup only fired on a live INSERT, so anything placed while
+      // the tab was shut stayed silent. Ring for whatever is still un-actioned
+      // at load, the way the rider panel already does.
+      const waiting = loaded.find((o) => o.status === 'pending')
+      if (waiting) {
+        poppedRef.current.add(waiting.id)
+        setPendingOrder(waiting)
+        if (soundOnRef.current) startAlarm('New order')
+      }
 
       // Realtime: new/updated orders pop in instantly
       channel = supabase

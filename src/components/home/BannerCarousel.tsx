@@ -13,7 +13,7 @@ const supabase = createBrowserClient(
 
 type Banner = {
   id: string; title: string; subtitle: string | null
-  image_url: string; link: string | null; is_pinned: boolean
+  image_url: string; link: string | null
 }
 
 const ROTATE_MS = 4000
@@ -26,20 +26,23 @@ export default function BannerCarousel() {
     async function load() {
       const { data } = await supabase
         .from('banners')
-        .select('id, title, subtitle, image_url, link, is_pinned')
+        .select('id, title, subtitle, image_url, link')
         .eq('is_active', true)
-        .order('is_pinned', { ascending: false })
         .order('sort_order', { ascending: true })
       setBanners((data as Banner[]) ?? [])
     }
     load()
   }, [])
 
+  // Timer is keyed on `active`, not set once — a shared interval keeps its own
+  // cadence, so a slide reached by the arrows (or the wrap back to the first)
+  // inherited whatever was left of the previous tick and could flip almost
+  // immediately. Restarting per slide gives every one the full ROTATE_MS.
   useEffect(() => {
     if (banners.length < 2) return
-    const t = setInterval(() => setActive((i) => (i + 1) % banners.length), ROTATE_MS)
-    return () => clearInterval(t)
-  }, [banners.length])
+    const t = setTimeout(() => setActive((i) => (i + 1) % banners.length), ROTATE_MS)
+    return () => clearTimeout(t)
+  }, [banners.length, active])
 
   const prev = () => setActive((i) => (i - 1 + banners.length) % banners.length)
   const next = () => setActive((i) => (i + 1) % banners.length)
@@ -48,28 +51,27 @@ export default function BannerCarousel() {
 
   return (
     <section>
-      <div className="relative rounded-3xl overflow-hidden h-[160px] sm:h-[220px] lg:h-[320px] shadow-zippy-lg group">
+      {/* Banner creatives are complete designs (own headline, own CTA), so the
+          slide shows the artwork alone — `title` is the admin-side label and the
+          alt text, not an overlay. The 7:5 frame sits between the poster aspects
+          in use (3:2 and 4:3) so object-cover fills the box edge to edge while
+          trimming only ~3% off the margins, well clear of the offer text. */}
+      <div className="relative mx-auto max-w-[900px] rounded-3xl overflow-hidden aspect-[7/5] bg-[#111827] shadow-zippy-lg group">
         {banners.map((b, i) => {
           const content = (
             <div className="relative h-full w-full">
-              <Image src={b.image_url} alt={b.title} fill className="object-cover" priority={i === 0} sizes="100vw" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <div className="relative h-full flex flex-col justify-end px-5 sm:px-10 lg:px-16 pb-4 sm:pb-8 max-w-[80%] sm:max-w-[70%]">
-                {b.is_pinned && (
-                  <span className="hidden sm:inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-white mb-3 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full w-fit">
-                    Featured
-                  </span>
-                )}
-                <h2 className="text-[16px] sm:text-[26px] lg:text-[34px] font-[900] text-white leading-[1.15] tracking-[-0.02em] mb-1 sm:mb-2 whitespace-pre-line" style={{ fontWeight: 900 }}>
-                  {b.title}
-                </h2>
-                {b.subtitle && <p className="text-[11px] sm:text-[14px] lg:text-[15px] text-white/85 leading-relaxed line-clamp-2 sm:line-clamp-none mb-2 sm:mb-4">{b.subtitle}</p>}
-                {b.link && (
-                  <span className="inline-flex items-center gap-1.5 px-3 sm:px-5 py-1.5 sm:py-2.5 bg-white text-[#111827] text-[11px] sm:text-[13.5px] font-[700] rounded-lg sm:rounded-xl w-fit shadow-[0_4px_16px_rgba(0,0,0,0.2)]">
-                    Order Now →
-                  </span>
-                )}
-              </div>
+              {/* `priority` is deprecated in Next 16 — the docs point to
+                  loading/fetchPriority instead. The first slide is the LCP
+                  candidate, so it loads eagerly and the rest stay lazy. */}
+              <Image
+                src={b.image_url}
+                alt={b.title}
+                fill
+                className="object-cover"
+                loading={i === 0 ? 'eager' : 'lazy'}
+                fetchPriority={i === 0 ? 'high' : 'auto'}
+                sizes="(max-width: 900px) 100vw, 900px"
+              />
             </div>
           )
           return (

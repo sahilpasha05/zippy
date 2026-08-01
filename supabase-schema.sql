@@ -213,6 +213,7 @@ create table if not exists public.orders (
   status text not null default 'pending' check (status in ('pending','confirmed','preparing','ready','out_for_delivery','delivered','cancelled')),
   total numeric(10,2) not null,
   delivery_fee numeric(10,2) default 0,
+  platform_fee numeric(10,2) default 0,
   discount numeric(10,2) default 0,
   address text not null,
   notes text,
@@ -332,6 +333,7 @@ create table if not exists public.banners (
   image_url text not null,
   link text,
   sort_order int default 0,
+  is_pinned boolean default false,
   is_active boolean default true,
   created_at timestamptz default now()
 );

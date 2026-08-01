@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-// Pre-launch flag: products/menu items are browsable everywhere, but ordering
-// (add to cart, checkout) stays disabled until this flips to true.
-export const ORDERING_ENABLED = false
+// Launched: ordering is open everywhere. Kept as a flag so it can be pulled
+// back to false in one place if orders ever need to be paused.
+export const ORDERING_ENABLED = true
 
 // Ordering (and the "Coming soon" labels) is always active on localhost,
 // regardless of ORDERING_ENABLED, so it can be developed/tested normally.

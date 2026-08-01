@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   MapPin, Search, Bell, User, ChevronDown,
-  Zap, Package, UtensilsCrossed, Tag, Menu, X, ShoppingBag, LogOut, History
+  Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History
 } from 'lucide-react'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
@@ -19,7 +19,6 @@ import LocationPicker from '@/components/LocationPicker'
 const navLinks = [
   { label: 'Essentials', href: '/essentials', icon: Package },
   { label: 'Restaurants', href: '/restaurants', icon: UtensilsCrossed },
-  { label: 'Offers', href: '/offers', icon: Tag },
 ]
 
 export default function Navbar() {

@@ -14,8 +14,9 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Fruits has its own separate partner system — store partners manage everything else.
-const FRUITS_CATEGORY_ID = '2f6d345d-f640-4da1-acd5-db9f19ff2041'
+// Vegetables & Fruits has its own separate partner portal — store partners
+// manage every other category.
+const PRODUCE_CATEGORY_ID = 'beec9b69-bce0-436c-9d3b-e6260ba88ef4'
 
 type Category = { id: string; name: string }
 type Partner = { id: string; name: string; slug: string }
@@ -54,7 +55,7 @@ export default function StoreSlugProductsPage() {
     async function init() {
       const [{ data: part }, { data: cats }] = await Promise.all([
         supabase.from('store_partners').select('id, name, slug').eq('slug', slug).single(),
-        supabase.from('grocery_categories').select('id, name').eq('is_active', true).neq('id', FRUITS_CATEGORY_ID).order('sort_order'),
+        supabase.from('grocery_categories').select('id, name').eq('is_active', true).neq('id', PRODUCE_CATEGORY_ID).order('sort_order'),
       ])
       setCategories((cats as Category[]) ?? [])
       if (!part) { setLoading(false); return }

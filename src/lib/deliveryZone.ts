@@ -116,3 +116,8 @@ export const DELIVERY_ZONE: Feature<Polygon> = {
 export function isWithinDeliveryZone(lat: number, lng: number): boolean {
   return booleanPointInPolygon(point([lng, lat]), DELIVERY_ZONE)
 }
+
+// One wording for every place an out-of-area customer gets turned away, so the
+// address picker and checkout can't drift apart.
+export const OUT_OF_ZONE_MESSAGE =
+  'We’re not delivering to your area yet — Zippy currently serves Tarikere only. Contact us at zippytarikere@gmail.com or on WhatsApp at 8277802605 for more details.'
