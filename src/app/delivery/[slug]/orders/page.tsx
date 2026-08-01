@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
-import { Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
@@ -59,7 +59,8 @@ export default function DeliveryOrdersPage() {
   const [partner, setPartner] = useState<Partner | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'active' | 'delivered'>('active')
+  const [tab, setTab] = useState<'active' | 'pending' | 'delivered'>('active')
+  const [search, setSearch] = useState('')
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const soundOnRef = useRef(true)
@@ -71,6 +72,8 @@ export default function DeliveryOrdersPage() {
   const partnerIdRef = useRef<string | null>(null)
   const [pendingAccept, setPendingAccept] = useState<Order[]>([])
   const pendingAcceptRef = useRef<Order[]>([])
+  // Orders already announced, so an unrelated update to the same row doesn't re-ring.
+  const announcedRef = useRef<Set<string>>(new Set())
   pendingAcceptRef.current = pendingAccept
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
   const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null)
@@ -83,9 +86,14 @@ export default function DeliveryOrdersPage() {
       .from('orders')
       .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, online_amount, cod_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
+      // Most recently assigned first — admin stamps updated_at when it assigns,
+      // so a re-assignment brings the order back to the top of this board.
+      .order('updated_at', { ascending: false })
       .order('placed_at', { ascending: false })
       .limit(50)
-    const fetched = (data as unknown as Order[]) ?? []
+    const raw = (data as unknown as Order[]) ?? []
+    // Anything still awaiting acceptance floats above the rest.
+    const fetched = [...raw].sort((a, b) => Number(!!a.accepted_at) - Number(!!b.accepted_at))
     setOrders(fetched)
     const pending = fetched.filter((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status))
     setPendingAccept(pending)
@@ -126,10 +134,12 @@ export default function DeliveryOrdersPage() {
           // `old.delivery_partner_id !== p.id` true even for the rider's own
           // "accepted_at" write, restarting the alarm the instant they accepted.
           // Ring on what the row now says instead: still unaccepted and live.
-          const row = payload.new as { accepted_at?: string | null; status?: string } | undefined
+          const row = payload.new as { id?: string; accepted_at?: string | null; status?: string } | undefined
+          const rowId = row?.id
           const awaitingAccept = !!row && row.accepted_at == null
             && !['delivered', 'cancelled'].includes(row.status ?? '')
-          if (awaitingAccept) {
+          if (awaitingAccept && rowId && !announcedRef.current.has(rowId)) {
+            announcedRef.current.add(rowId)
             if (soundOnRef.current) startAlarm('New delivery')
             setNewOrderFlash(true)
             setTimeout(() => setNewOrderFlash(false), 4000)
@@ -194,6 +204,7 @@ export default function DeliveryOrdersPage() {
   function acceptOrder(orderId: string) {
     setPendingAccept((prev) => {
       const next = prev.filter((o) => o.id !== orderId)
+      announcedRef.current.delete(orderId)
       if (next.length === 0) stopAlarm()
       return next
     })
@@ -260,8 +271,16 @@ export default function DeliveryOrdersPage() {
   )
 
   const activeOrders = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
+  // Not yet picked up: still with the kitchen, or assigned but not accepted.
+  const pendingOrders = activeOrders.filter((o) => !o.accepted_at || ['pending', 'confirmed', 'preparing'].includes(o.status))
   const deliveredOrders = orders.filter((o) => o.status === 'delivered')
-  const shown = tab === 'active' ? activeOrders : deliveredOrders
+
+  const q = search.trim().toLowerCase()
+  const matches = (o: Order) => !q || [
+    o.id.slice(0, 8), o.customer_name ?? '', o.customer_phone ?? '', o.address ?? '', restName(o) ?? '',
+  ].some((f) => f.toLowerCase().includes(q))
+
+  const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders).filter(matches)
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -311,11 +330,31 @@ export default function DeliveryOrdersPage() {
             </div>
           )}
 
+          <div className="relative mb-2.5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search order, name, phone or address"
+              className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
           <div className="flex gap-1.5">
             <button onClick={() => setTab('active')}
               className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
                 tab === 'active' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
               Active ({activeOrders.length})
+            </button>
+            <button onClick={() => setTab('pending')}
+              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+                tab === 'pending' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
+              Pending ({pendingOrders.length})
             </button>
             <button onClick={() => setTab('delivered')}
               className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
@@ -332,7 +371,7 @@ export default function DeliveryOrdersPage() {
           <div className="flex flex-col items-center gap-3 py-24 text-[#9CA3AF]">
             <Truck className="w-12 h-12" strokeWidth={1} />
             <p className="text-[15px] font-semibold text-[#374151]">
-              {tab === 'active' ? 'No deliveries right now' : 'No deliveries yet'}
+              {search ? 'Nothing matches that search' : tab === 'active' ? 'No deliveries right now' : tab === 'pending' ? 'Nothing waiting to be picked up' : 'No deliveries yet'}
             </p>
             {tab === 'active' && <p className="text-[13px]">New assignments from admin will show up here instantly.</p>}
           </div>

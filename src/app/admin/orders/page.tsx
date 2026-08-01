@@ -141,7 +141,12 @@ export default function AdminOrdersPage() {
   }
 
   async function assignOrder(orderId: string, partnerId: string) {
-    await supabase.from('orders').update({ delivery_partner_id: partnerId || null, accepted_at: null }).eq('id', orderId)
+    // updated_at has no trigger in this database, so stamp it here: the rider
+    // board sorts on it to put a freshly assigned order at the top, including a
+    // re-assignment of one they already had.
+    await supabase.from('orders')
+      .update({ delivery_partner_id: partnerId || null, accepted_at: null, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, delivery_partner_id: partnerId || null } : o))
   }
 
@@ -185,7 +190,9 @@ export default function AdminOrdersPage() {
       .filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status))
       .map((o) => o.id)
     if (unassignedIds.length === 0) { setAutoAssigning(false); setAutoAssignMsg('No unassigned orders'); setTimeout(() => setAutoAssignMsg(''), 2000); return }
-    await supabase.from('orders').update({ delivery_partner_id: autoAssignPartner, accepted_at: null }).in('id', unassignedIds)
+    await supabase.from('orders')
+      .update({ delivery_partner_id: autoAssignPartner, accepted_at: null, updated_at: new Date().toISOString() })
+      .in('id', unassignedIds)
     setOrders((prev) => prev.map((o) => unassignedIds.includes(o.id) ? { ...o, delivery_partner_id: autoAssignPartner } : o))
     setAutoAssigning(false)
     setAutoAssignMsg(`Assigned ${unassignedIds.length} order${unassignedIds.length !== 1 ? 's' : ''}!`)
