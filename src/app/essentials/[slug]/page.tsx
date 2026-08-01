@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { Search, ChevronRight, Package, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import CategoryComingSoon from '@/components/CategoryComingSoon'
+import { useGroceryGate } from '@/lib/launchConfig'
 import { useCartStore } from '@/lib/store/cart'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
@@ -30,6 +31,8 @@ type Product = {
 
 export default function CategoryPage() {
   const [comingSoon, setComingSoon] = useState<string | null>(null)
+  const groceryGated = useGroceryGate()
+  const router = useRouter()
   const { slug } = useParams<{ slug: string }>()
   const [category, setCategory] = useState<Category | null>(null)
   const [allCategories, setAllCategories] = useState<Category[]>([])
@@ -112,7 +115,7 @@ export default function CategoryPage() {
           {/* Other-category pills — desktop */}
           <div className="hidden lg:flex gap-2 overflow-x-auto pb-2 mb-6">
             {allCategories.map((c) => (
-              <button key={c.id} onClick={() => setComingSoon(c.name)}
+              <button key={c.id} onClick={() => { if (groceryGated) setComingSoon(c.name); else router.push(`/essentials/${c.slug}`) }}
                 className={cn('px-4 py-2 rounded-xl text-[12.5px] font-medium whitespace-nowrap shrink-0 transition-all border',
                   c.slug === slug ? 'bg-[#16A34A] text-white border-[#16A34A] shadow-[0_2px_6px_rgba(22,163,74,0.3)]' : 'bg-white text-[#6B7280] border-[#E5E7EB] hover:border-[#16A34A] hover:text-[#16A34A]')}>
                 {c.name}

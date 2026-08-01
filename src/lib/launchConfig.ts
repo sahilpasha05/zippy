@@ -16,3 +16,22 @@ export function useOrderingEnabled() {
 
   return enabled
 }
+
+// Grocery categories show a "not available yet" popup for customers, but on
+// localhost they navigate normally so the aisles can still be worked on.
+export function useGroceryGate() {
+  // Starts gated so the server render and the first client render agree; the
+  // localhost check is deferred a frame so nothing writes state synchronously
+  // inside the effect.
+  const [gated, setGated] = useState(true)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      if (isLocalhost) setGated(false)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  return gated
+}
