@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
-import { cn } from '@/lib/utils'
+import { cn, formatMoney } from '@/lib/utils'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +27,7 @@ type OrderItem = { name: string; quantity: number; price: number; image_url: str
 type Order = {
   id: string; status: string; total: number; customer_name: string | null; customer_phone: string | null
   placed_at: string; address: string | null; payment_method: string | null; payment_status: string | null
+  online_amount: number | null; cod_amount: number | null; cash_collected_at: string | null
   order_type: string | null
   delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
@@ -69,7 +70,7 @@ export default function AdminOrdersPage() {
     const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurants(name), order_items(name, quantity, price, image_url)')
         // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
         .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
@@ -222,7 +223,7 @@ export default function AdminOrdersPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[#F3F4F6]">
-                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Grocery Partner', 'Store Partner', 'Total', 'Time'].map((h) => (
+                    {['Order', 'Customer', 'Restaurant', 'Status', 'Rider', 'Grocery Partner', 'Store Partner', 'Paid online', 'Cash on delivery', 'Pending', 'Total', 'Time'].map((h) => (
                       <th key={h} className="text-left text-[11.5px] font-[600] text-[#9CA3AF] px-5 py-3">{h}</th>
                     ))}
                   </tr>
@@ -295,7 +296,38 @@ export default function AdminOrdersPage() {
                             </select>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-[13px] font-[700] text-[#111827]">₹{o.total}</td>
+                        {/* Split payments take 50% online and 50% cash, so the
+                            two legs are shown separately rather than only the total. */}
+                        <td className="px-5 py-3.5 text-[13px]">
+                          {Number(o.online_amount ?? 0) > 0 ? (
+                            <>
+                              <span className="font-[700] text-[#16A34A]">₹{formatMoney(o.online_amount)}</span>
+                              <span className="block text-[11px] text-[#9CA3AF] capitalize">
+                                {o.payment_method ?? '—'} · {o.payment_status ?? 'pending'}
+                              </span>
+                            </>
+                          ) : <span className="text-[#9CA3AF]">—</span>}
+                        </td>
+                        <td className="px-5 py-3.5 text-[13px]">
+                          {Number(o.cod_amount ?? 0) > 0 ? (
+                            <span className="font-[700] text-[#D97706]">₹{formatMoney(o.cod_amount)}</span>
+                          ) : <span className="text-[#9CA3AF]">—</span>}
+                        </td>
+                        {/* Outstanding = total less what has actually been received.
+                            The online leg counts once payment_status moves past
+                            "pending"; the cash leg only once the rider records
+                            collecting it. */}
+                        <td className="px-5 py-3.5 text-[13px]">
+                          {(() => {
+                            const onlinePaid = ['partially_paid', 'paid'].includes(o.payment_status ?? '') ? Number(o.online_amount ?? 0) : 0
+                            const cashPaid = (o.payment_status === 'paid' || o.cash_collected_at) ? Number(o.cod_amount ?? 0) : 0
+                            const pending = Math.max(0, Number(o.total) - onlinePaid - cashPaid)
+                            return pending > 0
+                              ? <span className="font-[700] text-[#DC2626]">₹{formatMoney(pending)}</span>
+                              : <span className="font-[600] text-[#16A34A]">Settled</span>
+                          })()}
+                        </td>
+                        <td className="px-5 py-3.5 text-[13px] font-[700] text-[#111827]">₹{formatMoney(o.total)}</td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</td>
                       </tr>
                       {isExpanded && (

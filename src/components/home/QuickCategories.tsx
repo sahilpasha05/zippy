@@ -43,7 +43,6 @@ export default function QuickCategories() {
         <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-x-3 gap-y-5">
           {[...Array(12)].map((_, i) => <div key={i} className="aspect-square bg-[#F3F4F6] rounded-2xl animate-pulse" />)}
         </div>
-        <CategoryComingSoon categoryName={comingSoon} onClose={() => setComingSoon(null)} />
     </section>
     )
   }
@@ -91,6 +90,7 @@ export default function QuickCategories() {
           </div>
         </div>
       )}
+      <CategoryComingSoon categoryName={comingSoon} onClose={() => setComingSoon(null)} />
     </section>
   )
 }
