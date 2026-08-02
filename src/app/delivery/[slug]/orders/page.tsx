@@ -501,8 +501,8 @@ export default function DeliveryOrdersPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                       <span className="text-[14px] font-[800] text-[#111827]">₹{o.total}</span>
                       {o.customer_phone && (
                         <a href={`tel:${o.customer_phone}`}
@@ -529,7 +529,7 @@ export default function DeliveryOrdersPage() {
                     {isReady && (
                       <button onClick={() => triggerProofCapture(o.id)} disabled={uploadingProofFor === o.id}
                         title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then take the delivery photo` : 'Take the delivery photo to complete this order'}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
+                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
                         {uploadingProofFor === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
                         {uploadingProofFor === o.id
                           ? 'Uploading...'
