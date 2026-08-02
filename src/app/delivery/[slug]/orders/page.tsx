@@ -104,9 +104,14 @@ export default function DeliveryOrdersPage() {
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
+      // Delivered orders older than a day drop off the board so they stop
+      // occupying slots; everything still live is always fetched.
+      .or(`status.neq.delivered,delivered_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('updated_at', { ascending: false })
       .order('placed_at', { ascending: false })
-      .limit(50)
+      // A rider can hold well past 50 orders — capping here meant an order
+      // assigned from admin simply never appeared on their board.
+      .limit(500)
     const raw = (data as unknown as Order[]) ?? []
     // Anything still awaiting acceptance floats above the rest.
     const fetched = [...raw].sort((a, b) => Number(!!a.accepted_at) - Number(!!b.accepted_at))
