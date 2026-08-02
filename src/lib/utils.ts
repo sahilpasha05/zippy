@@ -13,3 +13,17 @@ export function formatMoney(value: number | string | null | undefined): string {
   if (!Number.isFinite(n)) return '0'
   return Number.isInteger(n) ? String(n) : n.toFixed(2)
 }
+
+// "min ago" is fine for a fresh order but stops being useful once a shift or
+// a day has passed — this gives the actual calendar date and clock time to
+// pin down exactly when an order was placed, in the shop's local time.
+export function formatDateTime(d: string): string {
+  return new Date(d).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
