@@ -128,6 +128,17 @@ export default function DeliveryOrdersPage() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
     let cancelled = false
+    let pollId: ReturnType<typeof setInterval> | null = null
+
+    // The board used to rely entirely on the realtime socket. On a phone that
+    // socket drops whenever the app is backgrounded or the network switches
+    // between wifi and data, and nothing ever reconnected the data — the board
+    // silently froze on whatever it had loaded. These refresh it regardless.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && partnerIdRef.current) {
+        loadOrders(partnerIdRef.current)
+      }
+    }
 
     async function init() {
       const { data: p } = await supabase.from('delivery_partners')
@@ -171,11 +182,22 @@ export default function DeliveryOrdersPage() {
           setTimeout(() => loadOrders(p.id), 1500)
         })
         .subscribe()
+
+      // Cheap safety net: a periodic reload, plus one whenever the rider comes
+      // back to the tab or the connection returns.
+      pollId = setInterval(() => { if (partnerIdRef.current) loadOrders(partnerIdRef.current) }, 30000)
+      document.addEventListener('visibilitychange', onVisible)
+      window.addEventListener('online', onVisible)
+      window.addEventListener('focus', onVisible)
     }
     init()
 
     return () => {
       cancelled = true
+      if (pollId) clearInterval(pollId)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
+      window.removeEventListener('focus', onVisible)
       if (channel) supabase.removeChannel(channel)
       stopAlarm()
     }

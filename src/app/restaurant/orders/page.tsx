@@ -93,6 +93,9 @@ export default function RestaurantOrdersPage() {
   const [pendingOrder, setPendingOrder] = useState<Order | null>(null)
   // Orders already shown in the popup, so later updates don't re-pop them.
   const poppedRef = useRef<Set<string>>(new Set())
+  // Set once the panel knows which shop it is, so the refresh fallbacks below
+  // can reload without re-reading the slug.
+  const idRef = useRef<string | null>(null)
   const soundOnRef = useRef(true)
   soundOnRef.current = soundOn
 
@@ -115,6 +118,13 @@ export default function RestaurantOrdersPage() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
     let cancelled = false
+    let pollId: ReturnType<typeof setInterval> | null = null
+
+    // Realtime alone isn't enough: the socket drops on backgrounding or a
+    // network change and the panel then sits frozen on stale data.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && idRef.current) loadOrders(idRef.current)
+    }
 
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
@@ -124,6 +134,7 @@ export default function RestaurantOrdersPage() {
       const { data: rest } = await query
       if (!rest || cancelled) { setLoading(false); return }
       setRestaurant(rest as Restaurant)
+      idRef.current = rest.id
       const loaded = await loadOrders(rest.id)
       setLoading(false)
 
@@ -174,11 +185,20 @@ export default function RestaurantOrdersPage() {
           loadOrders(rest.id)
         })
         .subscribe()
+
+      pollId = setInterval(() => { if (idRef.current) loadOrders(idRef.current) }, 30000)
+      document.addEventListener('visibilitychange', onVisible)
+      window.addEventListener('online', onVisible)
+      window.addEventListener('focus', onVisible)
     }
     init()
 
     return () => {
       cancelled = true
+      if (pollId) clearInterval(pollId)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
+      window.removeEventListener('focus', onVisible)
       if (channel) supabase.removeChannel(channel)
       stopAlarm()
     }
