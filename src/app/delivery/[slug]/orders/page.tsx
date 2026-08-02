@@ -30,7 +30,7 @@ type Order = {
   delivery_latitude: number | null; delivery_longitude: number | null
   accepted_at: string | null
   online_amount: number | null; cod_amount: number | null
-  payment_status: string | null; cash_collected_at: string | null
+  payment_status: string | null; cash_collected_at: string | null; delivered_at: string | null
   order_items: OrderItem[]
   restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
 }
@@ -100,7 +100,7 @@ export default function DeliveryOrdersPage() {
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, online_amount, cod_amount, payment_status, cash_collected_at, order_items(name, quantity, price), restaurants(name, address, phone)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, online_amount, cod_amount, payment_status, cash_collected_at, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
@@ -166,6 +166,9 @@ export default function DeliveryOrdersPage() {
             setTimeout(() => setNewOrderFlash(false), 4000)
           }
           loadOrders(p.id)
+          // Replication can trail the notification by a moment; a single retry
+          // stops an assignment ringing without ever landing on the board.
+          setTimeout(() => loadOrders(p.id), 1500)
         })
         .subscribe()
     }
@@ -303,6 +306,12 @@ export default function DeliveryOrdersPage() {
 
   const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders).filter(matches)
 
+  // "Today" is the rider's own day, not UTC.
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
+  const isToday = (d: string | null) => !!d && new Date(d) >= startOfToday
+  const deliveredToday = orders.filter((o) => o.status === 'delivered' && isToday(o.delivered_at))
+  const collectedToday = deliveredToday.reduce((sum, o) => sum + Number(o.cod_amount ?? 0), 0)
+
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Header */}
@@ -350,6 +359,23 @@ export default function DeliveryOrdersPage() {
               <span className="text-[13px] font-[700] text-white">New delivery assigned!</span>
             </div>
           )}
+
+          {/* Today at a glance, so the rider can see their own day's work and
+              what cash they should be holding without opening analytics. */}
+          <div className="grid grid-cols-3 gap-2 mb-2.5">
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#15803D] leading-none">{deliveredToday.length}</p>
+              <p className="text-[10.5px] text-[#15803D]/70 mt-1">delivered today</p>
+            </div>
+            <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
+              <p className="text-[10.5px] text-[#6D28D9]/70 mt-1">still to deliver</p>
+            </div>
+            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#B45309] leading-none">₹{collectedToday.toFixed(0)}</p>
+              <p className="text-[10.5px] text-[#B45309]/70 mt-1">cash collected</p>
+            </div>
+          </div>
 
           <div className="relative mb-2.5">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
