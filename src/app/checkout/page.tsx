@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { load as loadCashfree } from '@cashfreepayments/cashfree-js'
 import { MapPin, CreditCard, ChevronRight, Plus, Check, Zap, Gift, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
@@ -45,6 +45,11 @@ export default function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null)
   const [placeError, setPlaceError] = useState('')
   const [showLocationPicker, setShowLocationPicker] = useState(false)
+  // A second tap landing before React re-renders the disabled button would
+  // otherwise slip through the `placing` state check and insert the order's
+  // items a second time. This ref blocks it the instant the first tap starts,
+  // with no re-render in between.
+  const submittingRef = useRef(false)
   // Ordering requires an account: it is what carries the delivery number, the
   // order history, tracking and reviews. A guest order would have none of those.
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
@@ -83,6 +88,7 @@ export default function CheckoutPage() {
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
   const handlePlace = async () => {
+    if (submittingRef.current) return
     if (items.length === 0 || !selectedAddress) return
 
     if (!signedIn) { setShowAuth(true); return }
@@ -102,6 +108,7 @@ export default function CheckoutPage() {
       }
     }
 
+    submittingRef.current = true
     setPlacing(true)
     setPlaceError('')
 
@@ -263,6 +270,8 @@ export default function CheckoutPage() {
       setPlaceError(msg)
       console.error(err)
       setPlacing(false)
+    } finally {
+      submittingRef.current = false
     }
   }
 
