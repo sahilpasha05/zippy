@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
-import { cn } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
 const supabase = createBrowserClient(
@@ -323,6 +323,7 @@ export default function RestaurantOrdersPage() {
                             </span>
                           </div>
                           <p className="text-[12px] text-[#9CA3AF]">{o.customer_name ?? 'Customer'} · {timeAgo(o.placed_at)}</p>
+                          <p className="text-[11px] text-[#9CA3AF]">{formatDateTime(o.placed_at)}</p>
                         </div>
                         <div className="text-right">
                           <div className="text-[15px] font-[800] text-[#111827]">₹{o.total}</div>

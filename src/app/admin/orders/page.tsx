@@ -5,7 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
-import { cn, formatMoney } from '@/lib/utils'
+import { cn, formatMoney, formatDateTime } from '@/lib/utils'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -441,7 +441,10 @@ export default function AdminOrdersPage() {
                             className="w-36 px-2 py-1 border border-[#E5E7EB] rounded-lg text-[12px] outline-none focus:border-[#7C3AED] bg-white"
                           />
                         </td>
-                        <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</td>
+                        <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">
+                          <span className="block">{timeAgo(o.placed_at)}</span>
+                          <span className="block text-[11px]">{formatDateTime(o.placed_at)}</span>
+                        </td>
                       </tr>
                       {isExpanded && (
                         <tr className="bg-[#FAFAFA]">

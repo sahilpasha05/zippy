@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing, MapPin, Bike, X } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
-import { cn } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
 const supabase = createBrowserClient(
@@ -338,6 +338,7 @@ export default function SlugOrdersPage() {
                             </span>
                           </div>
                           <p className="text-[12px] text-[#9CA3AF]">{o.customer_name ?? 'Customer'} · {timeAgo(o.placed_at)}</p>
+                          <p className="text-[11px] text-[#9CA3AF]">{formatDateTime(o.placed_at)}</p>
                         </div>
                         <div className="text-right">
                           <div className="text-[15px] font-[800] text-[#111827]">₹{o.total}</div>
