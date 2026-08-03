@@ -86,8 +86,6 @@ export default function AdminOrdersPage() {
       supabase
         .from('orders')
         .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
-        // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
-        .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
         .order('placed_at', { ascending: false })
         // The header counts (active / unassigned) and every tab are derived
         // from this list, so capping at 100 under-reported them once there were

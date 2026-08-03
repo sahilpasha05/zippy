@@ -116,8 +116,6 @@ export default function GrocerySlugOrdersPage() {
       .from('orders')
       .select('id, status, total, customer_name, customer_phone, placed_at, address, delivery_latitude, delivery_longitude, delivery_partner_id, order_items(name, quantity, price, image_url, product_type)')
       .eq('grocery_partner_id', partnerId)
-      // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
-      .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('placed_at', { ascending: false })
       // A busy day runs well past 50 orders; capping here made them vanish
       // from the panel entirely.
