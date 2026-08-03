@@ -43,10 +43,13 @@ export default function StoreSlugProductsPage() {
   const [formError, setFormError] = useState('')
 
   const loadProducts = useCallback(async (partnerId: string) => {
+    // Products added centrally in the admin panel have no store_partner_id —
+    // they're the shared catalog every store carries alongside whatever this
+    // store has added on its own.
     const { data } = await supabase
       .from('grocery_products')
       .select('id, name, image_url, price, mrp, weight, category_id, in_stock, is_active')
-      .eq('store_partner_id', partnerId)
+      .or(`store_partner_id.eq.${partnerId},store_partner_id.is.null`)
       .order('created_at', { ascending: false })
     setProducts((data as Product[]) ?? [])
   }, [])
