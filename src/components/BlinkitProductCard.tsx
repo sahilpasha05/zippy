@@ -7,6 +7,7 @@ import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { useOrderingEnabled } from '@/lib/launchConfig'
+import { applyPriceMarkup } from '@/lib/cartPricing'
 
 export type BlinkitProduct = {
   id: string
@@ -24,7 +25,13 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
   const { addItem, replaceCartWith, items, updateQuantity } = useCartStore()
   const [askReplace, setAskReplace] = useState(false)
 
-  const draft = { product_id: p.id, product_type: 'grocery' as const, restaurant_id: null, name: p.name, image_url: p.image_url ?? null, price: p.price, quantity: 1 }
+  // Marked up here, at the point a stored price first becomes customer-facing,
+  // so display and the cart draft always agree — nothing downstream (cart
+  // totals, checkout, the order row) needs to know about the markup at all.
+  const price = applyPriceMarkup(p.price)
+  const mrp = applyPriceMarkup(p.mrp ?? p.price)
+
+  const draft = { product_id: p.id, product_type: 'grocery' as const, restaurant_id: null, name: p.name, image_url: p.image_url ?? null, price, quantity: 1 }
 
   function handleAdd() {
     if (conflictsWithCart(items, null)) { setAskReplace(true); return }
@@ -34,8 +41,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
   const orderingEnabled = useOrderingEnabled()
   const cartItem = items.find((i) => i.product_id === p.id)
   const inStock = p.in_stock ?? true
-  const mrp = p.mrp ?? p.price
-  const discount = mrp > p.price ? Math.round(((mrp - p.price) / mrp) * 100) : 0
+  const discount = mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0
 
   return (
     <div className="relative bg-white rounded-xl border border-[#EAEAEA] p-2.5 flex flex-col hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-shadow duration-200">
@@ -78,7 +84,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
       {/* Price + ADD */}
       <div className="flex items-center justify-between gap-2 mt-auto">
         <div className="leading-tight">
-          <div className="text-[13px] font-[700] text-[#1F1F1F]">₹{p.price}</div>
+          <div className="text-[13px] font-[700] text-[#1F1F1F]">₹{price}</div>
           {discount > 0 && <div className="text-[11px] text-[#9CA3AF] line-through">₹{mrp}</div>}
         </div>
         {orderingEnabled && inStock ? (

@@ -1,5 +1,15 @@
 import type { CartItem } from '@/types'
 
+// A margin applied on top of every stored product/menu price, computed at
+// display and cart-add time rather than written into the database — so it
+// shows consistently everywhere (product card, cart, checkout) and can be
+// changed or removed in one place without touching stored data.
+const PRICE_MARKUP = 1.05
+
+export function applyPriceMarkup(price: number): number {
+  return Math.round(price * PRICE_MARKUP * 100) / 100
+}
+
 // Once the cart's base subtotal reaches this amount, every item gets a flat
 // per-unit surcharge added to its displayed/charged price (small-order cost
 // recovery — baked into the price shown, not a separate line item).
