@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2 } from 'lucide-react'
+import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 
 const supabase = createBrowserClient(
@@ -23,6 +23,7 @@ export default function AdminSettingsPage() {
     orderNotifications: true,
     newRestaurantAlerts: true,
     maintenanceMode: false,
+    groceriesAvailable: true,
   })
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function AdminSettingsPage() {
           deliveryMinutes: String(data.delivery_minutes ?? 10),
           maxDeliveryFee: String(data.max_delivery_fee ?? 99),
           minOrderValue: String(data.min_order_value ?? 49),
+          groceriesAvailable: data.groceries_available ?? true,
         }))
       }
       setLoading(false)
@@ -53,6 +55,7 @@ export default function AdminSettingsPage() {
       delivery_minutes: +settings.deliveryMinutes || 10,
       max_delivery_fee: +settings.maxDeliveryFee || 99,
       min_order_value: +settings.minOrderValue || 49,
+      groceries_available: settings.groceriesAvailable,
       updated_at: new Date().toISOString(),
     }).eq('id', 1)
     setSaving(false)
@@ -113,6 +116,24 @@ export default function AdminSettingsPage() {
                 <input value={settings.supportEmail} onChange={(e) => set('supportEmail', e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
               </div>
+            </div>
+          </div>
+
+          {/* Groceries availability */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <ShoppingBasket className="w-4 h-4 text-[#7C3AED]" />
+              <h2 className="text-[14px] font-[700] text-[#111827]">Groceries</h2>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-[13.5px] font-[600] text-[#111827]">Groceries available to customers</p>
+                <p className="text-[12px] text-[#6B7280]">Turn off to pause grocery ordering — customers see a &quot;currently unavailable&quot; message instead of the catalog. Restaurant ordering is unaffected.</p>
+              </div>
+              <button onClick={() => set('groceriesAvailable', !settings.groceriesAvailable)}
+                className={`relative w-11 h-6 rounded-full shrink-0 ml-4 transition-all duration-300 ${settings.groceriesAvailable ? 'bg-[#16A34A]' : 'bg-[#D1D5DB]'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${settings.groceriesAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
             </div>
           </div>
 

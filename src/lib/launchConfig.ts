@@ -1,4 +1,12 @@
+'use client'
+
 import { useEffect, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // Launched: ordering is open everywhere. Kept as a flag so it can be pulled
 // back to false in one place if orders ever need to be paused.
@@ -17,21 +25,52 @@ export function useOrderingEnabled() {
   return enabled
 }
 
-// Grocery categories show a "not available yet" popup for customers, but on
-// localhost they navigate normally so the aisles can still be worked on.
+// Single app-wide subscription shared by every useGroceryGate() caller, same
+// pattern as useDeliveryEta. Starts open (available) so a slow first fetch
+// doesn't flash every grocery category shut before snapping back.
+let groceriesAvailable = true
+let groceriesInitialized = false
+const groceryListeners = new Set<(available: boolean) => void>()
+
+function notifyGroceries(available: boolean) {
+  groceriesAvailable = available
+  groceryListeners.forEach((l) => l(available))
+}
+
+function ensureGroceriesInitialized() {
+  if (groceriesInitialized) return
+  groceriesInitialized = true
+
+  supabase
+    .from('platform_settings')
+    .select('groceries_available')
+    .eq('id', 1)
+    .single()
+    .then(({ data }) => {
+      if (data && typeof data.groceries_available === 'boolean') notifyGroceries(data.groceries_available)
+    })
+
+  supabase
+    .channel('platform-settings-groceries')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'platform_settings' }, (payload) => {
+      const next = (payload.new as { groceries_available?: boolean })?.groceries_available
+      if (typeof next === 'boolean') notifyGroceries(next)
+    })
+    .subscribe()
+}
+
+// Admin-controlled (Settings -> Groceries Available). Grocery categories show
+// a "currently unavailable" popup for customers whenever an admin pauses
+// ordering, and reopen live the moment it's switched back on.
 export function useGroceryGate() {
-  // Starts gated so the server render and the first client render agree; the
-  // localhost check is deferred a frame so nothing writes state synchronously
-  // inside the effect.
-  const [gated, setGated] = useState(true)
+  const [available, setAvailable] = useState(groceriesAvailable)
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      if (isLocalhost) setGated(false)
-    })
-    return () => cancelAnimationFrame(id)
+    ensureGroceriesInitialized()
+    groceryListeners.add(setAvailable)
+    setAvailable(groceriesAvailable)
+    return () => { groceryListeners.delete(setAvailable) }
   }, [])
 
-  return gated
+  return !available
 }
