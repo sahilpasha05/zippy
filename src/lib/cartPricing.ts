@@ -1,12 +1,11 @@
 import type { CartItem } from '@/types'
 
-// A margin applied on top of every stored product/menu price, computed at
-// display and cart-add time rather than written into the database — so it
-// shows consistently everywhere (product card, cart, checkout) and can be
-// changed or removed in one place without touching stored data.
+// A margin applied once an item is in the cart — the product/menu card still
+// shows the plain stored price, but every cart-facing number (unit price,
+// subtotal, and what actually gets charged/stored on the order) is 5% higher.
 const PRICE_MARKUP = 1.05
 
-export function applyPriceMarkup(price: number): number {
+function applyPriceMarkup(price: number): number {
   return Math.round(price * PRICE_MARKUP * 100) / 100
 }
 
@@ -67,7 +66,7 @@ export function getFreeFriesProgress(items: CartItem[]): FreeFriesProgress {
 }
 
 export function getCartBaseTotal(items: CartItem[]): number {
-  return items.reduce((sum, i) => sum + i.price * i.quantity, 0)
+  return items.reduce((sum, i) => sum + applyPriceMarkup(i.price) * i.quantity, 0)
 }
 
 export function surchargeApplies(baseTotal: number): boolean {
@@ -76,11 +75,11 @@ export function surchargeApplies(baseTotal: number): boolean {
 
 // The per-unit price to display/charge for one item, given the cart's base subtotal.
 export function getAdjustedUnitPrice(item: Pick<CartItem, 'price'>, baseTotal: number): number {
-  return item.price + (surchargeApplies(baseTotal) ? PER_ITEM_SURCHARGE : 0)
+  return applyPriceMarkup(item.price) + (surchargeApplies(baseTotal) ? PER_ITEM_SURCHARGE : 0)
 }
 
 export function getCartAdjustedTotal(items: CartItem[]): number {
   const baseTotal = getCartBaseTotal(items)
   const apply = surchargeApplies(baseTotal)
-  return items.reduce((sum, i) => sum + (i.price + (apply ? PER_ITEM_SURCHARGE : 0)) * i.quantity, 0)
+  return items.reduce((sum, i) => sum + (applyPriceMarkup(i.price) + (apply ? PER_ITEM_SURCHARGE : 0)) * i.quantity, 0)
 }

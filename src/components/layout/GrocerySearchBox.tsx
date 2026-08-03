@@ -6,7 +6,6 @@ import Image from 'next/image'
 import { Search, Package, Loader2, MessageCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
-import { applyPriceMarkup } from '@/lib/cartPricing'
 
 type SearchProduct = {
   id: string
@@ -52,7 +51,7 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
           ((data as unknown as Row[]) ?? []).map((p) => ({
             id: p.id,
             name: p.name,
-            price: applyPriceMarkup(p.price),
+            price: p.price,
             image_url: p.image_url,
             category_slug: p.grocery_categories?.slug ?? '',
             brand: p.brand,
