@@ -5,10 +5,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  MapPin, Search, Bell, User, ChevronDown,
+  MapPin, Bell, User, ChevronDown,
   Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History
 } from 'lucide-react'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
+import GrocerySearchBox from '@/components/layout/GrocerySearchBox'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
 import { useCartStore } from '@/lib/store/cart'
@@ -28,8 +29,6 @@ export default function Navbar() {
   const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [searchFocused, setSearchFocused] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [confirmingSignOut, setConfirmingSignOut] = useState(false)
@@ -64,13 +63,6 @@ export default function Navbar() {
   function closeProfileMenu() {
     setProfileMenuOpen(false)
     setConfirmingSignOut(false)
-  }
-
-  // The only searchable catalog today is groceries, so every search lands on
-  // Essentials with the term applied — not a dead input that does nothing.
-  function submitSearch() {
-    const q = searchQuery.trim()
-    if (q) router.push(`/essentials?q=${encodeURIComponent(q)}`)
   }
 
   const selectedAddress = addressesReady ? addresses.find((a) => a.id === selectedId) ?? null : null
@@ -136,19 +128,7 @@ export default function Navbar() {
             </div>
           </div>
           {/* Full-width search */}
-          <div className="flex items-center gap-2.5 px-4 py-3 bg-[#F8F8F8] border border-[#EEEEEE] rounded-xl">
-            <button onClick={submitSearch} aria-label="Search" className="shrink-0">
-              <Search className="w-4.5 h-4.5 text-[#6B7280]" strokeWidth={2} />
-            </button>
-            <input
-              type="text"
-              placeholder='Search "chocolate"'
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitSearch() }}
-              className="flex-1 bg-transparent text-[14.5px] text-[#111827] placeholder:text-[#9CA3AF] outline-none min-w-0"
-            />
-          </div>
+          <GrocerySearchBox variant="mobile" />
         </div>
 
         {/* Desktop header */}
@@ -185,36 +165,7 @@ export default function Navbar() {
             </button>
 
             {/* Search */}
-            <div className={cn(
-              'flex-1 max-w-2xl relative transition-all duration-200',
-              searchFocused ? 'max-w-2xl' : 'max-w-xl'
-            )}>
-              <div className={cn(
-                'flex items-center gap-3 px-4 py-2.5 rounded-2xl border transition-all duration-200',
-                searchFocused
-                  ? 'border-[#16A34A] shadow-[0_0_0_3px_rgba(22,163,74,0.12)] bg-white'
-                  : 'border-[#E5E7EB] bg-[#F8FAFC] hover:border-[#D1D5DB]'
-              )}>
-                <button onClick={submitSearch} aria-label="Search" className="shrink-0">
-                  <Search className="w-4 h-4 text-[#9CA3AF]" strokeWidth={2} />
-                </button>
-                <input
-                  type="text"
-                  placeholder="Search groceries..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') submitSearch() }}
-                  className="flex-1 bg-transparent text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none min-w-0"
-                />
-                {searchQuery && (
-                  <button onClick={() => setSearchQuery('')} className="text-[#9CA3AF] hover:text-[#6B7280] transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <GrocerySearchBox variant="desktop" />
 
             {/* Nav Links - Desktop */}
             <nav className="hidden lg:flex items-center gap-1">
