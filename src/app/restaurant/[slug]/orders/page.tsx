@@ -241,10 +241,9 @@ export default function SlugOrdersPage() {
       activeTab === 'Cancelled' ? o.status === 'cancelled' : true
     const q = search.toLowerCase()
     const matchSearch = !q || (o.customer_name ?? '').toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
-    // Only delivered orders reset with the day — active/cancelled orders never
-    // hide behind the date picker, same as the old rolling-24h cutoff never
-    // clipped anything but 'delivered'.
-    const matchDate = o.status !== 'delivered' || !dateFilter || toLocalDateInput(o.placed_at) === dateFilter
+    // Only unresolved orders bypass the date picker — delivered and cancelled
+    // are both "done" and reset with the day like everything else.
+    const matchDate = !['delivered','cancelled'].includes(o.status) || !dateFilter || toLocalDateInput(o.placed_at) === dateFilter
     return matchTab && matchSearch && matchDate
   })
 
