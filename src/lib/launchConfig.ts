@@ -59,10 +59,11 @@ function ensureGroceriesInitialized() {
     .subscribe()
 }
 
-// Admin-controlled (Settings -> Groceries Available). Grocery categories show
-// a "currently unavailable" popup for customers whenever an admin pauses
-// ordering, and reopen live the moment it's switched back on.
-export function useGroceryGate() {
+// Admin-controlled (Settings -> Groceries Available). This is the source of
+// truth every grocery surface checks directly — the product grid, the Add
+// button, and the category-tile popup all read the same live value, so
+// turning it off actually stops ordering everywhere, not just navigation.
+export function useGroceriesAvailable() {
   const [available, setAvailable] = useState(groceriesAvailable)
 
   useEffect(() => {
@@ -72,5 +73,10 @@ export function useGroceryGate() {
     return () => { groceryListeners.delete(setAvailable) }
   }, [])
 
-  return !available
+  return available
+}
+
+// Inverted convenience for the category-tile "coming soon" popup.
+export function useGroceryGate() {
+  return !useGroceriesAvailable()
 }

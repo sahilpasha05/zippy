@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, ChevronRight, Package, Loader2, MessageCircle } from 'lucide-react'
+import { Search, ChevronRight, Package, Loader2, MessageCircle, Clock } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import CategoryComingSoon from '@/components/CategoryComingSoon'
@@ -68,6 +68,29 @@ export default function CategoryPage() {
   }, [slug])
 
   useEffect(() => { useCartStore.persist.rehydrate() }, [])
+
+  if (groceryGated) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-4 px-6 py-24 text-center">
+          <div className="w-16 h-16 bg-[#F5F3FF] rounded-2xl flex items-center justify-center">
+            <Clock className="w-7 h-7 text-[#7C3AED]" />
+          </div>
+          <h1 className="text-[20px] font-[800] text-[#111827]">We&apos;re not available today</h1>
+          <p className="text-[13.5px] text-[#6B7280] max-w-sm">Please come back at 10 AM, or reach out below.</p>
+          <a
+            href={whatsappSupportUrl('Hi, I need assistance with groceries.')}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 mt-2 px-5 py-2.5 bg-[#25D366] text-white text-[13.5px] font-[700] rounded-xl hover:bg-[#1DA851] transition-all shadow-[0_2px_10px_rgba(37,211,102,0.3)]"
+          >
+            <MessageCircle className="w-4 h-4" /> Ask us on WhatsApp
+          </a>
+        </div>
+        <SiteFooter />
+      </>
+    )
+  }
 
   const filtered = products.filter((p) => matchesSearchQuery(search, p.name, p.brand, p.weight))
   const hasSubcategories = subcategories.length > 0

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { useOrderingEnabled } from '@/lib/launchConfig'
+import { useOrderingEnabled, useGroceriesAvailable } from '@/lib/launchConfig'
 
 export type BlinkitProduct = {
   id: string
@@ -31,7 +31,11 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
     addItem(draft)
   }
   const deliveryEta = useDeliveryEta()
-  const orderingEnabled = useOrderingEnabled()
+  const launchEnabled = useOrderingEnabled()
+  const groceriesAvailable = useGroceriesAvailable()
+  // Admin can pause grocery ordering (Settings -> Groceries) independently of
+  // the general pre-launch flag, so the Add button has to respect both.
+  const orderingEnabled = launchEnabled && groceriesAvailable
   const cartItem = items.find((i) => i.product_id === p.id)
   const inStock = p.in_stock ?? true
   const mrp = p.mrp ?? p.price
