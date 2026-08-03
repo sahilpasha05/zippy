@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing, X, Calendar } from 'lucide-react'
+import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing, X, Filter } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn, formatDateTime, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
@@ -265,7 +265,7 @@ export default function RestaurantOrdersPage() {
                   className="bg-transparent text-[13px] text-[#111827] placeholder:text-[#9CA3AF] outline-none w-full sm:w-40 min-w-0" />
               </div>
               <div className="shrink-0 flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#16A34A] transition-all">
-                <Calendar className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
+                <Filter className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
                 <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
                   className="bg-transparent text-[13px] text-[#111827] outline-none" />
                 {dateFilter && (
