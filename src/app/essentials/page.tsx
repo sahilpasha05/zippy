@@ -105,8 +105,8 @@ function EssentialsPageInner() {
           <div className="w-16 h-16 bg-[#F5F3FF] rounded-2xl flex items-center justify-center">
             <Clock className="w-7 h-7 text-[#7C3AED]" />
           </div>
-          <h1 className="text-[20px] font-[800] text-[#111827]">Groceries aren&apos;t available right now</h1>
-          <p className="text-[13.5px] text-[#6B7280] max-w-sm">We&apos;ve paused grocery ordering for the moment — check back shortly, or reach out below.</p>
+          <h1 className="text-[20px] font-[800] text-[#111827]">We&apos;re not available today</h1>
+          <p className="text-[13.5px] text-[#6B7280] max-w-sm">Please come back at 10 AM, or reach out below.</p>
           <a
             href={whatsappSupportUrl('Hi, I need assistance with groceries.')}
             target="_blank" rel="noopener noreferrer"
