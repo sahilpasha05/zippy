@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, SlidersHorizontal, ChevronRight, MessageCircle } from 'lucide-react'
+import { Search, SlidersHorizontal, ChevronRight, MessageCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
@@ -10,6 +10,7 @@ import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
 import { createBrowserClient } from '@supabase/ssr'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { useGroceriesAvailable } from '@/lib/launchConfig'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
 import SiteFooter from '@/components/layout/SiteFooter'
 
@@ -61,6 +62,7 @@ function EssentialsPageInner() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const deliveryEta = useDeliveryEta()
+  const groceriesAvailable = useGroceriesAvailable()
 
   useEffect(() => {
     const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -94,6 +96,29 @@ function EssentialsPageInner() {
     const matchSearch = matchesSearchQuery(search, p.name, p.brand, p.weight)
     return matchCat && matchSearch
   })
+
+  if (!groceriesAvailable) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-4 px-6 py-24 text-center">
+          <div className="w-16 h-16 bg-[#F5F3FF] rounded-2xl flex items-center justify-center">
+            <Clock className="w-7 h-7 text-[#7C3AED]" />
+          </div>
+          <h1 className="text-[20px] font-[800] text-[#111827]">Groceries aren&apos;t available right now</h1>
+          <p className="text-[13.5px] text-[#6B7280] max-w-sm">We&apos;ve paused grocery ordering for the moment — check back shortly, or reach out below.</p>
+          <a
+            href={whatsappSupportUrl('Hi, I need assistance with groceries.')}
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 mt-2 px-5 py-2.5 bg-[#25D366] text-white text-[13.5px] font-[700] rounded-xl hover:bg-[#1DA851] transition-all shadow-[0_2px_10px_rgba(37,211,102,0.3)]"
+          >
+            <MessageCircle className="w-4 h-4" /> Ask us on WhatsApp
+          </a>
+        </div>
+        <SiteFooter />
+      </>
+    )
+  }
 
   return (
     <>
