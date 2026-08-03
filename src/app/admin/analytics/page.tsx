@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { TrendingUp, ShoppingBag, Store, Users } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
+import { getDailyRevenue, todayKey } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -13,8 +14,6 @@ const supabase = createBrowserClient(
 )
 
 type Order = { id: string; status: string; total: number; placed_at: string; restaurant_id: string | null }
-
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 export default function AdminAnalyticsPage() {
   const [range, setRange] = useState<DateRange>(presetRange(30))
@@ -44,12 +43,11 @@ export default function AdminAnalyticsPage() {
   const totalRevenue = delivered.reduce((s, o) => s + o.total, 0)
   const avgOrderValue = delivered.length ? totalRevenue / delivered.length : 0
 
-  // Revenue by day of week
-  const revenueByDay = DAYS.map((_, idx) => {
-    const dayOrders = delivered.filter((o) => new Date(o.placed_at).getDay() === idx)
-    return dayOrders.reduce((s, o) => s + o.total, 0)
-  })
-  const maxDayRevenue = Math.max(...revenueByDay, 1)
+  // One bar per actual calendar date in the selected range, not per day of
+  // the week — so a spike or dip on a specific date is visible.
+  const dailyRevenue = getDailyRevenue(orders, range)
+  const maxDailyRevenue = Math.max(...dailyRevenue.map((d) => d.revenue), 1)
+  const today = todayKey()
 
   // Order status breakdown
   const statusCounts = orders.reduce((acc, o) => {
@@ -102,18 +100,17 @@ export default function AdminAnalyticsPage() {
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Revenue by day */}
             <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
-              <h2 className="text-[15px] font-[700] text-[#111827] mb-1" style={{ fontWeight: 700 }}>Revenue by Day of Week</h2>
-              <p className="text-[12px] text-[#9CA3AF] mb-5">From delivered orders in range</p>
-              <div className="flex items-end gap-2 h-40">
-                {DAYS.map((day, i) => {
-                  const val = revenueByDay[i]
-                  const pct = (val / maxDayRevenue) * 100
-                  const isToday = i === new Date().getDay()
+              <h2 className="text-[15px] font-[700] text-[#111827] mb-1" style={{ fontWeight: 700 }}>Revenue by Day</h2>
+              <p className="text-[12px] text-[#9CA3AF] mb-5">From delivered orders, one bar per date in range</p>
+              <div className="flex items-end gap-1.5 h-40 overflow-x-auto pb-1">
+                {dailyRevenue.map((d) => {
+                  const pct = (d.revenue / maxDailyRevenue) * 100
+                  const isToday = d.date === today
                   return (
-                    <div key={day} className="flex-1 flex flex-col items-center gap-2">
-                      <div className="text-[10px] text-[#9CA3AF] font-medium">{val > 0 ? `₹${(val/1000).toFixed(1)}k` : ''}</div>
+                    <div key={d.date} className="flex flex-col items-center gap-2 shrink-0 w-9">
+                      <div className="text-[9px] text-[#9CA3AF] font-medium whitespace-nowrap">{d.revenue > 0 ? `₹${(d.revenue/1000).toFixed(1)}k` : ''}</div>
                       <div className="w-full rounded-t-lg min-h-[4px] transition-all" style={{ height: `${Math.max(pct, 4)}%`, background: isToday ? '#7C3AED' : '#DDD6FE' }} />
-                      <div className={cn('text-[11px] font-medium', isToday ? 'text-[#7C3AED]' : 'text-[#9CA3AF]')}>{day}</div>
+                      <div className={cn('text-[10px] font-medium whitespace-nowrap', isToday ? 'text-[#7C3AED]' : 'text-[#9CA3AF]')}>{d.label}</div>
                     </div>
                   )
                 })}
