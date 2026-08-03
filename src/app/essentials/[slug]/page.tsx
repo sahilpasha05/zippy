@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, ChevronRight, Package, Loader2 } from 'lucide-react'
+import { Search, ChevronRight, Package, Loader2, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import CategoryComingSoon from '@/components/CategoryComingSoon'
 import { useGroceryGate } from '@/lib/launchConfig'
 import { useCartStore } from '@/lib/store/cart'
-import { cn } from '@/lib/utils'
+import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
@@ -69,7 +69,7 @@ export default function CategoryPage() {
 
   useEffect(() => { useCartStore.persist.rehydrate() }, [])
 
-  const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = products.filter((p) => matchesSearchQuery(search, p.name, p.brand, p.weight))
   const hasSubcategories = subcategories.length > 0
 
   function scrollToSub(subId: string) {
@@ -135,8 +135,17 @@ export default function CategoryPage() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center py-20 gap-3 text-[#9CA3AF]">
               <Package className="w-12 h-12" strokeWidth={1} />
-              <p className="text-[15px] font-semibold text-[#374151]">No products here yet</p>
-              <p className="text-[13px]">Products added in the admin panel will show up here instantly.</p>
+              <p className="text-[15px] font-semibold text-[#374151]">{search ? 'No products found' : 'No products here yet'}</p>
+              <p className="text-[13px]">{search ? 'Try a different search term.' : 'Products added in the admin panel will show up here instantly.'}</p>
+              <a
+                href={whatsappSupportUrl(search
+                  ? `Hi, I need assistance with groceries. I couldn't find: "${search}" in ${category?.name ?? 'this category'}`
+                  : `Hi, I need assistance with groceries. ${category?.name ?? 'This category'} looks empty.`)}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 mt-1 px-5 py-2.5 bg-[#25D366] text-white text-[13.5px] font-[700] rounded-xl hover:bg-[#1DA851] transition-all shadow-[0_2px_10px_rgba(37,211,102,0.3)]"
+              >
+                <MessageCircle className="w-4 h-4" /> Ask us on WhatsApp
+              </a>
             </div>
           ) : (
             <div className="flex gap-3 lg:gap-6">
