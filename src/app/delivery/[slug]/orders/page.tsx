@@ -77,7 +77,7 @@ export default function DeliveryOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'pending' | 'delivered'>('active')
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const soundOnRef = useRef(true)

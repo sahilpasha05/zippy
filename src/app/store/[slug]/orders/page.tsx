@@ -94,7 +94,7 @@ export default function StoreSlugOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
+  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
@@ -251,7 +251,10 @@ export default function StoreSlugOrdersPage() {
       activeTab === 'Cancelled' ? o.status === 'cancelled' : true
     const q = search.toLowerCase()
     const matchSearch = !q || (o.customer_name ?? '').toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
-    const matchDate = !dateFilter || toLocalDateInput(o.placed_at) === dateFilter
+    // Only delivered orders reset with the day — active/cancelled orders never
+    // hide behind the date picker, same as the old rolling-24h cutoff never
+    // clipped anything but 'delivered'.
+    const matchDate = o.status !== 'delivered' || !dateFilter || toLocalDateInput(o.placed_at) === dateFilter
     return matchTab && matchSearch && matchDate
   })
 
