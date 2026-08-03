@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
 import { useOrderingEnabled } from '@/lib/launchConfig'
-import { FREE_FRIES_OFFER, getFreeFriesProgress, applyPriceMarkup } from '@/lib/cartPricing'
+import { FREE_FRIES_OFFER, getFreeFriesProgress } from '@/lib/cartPricing'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
@@ -175,9 +175,7 @@ export default function RestaurantDetailPage() {
           id: p.id as string,
           name: p.name as string,
           desc: (p.description as string | null) ?? '',
-          // Marked up here, at the point a stored price first becomes
-          // customer-facing, so display and the cart draft always agree.
-          price: applyPriceMarkup(Number(p.price)),
+          price: Number(p.price),
           image: (p.image_url as string | null) ?? PLACEHOLDER_IMAGE,
           isVeg: p.is_veg as boolean,
           isBestseller: p.is_bestseller as boolean,
