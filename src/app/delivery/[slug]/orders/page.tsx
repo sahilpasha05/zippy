@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera, Calendar } from 'lucide-react'
+import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
@@ -77,6 +77,7 @@ export default function DeliveryOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'active' | 'pending' | 'delivered'>('active')
   const [search, setSearch] = useState('')
+  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
   const soundOnRef = useRef(true)
@@ -104,9 +105,6 @@ export default function DeliveryOrdersPage() {
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
-      // Delivered orders older than a day drop off the board so they stop
-      // occupying slots; everything still live is always fetched.
-      .or(`status.neq.delivered,delivered_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('updated_at', { ascending: false })
       .order('placed_at', { ascending: false })
       // A rider can hold well past 50 orders — capping here meant an order
@@ -326,7 +324,11 @@ export default function DeliveryOrdersPage() {
     o.id.slice(0, 8), o.customer_name ?? '', o.customer_phone ?? '', o.address ?? '', restName(o) ?? '',
   ].some((f) => f.toLowerCase().includes(q))
 
-  const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders).filter(matches)
+  const matchesDate = (o: Order) => !dateFilter || toLocalDateInput(o.delivered_at ?? o.placed_at) === dateFilter
+
+  const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders)
+    .filter(matches)
+    .filter((o) => tab !== 'delivered' || matchesDate(o))
 
   // "Today" is the rider's own day, not UTC.
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
@@ -431,6 +433,23 @@ export default function DeliveryOrdersPage() {
               Delivered ({deliveredOrders.length})
             </button>
           </div>
+
+          {tab === 'delivered' && (
+            <div className="relative mt-2.5">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
+              />
+              {dateFilter && (
+                <button onClick={() => setDateFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

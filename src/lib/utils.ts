@@ -28,6 +28,16 @@ export function formatDateTime(d: string): string {
   })
 }
 
+// Matches the value a native <input type="date"> holds (YYYY-MM-DD, no
+// timezone). Deriving it with local getters — not toISOString, which shifts
+// to UTC first — keeps "today" the shop's actual today, not tomorrow's UTC date.
+export function toLocalDateInput(d: string): string {
+  const date = new Date(d)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
 // A plain single-substring match misses "amul butter" against a product named
 // "Butter (Amul, 500g)" — every typed word has to appear somewhere across the
 // searchable fields, but not in any particular order or field.

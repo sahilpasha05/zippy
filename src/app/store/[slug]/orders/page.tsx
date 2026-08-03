@@ -4,10 +4,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import Image from 'next/image'
-import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, Loader2, Volume2, VolumeX, BellRing, MapPin, Bike, X } from 'lucide-react'
+import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, Loader2, Volume2, VolumeX, BellRing, MapPin, Bike, X, Calendar } from 'lucide-react'
 import StorePartnerSidebar from '@/components/store/StorePartnerSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
-import { cn } from '@/lib/utils'
+import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 
 const supabase = createBrowserClient(
@@ -94,6 +94,7 @@ export default function StoreSlugOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
   const [search, setSearch] = useState('')
+  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
@@ -116,8 +117,6 @@ export default function StoreSlugOrdersPage() {
       .from('orders')
       .select('id, status, total, customer_name, customer_phone, placed_at, address, delivery_latitude, delivery_longitude, delivery_partner_id, order_items(name, quantity, price, image_url, product_type)')
       .eq('store_partner_id', partnerId)
-      // Delivered orders older than 24h drop off this view (still fully queryable in Analytics — nothing is deleted)
-      .or(`status.neq.delivered,placed_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`)
       .order('placed_at', { ascending: false })
       // A busy day runs well past 50 orders; capping here made them vanish
       // from the panel entirely.
@@ -252,7 +251,11 @@ export default function StoreSlugOrdersPage() {
       activeTab === 'Cancelled' ? o.status === 'cancelled' : true
     const q = search.toLowerCase()
     const matchSearch = !q || (o.customer_name ?? '').toLowerCase().includes(q) || o.id.toLowerCase().includes(q)
-    return matchTab && matchSearch
+    // Only delivered orders reset with the day — active/cancelled orders never
+    // hide behind the date picker, same as the old rolling-24h cutoff never
+    // clipped anything but 'delivered'.
+    const matchDate = o.status !== 'delivered' || !dateFilter || toLocalDateInput(o.placed_at) === dateFilter
+    return matchTab && matchSearch && matchDate
   })
 
   const activeCnt = orders.filter((o) => !['delivered','cancelled'].includes(o.status)).length
@@ -286,6 +289,16 @@ export default function StoreSlugOrdersPage() {
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search orders..."
                   className="bg-transparent text-[13px] text-[#111827] placeholder:text-[#9CA3AF] outline-none w-full sm:w-40 min-w-0" />
+              </div>
+              <div className="shrink-0 flex items-center gap-2 px-3.5 py-2 border border-[#E5E7EB] rounded-xl bg-[#F8FAFC] focus-within:border-[#16A34A] transition-all">
+                <Calendar className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />
+                <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
+                  className="bg-transparent text-[13px] text-[#111827] outline-none" />
+                {dateFilter && (
+                  <button onClick={() => setDateFilter('')} title="Clear date filter" className="shrink-0 text-[#9CA3AF] hover:text-[#374151]">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
