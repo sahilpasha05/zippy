@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Search, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Search, SlidersHorizontal, ChevronRight, MessageCircle } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
@@ -23,6 +24,7 @@ type Product = {
   price: number
   mrp: number
   weight: string | null
+  brand: string | null
   rating: number
   in_stock: boolean
   delivery_eta: string
@@ -44,8 +46,17 @@ function ProductSkeleton() {
 }
 
 export default function EssentialsPage() {
+  return (
+    <Suspense fallback={null}>
+      <EssentialsPageInner />
+    </Suspense>
+  )
+}
+
+function EssentialsPageInner() {
+  const searchParams = useSearchParams()
   const [activeCategory, setActiveCategory] = useState('all')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +67,7 @@ export default function EssentialsPage() {
     Promise.all([
       supabase
         .from('grocery_products')
-        .select('id, name, price, mrp, weight, rating, in_stock, delivery_eta, image_url, grocery_categories(slug)')
+        .select('id, name, price, mrp, weight, brand, rating, in_stock, delivery_eta, image_url, grocery_categories(slug)')
         .eq('is_active', true)
         .order('created_at'),
       supabase
@@ -80,7 +91,7 @@ export default function EssentialsPage() {
 
   const filtered = products.filter((p) => {
     const matchCat = activeCategory === 'all' || p.category_slug === activeCategory
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase())
+    const matchSearch = matchesSearchQuery(search, p.name, p.brand, p.weight)
     return matchCat && matchSearch
   })
 
@@ -163,6 +174,15 @@ export default function EssentialsPage() {
               <span className="text-5xl">🔍</span>
               <p className="text-[16px] font-semibold text-[#374151]">No products found</p>
               <p className="text-[13px] text-[#6B7280]">Try a different category or search term</p>
+              <a
+                href={whatsappSupportUrl(search
+                  ? `Hi, I need assistance with groceries. I couldn't find: "${search}"`
+                  : 'Hi, I need assistance with groceries.')}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 mt-2 px-5 py-2.5 bg-[#25D366] text-white text-[13.5px] font-[700] rounded-xl hover:bg-[#1DA851] transition-all shadow-[0_2px_10px_rgba(37,211,102,0.3)]"
+              >
+                <MessageCircle className="w-4 h-4" /> Ask us on WhatsApp
+              </a>
             </div>
           ) : (
             <>

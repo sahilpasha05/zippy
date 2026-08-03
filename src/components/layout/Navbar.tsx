@@ -66,6 +66,13 @@ export default function Navbar() {
     setConfirmingSignOut(false)
   }
 
+  // The only searchable catalog today is groceries, so every search lands on
+  // Essentials with the term applied — not a dead input that does nothing.
+  function submitSearch() {
+    const q = searchQuery.trim()
+    if (q) router.push(`/essentials?q=${encodeURIComponent(q)}`)
+  }
+
   const selectedAddress = addressesReady ? addresses.find((a) => a.id === selectedId) ?? null : null
   const locationLabel = selectedAddress ? selectedAddress.address : 'Tarikere, Karnataka'
   const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
@@ -130,12 +137,15 @@ export default function Navbar() {
           </div>
           {/* Full-width search */}
           <div className="flex items-center gap-2.5 px-4 py-3 bg-[#F8F8F8] border border-[#EEEEEE] rounded-xl">
-            <Search className="w-4.5 h-4.5 text-[#6B7280] shrink-0" strokeWidth={2} />
+            <button onClick={submitSearch} aria-label="Search" className="shrink-0">
+              <Search className="w-4.5 h-4.5 text-[#6B7280]" strokeWidth={2} />
+            </button>
             <input
               type="text"
               placeholder='Search "chocolate"'
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submitSearch() }}
               className="flex-1 bg-transparent text-[14.5px] text-[#111827] placeholder:text-[#9CA3AF] outline-none min-w-0"
             />
           </div>
@@ -185,14 +195,17 @@ export default function Navbar() {
                   ? 'border-[#16A34A] shadow-[0_0_0_3px_rgba(22,163,74,0.12)] bg-white'
                   : 'border-[#E5E7EB] bg-[#F8FAFC] hover:border-[#D1D5DB]'
               )}>
-                <Search className="w-4 h-4 text-[#9CA3AF] shrink-0" strokeWidth={2} />
+                <button onClick={submitSearch} aria-label="Search" className="shrink-0">
+                  <Search className="w-4 h-4 text-[#9CA3AF]" strokeWidth={2} />
+                </button>
                 <input
                   type="text"
-                  placeholder="Search groceries, restaurants, dishes..."
+                  placeholder="Search groceries..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitSearch() }}
                   className="flex-1 bg-transparent text-[14px] text-[#111827] placeholder:text-[#9CA3AF] outline-none min-w-0"
                 />
                 {searchQuery && (
