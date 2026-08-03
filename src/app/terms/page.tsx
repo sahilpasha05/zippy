@@ -55,7 +55,7 @@ export default function TermsPage() {
             </Section>
 
             <Section title="Limitation of liability">
-              <p>CloudByte is not liable for indirect or consequential losses arising from delays, unavailability of items, or third-party service disruptions beyond our reasonable control.</p>
+              <p>Zippy is not liable for indirect or consequential losses arising from delays, unavailability of items, or third-party service disruptions beyond our reasonable control.</p>
             </Section>
 
             <Section title="Governing law">
