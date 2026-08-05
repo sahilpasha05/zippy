@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Star, Clock, MapPin, ChevronRight, Plus, Minus, Search, Heart, Share2, Flame, Gift, Loader2 } from 'lucide-react'
+import { Star, Clock, MapPin, ChevronRight, Plus, Minus, Search, Heart, Share2, Flame, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
 import { useOrderingEnabled } from '@/lib/launchConfig'
-import { FREE_FRIES_OFFER, getFreeFriesProgress } from '@/lib/cartPricing'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
@@ -35,40 +34,6 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7
 type MenuItem = { id: string; name: string; desc: string; price: number; image: string; isVeg: boolean; isBestseller: boolean; rating: number }
 type MenuSection = { category: string; items: MenuItem[] }
 
-// A ₹0 menu row is an offer marker, not something to sell: it advertises a
-// cart-level reward, so it renders as a progress card instead of an ADD button.
-function OfferRow({ item, restaurantId }: { item: MenuItem; restaurantId: string }) {
-  const { items } = useCartStore()
-  const isFreeFries = restaurantId === FREE_FRIES_OFFER.restaurantId
-  const progress = getFreeFriesProgress(items)
-
-  return (
-    <div className="flex items-start gap-4 py-5 border-b border-[#F3F4F6] last:border-0">
-      <div className="flex-1 min-w-0">
-        <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded-full mb-1.5">
-          <Gift className="w-3 h-3" /> Offer
-        </span>
-        <h4 className="text-[14.5px] font-[600] text-[#111827] mb-1">{item.name}</h4>
-        <p className="text-[12.5px] text-[#6B7280] mb-2 leading-relaxed">{item.desc}</p>
-        {isFreeFries && (
-          progress.unlocked ? (
-            <p className="text-[12.5px] font-[700] text-[#15803D]">
-              Unlocked — your free {FREE_FRIES_OFFER.reward} come with this order.
-            </p>
-          ) : (
-            <p className="text-[12.5px] font-[600] text-[#D97706]">
-              Add ₹{progress.remaining.toFixed(0)} more to unlock free {FREE_FRIES_OFFER.reward}.
-            </p>
-          )
-        )}
-      </div>
-      <div className="w-32 h-32 rounded-full overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0">
-        <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
-      </div>
-    </div>
-  )
-}
-
 function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaurantId: string; disabled: boolean }) {
   const { addItem, replaceCartWith, items, updateQuantity } = useCartStore()
   const orderingEnabled = useOrderingEnabled()
@@ -82,7 +47,9 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
     addItem(draft)
   }
 
-  if (item.price === 0) return <OfferRow item={item} restaurantId={restaurantId} />
+  // A ₹0 row was the free-fries offer marker; that offer is retired, so it's
+  // no longer a purchasable or displayable menu item.
+  if (item.price === 0) return null
 
   return (
     <div className="flex items-start gap-4 py-5 border-b border-[#F3F4F6] last:border-0 group">

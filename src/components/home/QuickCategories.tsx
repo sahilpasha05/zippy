@@ -12,17 +12,17 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-type Category = { id: string; name: string; slug: string; image_url: string | null; group_name: string | null }
+type Category = { id: string; name: string; slug: string; image_url: string | null; group_name: string | null; available: boolean }
 
 const GROUP_ORDER = ['Grocery & Kitchen', 'Snacks & Drinks', 'Beauty & Personal Care', 'Household Essentials']
 
 export default function QuickCategories() {
-  const [comingSoon, setComingSoon] = useState<string | null>(null)
+  const [comingSoon, setComingSoon] = useState<Category | null>(null)
   const gated = useGroceryGate()
   const router = useRouter()
 
   function openCategory(c: Category) {
-    if (gated) setComingSoon(c.name)
+    if (gated || !c.available) setComingSoon(c)
     else router.push(`/essentials/${c.slug}`)
   }
   const [categories, setCategories] = useState<Category[]>([])
@@ -32,7 +32,7 @@ export default function QuickCategories() {
     async function load() {
       const { data } = await supabase
         .from('grocery_categories')
-        .select('id, name, slug, image_url, group_name')
+        .select('id, name, slug, image_url, group_name, available')
         .eq('is_active', true)
         .order('sort_order')
       setCategories((data as Category[]) ?? [])
@@ -99,7 +99,12 @@ export default function QuickCategories() {
           </div>
         </div>
       )}
-      <CategoryComingSoon categoryName={comingSoon} onClose={() => setComingSoon(null)} />
+      <CategoryComingSoon
+        categoryName={comingSoon?.name ?? null}
+        reason={comingSoon && !comingSoon.available ? 'paused' : 'coming_soon'}
+        onClose={() => setComingSoon(null)}
+        onSchedule={() => { if (comingSoon) router.push(`/essentials/${comingSoon.slug}`); setComingSoon(null) }}
+      />
     </section>
   )
 }

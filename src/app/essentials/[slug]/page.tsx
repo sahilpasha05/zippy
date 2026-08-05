@@ -21,7 +21,7 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-type Category = { id: string; name: string; slug: string; image_url: string | null }
+type Category = { id: string; name: string; slug: string; image_url: string | null; available: boolean }
 type Subcategory = { id: string; name: string; slug: string; image_url: string | null }
 type Product = {
   id: string; name: string; price: number; mrp: number | null
@@ -30,7 +30,7 @@ type Product = {
 }
 
 export default function CategoryPage() {
-  const [comingSoon, setComingSoon] = useState<string | null>(null)
+  const [comingSoon, setComingSoon] = useState<Category | null>(null)
   const groceryGated = useGroceryGate()
   const router = useRouter()
   const { slug } = useParams<{ slug: string }>()
@@ -47,8 +47,8 @@ export default function CategoryPage() {
     async function load() {
       setLoading(true)
       const [{ data: cat }, { data: cats }] = await Promise.all([
-        supabase.from('grocery_categories').select('id, name, slug, image_url').eq('slug', slug).single(),
-        supabase.from('grocery_categories').select('id, name, slug, image_url').eq('is_active', true).order('sort_order'),
+        supabase.from('grocery_categories').select('id, name, slug, image_url, available').eq('slug', slug).single(),
+        supabase.from('grocery_categories').select('id, name, slug, image_url, available').eq('is_active', true).order('sort_order'),
       ])
       setAllCategories((cats as Category[]) ?? [])
       if (!cat) { setCategory(null); setLoading(false); return }
@@ -135,10 +135,21 @@ export default function CategoryPage() {
             </div>
           </div>
 
+          {/* Category paused — catalog stays browsable/orderable below, this
+              just sets the expectation that it's a scheduled order for now. */}
+          {category?.available === false && (
+            <div className="flex items-start gap-3 mb-5 px-4 py-3 bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl">
+              <Clock className="w-4 h-4 text-[#7C3AED] mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-[#5B21B6]">
+                <strong>{category.name} is closed right now.</strong> You can still order — it'll get first priority the moment we reopen.
+              </p>
+            </div>
+          )}
+
           {/* Other-category pills — desktop */}
           <div className="hidden lg:flex gap-2 overflow-x-auto pb-2 mb-6">
             {allCategories.map((c) => (
-              <button key={c.id} onClick={() => { if (groceryGated) setComingSoon(c.name); else router.push(`/essentials/${c.slug}`) }}
+              <button key={c.id} onClick={() => { if (groceryGated || !c.available) setComingSoon(c); else router.push(`/essentials/${c.slug}`) }}
                 className={cn('px-4 py-2 rounded-xl text-[12.5px] font-medium whitespace-nowrap shrink-0 transition-all border',
                   c.slug === slug ? 'bg-[#16A34A] text-white border-[#16A34A] shadow-[0_2px_6px_rgba(22,163,74,0.3)]' : 'bg-white text-[#6B7280] border-[#E5E7EB] hover:border-[#16A34A] hover:text-[#16A34A]')}>
                 {c.name}
@@ -226,7 +237,12 @@ export default function CategoryPage() {
           )}
         </div>
       </div>
-      <CategoryComingSoon categoryName={comingSoon} onClose={() => setComingSoon(null)} />
+      <CategoryComingSoon
+        categoryName={comingSoon?.name ?? null}
+        reason={comingSoon && !groceryGated && !comingSoon.available ? 'paused' : 'coming_soon'}
+        onClose={() => setComingSoon(null)}
+        onSchedule={() => { if (comingSoon) router.push(`/essentials/${comingSoon.slug}`); setComingSoon(null) }}
+      />
       <SiteFooter />
     </>
   )

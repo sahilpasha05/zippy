@@ -2,16 +2,27 @@
 
 import { Clock, X } from 'lucide-react'
 
-// Grocery categories are browsable in the admin but not open to customers yet.
-// Tapping one shows this instead of navigating into an empty-feeling aisle.
+// Two distinct reasons a category can be un-orderable, with different copy
+// and a different primary action:
+// - 'coming_soon': category is browsable in the admin but not open to
+//   customers yet (is_active gate). Nothing to do but wait.
+// - 'paused': an admin has temporarily closed this specific category
+//   (available = false), e.g. the store is shut for the day. The catalog is
+//   still browsable — the customer can place an order now that gets first
+//   priority the moment the category reopens.
 export default function CategoryComingSoon({
   categoryName,
+  reason = 'coming_soon',
   onClose,
+  onSchedule,
 }: {
   categoryName: string | null
+  reason?: 'coming_soon' | 'paused'
   onClose: () => void
+  onSchedule?: () => void
 }) {
   if (!categoryName) return null
+  const isPaused = reason === 'paused'
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center">
@@ -24,19 +35,31 @@ export default function CategoryComingSoon({
           <Clock className="w-5 h-5 text-[#7C3AED]" strokeWidth={2} />
         </div>
         <h2 className="text-[16px] font-[800] text-[#111827] mb-1.5" style={{ fontWeight: 800 }}>
-          {categoryName}
+          {isPaused ? `${categoryName} is closed right now` : categoryName}
         </h2>
         <p className="text-[13px] text-[#6B7280] leading-relaxed mb-5">
-          We&apos;re currently unavailable in this category — we&apos;ll be opening it soon.
-          Restaurant food is available to order right now.
+          {isPaused
+            ? "We're not taking orders in this category at the moment. You can still schedule your order — it'll get first priority the moment we reopen."
+            : <>We&apos;re currently unavailable in this category — we&apos;ll be opening it soon.
+              Restaurant food is available to order right now.</>}
         </p>
-        <button
-          onClick={onClose}
-          className="w-full py-2.5 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all"
-          style={{ fontWeight: 700 }}
-        >
-          Got it
-        </button>
+        {isPaused ? (
+          <button
+            onClick={onSchedule}
+            className="w-full py-2.5 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all"
+            style={{ fontWeight: 700 }}
+          >
+            Schedule My Order
+          </button>
+        ) : (
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all"
+            style={{ fontWeight: 700 }}
+          >
+            Got it
+          </button>
+        )}
       </div>
     </div>
   )

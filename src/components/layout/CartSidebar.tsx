@@ -2,20 +2,18 @@
 
 import { useEffect } from 'react'
 import { useCartStore } from '@/lib/store/cart'
-import { X, ShoppingCart, Plus, Minus, Trash2, Zap, Gift, ArrowRight } from 'lucide-react'
+import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, getPlatformFee, getFreeFriesProgress, FREE_FRIES_OFFER, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
-  const baseTotal = getCartBaseTotal(items)
-  const cartTotal = getCartAdjustedTotal(items)
+  const cartTotal = getCartBaseTotal(items)
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + DELIVERY_FEE + platformFee
-  const friesProgress = getFreeFriesProgress(items)
   const deliveryEta = useDeliveryEta()
 
   useEffect(() => {
@@ -74,7 +72,7 @@ export default function CartSidebar() {
           ) : (
             <div className="space-y-3">
               {items.map((item) => {
-                const unitPrice = getAdjustedUnitPrice(item, baseTotal)
+                const unitPrice = getAdjustedUnitPrice(item)
                 return (
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-[#F8FAFC] rounded-2xl group">
                   {/* Image */}
@@ -126,20 +124,6 @@ export default function CartSidebar() {
               <Zap className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
               <p className="text-[12.5px] font-medium text-[#14532D]">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
             </div>
-
-            {friesProgress.spend > 0 && (
-              <div className={cn(
-                'flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-[600]',
-                friesProgress.unlocked ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FFFBEB] text-[#B45309]'
-              )}>
-                <Gift className="w-4 h-4 shrink-0 mt-px" />
-                <span>
-                  {friesProgress.unlocked
-                    ? `Free ${FREE_FRIES_OFFER.reward} unlocked — added to your order.`
-                    : `Add ₹${friesProgress.remaining.toFixed(0)} more from Smiley Cafe to unlock free ${FREE_FRIES_OFFER.reward}.`}
-                </span>
-              </div>
-            )}
 
             {/* Bill Summary */}
             <div className="space-y-2">

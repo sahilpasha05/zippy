@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Search, SlidersHorizontal, ChevronRight, MessageCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
@@ -12,12 +12,13 @@ import { createBrowserClient } from '@supabase/ssr'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { useGroceriesAvailable } from '@/lib/launchConfig'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
+import CategoryComingSoon from '@/components/CategoryComingSoon'
 import SiteFooter from '@/components/layout/SiteFooter'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-type Category = { id: string; name: string; slug: string }
+type Category = { id: string; name: string; slug: string; available: boolean }
 
 type Product = {
   id: string
@@ -31,6 +32,7 @@ type Product = {
   delivery_eta: string
   image_url: string | null
   category_slug: string
+  category_available: boolean
 }
 
 function ProductSkeleton() {
@@ -56,11 +58,13 @@ export default function EssentialsPage() {
 
 function EssentialsPageInner() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [activeCategory, setActiveCategory] = useState('all')
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [comingSoon, setComingSoon] = useState<Category | null>(null)
   const deliveryEta = useDeliveryEta()
   const groceriesAvailable = useGroceriesAvailable()
 
@@ -69,12 +73,12 @@ function EssentialsPageInner() {
     Promise.all([
       supabase
         .from('grocery_products')
-        .select('id, name, price, mrp, weight, brand, rating, in_stock, delivery_eta, image_url, grocery_categories(slug)')
+        .select('id, name, price, mrp, weight, brand, rating, in_stock, delivery_eta, image_url, grocery_categories(slug, available)')
         .eq('is_active', true)
         .order('created_at'),
       supabase
         .from('grocery_categories')
-        .select('id, name, slug')
+        .select('id, name, slug, available')
         .eq('is_active', true)
         .order('sort_order'),
     ]).then(([{ data: prods }, { data: cats }]) => {
@@ -83,6 +87,7 @@ function EssentialsPageInner() {
           prods.map((p: any) => ({
             ...p,
             category_slug: p.grocery_categories?.slug ?? '',
+            category_available: p.grocery_categories?.available ?? true,
           }))
         )
       }
@@ -91,10 +96,16 @@ function EssentialsPageInner() {
     })
   }, [])
 
+  function selectCategory(c: Category) {
+    if (!c.available) setComingSoon(c)
+    else setActiveCategory(c.slug)
+  }
+
   const filtered = products.filter((p) => {
     const matchCat = activeCategory === 'all' || p.category_slug === activeCategory
     const matchSearch = matchesSearchQuery(search, p.name, p.brand, p.weight)
-    return matchCat && matchSearch
+    // A paused category's products drop out of "All" too, not just its own tab.
+    return matchCat && matchSearch && p.category_available !== false
   })
 
   if (!groceriesAvailable) {
@@ -173,7 +184,7 @@ function EssentialsPageInner() {
               {categories.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setActiveCategory(c.slug)}
+                  onClick={() => selectCategory(c)}
                   className={cn(
                     'flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium whitespace-nowrap transition-all shrink-0',
                     activeCategory === c.slug
@@ -219,6 +230,12 @@ function EssentialsPageInner() {
           )}
         </div>
       </div>
+      <CategoryComingSoon
+        categoryName={comingSoon?.name ?? null}
+        reason="paused"
+        onClose={() => setComingSoon(null)}
+        onSchedule={() => { if (comingSoon) router.push(`/essentials/${comingSoon.slug}`); setComingSoon(null) }}
+      />
       <SiteFooter />
     </>
   )

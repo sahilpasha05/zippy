@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { load as loadCashfree } from '@cashfreepayments/cashfree-js'
-import { MapPin, CreditCard, ChevronRight, Plus, Check, Zap, Gift, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
+import { MapPin, CreditCard, ChevronRight, Plus, Check, Zap, Smartphone, Banknote, Loader2, Home, Briefcase, Star } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getCartAdjustedTotal, getPlatformFee, getFreeFriesProgress, FREE_FRIES_OFFER, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import Navbar from '@/components/layout/Navbar'
@@ -37,8 +37,7 @@ export default function CheckoutPage() {
   const { addresses, selectedId, selectAddress, ready: addressesReady } = useAddresses()
   const deliveryEta = useDeliveryEta()
   const [mounted, setMounted] = useState(false)
-  const baseTotal = getCartBaseTotal(items)
-  const cartTotal = getCartAdjustedTotal(items)
+  const cartTotal = getCartBaseTotal(items)
   const [selectedPayment, setSelectedPayment] = useState('upi')
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(false)
@@ -81,7 +80,6 @@ export default function CheckoutPage() {
 
   const deliveryFee = DELIVERY_FEE
   const platformFee = getPlatformFee(cartTotal)
-  const friesProgress = getFreeFriesProgress(items)
   const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
@@ -170,9 +168,12 @@ export default function CheckoutPage() {
           .select('id')
           .maybeSingle()
         if (!error && updated) {
+          // Items are rewritten below, so clear the previous attempt's lines
+          // first — if this fails, the fresh insert would land on top of the
+          // old rows and double every item, so abort rather than proceed.
+          const { error: clearErr } = await supabase.from('order_items').delete().eq('order_id', updated.id)
+          if (clearErr) throw clearErr
           order = updated
-          // Items are rewritten below, so clear the previous attempt's lines.
-          await supabase.from('order_items').delete().eq('order_id', updated.id)
         }
       }
 
@@ -194,24 +195,9 @@ export default function CheckoutPage() {
         product_type: item.product_type,
         name: item.name,
         image_url: item.image_url ?? null,
-        price: getAdjustedUnitPrice(item, baseTotal),
+        price: getAdjustedUnitPrice(item),
         quantity: item.quantity,
       }))
-
-      // The reward is earned by the cart, never added by the customer, so it is
-      // appended here at ₹0 — the threshold is re-checked at the moment of
-      // placing rather than trusted from whenever the cart was last touched.
-      if (getFreeFriesProgress(items).unlocked) {
-        orderItems.push({
-          order_id: order.id,
-          product_id: FREE_FRIES_OFFER.rewardProductId,
-          product_type: 'restaurant',
-          name: `${FREE_FRIES_OFFER.reward} (FREE — order above ₹${FREE_FRIES_OFFER.threshold})`,
-          image_url: FREE_FRIES_OFFER.rewardImageUrl,
-          price: 0,
-          quantity: 1,
-        })
-      }
 
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
@@ -479,23 +465,9 @@ export default function CheckoutPage() {
                           <p className="text-[12.5px] font-[600] text-[#111827] truncate" style={{ fontWeight: 600 }}>{item.name}</p>
                           <p className="text-[11.5px] text-[#6B7280]">×{item.quantity}</p>
                         </div>
-                        <p className="text-[13px] font-[700] text-[#111827] shrink-0" style={{ fontWeight: 700 }}>₹{(getAdjustedUnitPrice(item, baseTotal) * item.quantity).toFixed(0)}</p>
+                        <p className="text-[13px] font-[700] text-[#111827] shrink-0" style={{ fontWeight: 700 }}>₹{(getAdjustedUnitPrice(item) * item.quantity).toFixed(0)}</p>
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {friesProgress.spend > 0 && (
-                  <div className={cn(
-                    'flex items-start gap-2 rounded-xl px-3.5 py-2.5 text-[12.5px] font-[600] mb-4',
-                    friesProgress.unlocked ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FFFBEB] text-[#B45309]'
-                  )}>
-                    <Gift className="w-4 h-4 shrink-0 mt-px" />
-                    <span>
-                      {friesProgress.unlocked
-                        ? `Free ${FREE_FRIES_OFFER.reward} unlocked — included with this order.`
-                        : `Add ₹${friesProgress.remaining.toFixed(0)} more from Smiley Cafe to unlock free ${FREE_FRIES_OFFER.reward}.`}
-                    </span>
                   </div>
                 )}
 

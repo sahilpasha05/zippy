@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { format, isToday, isYesterday } from 'date-fns'
 import Image from 'next/image'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone, MessageSquare, Loader2, Volume2, VolumeX, BellRing, MapPin, Bike, X, Filter } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
@@ -52,6 +53,24 @@ function etaMinutes(placedAt: string, status: string) {
   const mins = Math.floor((Date.now() - new Date(placedAt).getTime()) / 60000)
   const eta = status === 'confirmed' ? 25 - mins : status === 'preparing' ? 15 - mins : status === 'out_for_delivery' ? 8 - mins : null
   return eta !== null && eta > 0 ? `${eta} min` : null
+}
+
+function dayLabel(dateKey: string) {
+  const d = new Date(`${dateKey}T00:00:00`)
+  if (isToday(d)) return 'Today'
+  if (isYesterday(d)) return 'Yesterday'
+  return format(d, 'EEEE, d MMM')
+}
+
+// Buckets orders by the day they were placed, most recent day first, without
+// reordering the underlying (already-sorted) list.
+function groupByDay(list: Order[]) {
+  const buckets: Record<string, Order[]> = {}
+  for (const o of list) {
+    const key = toLocalDateInput(o.placed_at)
+    ;(buckets[key] ??= []).push(o)
+  }
+  return Object.entries(buckets).sort((a, b) => b[0].localeCompare(a[0]))
 }
 
 
@@ -248,6 +267,7 @@ export default function SlugOrdersPage() {
   })
 
   const activeCnt = orders.filter((o) => !['delivered','cancelled'].includes(o.status)).length
+  const dayGroups = groupByDay(filtered)
 
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-[#F8FAFC]">
@@ -289,6 +309,12 @@ export default function SlugOrdersPage() {
                   </button>
                 )}
               </div>
+              {dateFilter !== toLocalDateInput(new Date().toISOString()) && (
+                <button onClick={() => setDateFilter(toLocalDateInput(new Date().toISOString()))}
+                  className="shrink-0 px-3 py-2 rounded-xl text-[12.5px] font-[600] border border-[#E5E7EB] text-[#374151] hover:border-[#D1D5DB] transition-all">
+                  Today
+                </button>
+              )}
             </div>
           </div>
           {newOrderFlash && (
@@ -321,10 +347,19 @@ export default function SlugOrdersPage() {
               <CheckCircle className="w-12 h-12 text-[#D1D5DB]" strokeWidth={1} />
               <p className="text-[15px] font-semibold text-[#374151]">No orders found</p>
               {orders.length === 0 && <p className="text-[13px] text-[#9CA3AF]">Orders will appear here in real-time as customers place them</p>}
+              {orders.length > 0 && dateFilter && <p className="text-[13px] text-[#9CA3AF]">Pick another date above, or clear it to see every day.</p>}
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filtered.map((o) => {
+            <div className="space-y-6">
+            {dayGroups.map(([dateKey, dayOrders]) => (
+              <div key={dateKey}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11.5px] font-[700] text-[#6B7280] uppercase tracking-wide">{dayLabel(dateKey)}</span>
+                  <span className="text-[11px] text-[#9CA3AF]">({dayOrders.length})</span>
+                  <div className="flex-1 h-px bg-[#E5E7EB]" />
+                </div>
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {dayOrders.map((o) => {
                 const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.pending
                 const Icon = cfg.icon
                 const isActive = !['delivered','cancelled'].includes(o.status)
@@ -443,6 +478,9 @@ export default function SlugOrdersPage() {
                   </div>
                 )
               })}
+                </div>
+              </div>
+            ))}
             </div>
           )}
         </div>

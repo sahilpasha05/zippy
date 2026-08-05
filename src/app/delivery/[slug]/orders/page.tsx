@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
 import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera, Filter } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
@@ -68,6 +69,28 @@ function amountToCollect(o: { total: number; online_amount: number | null; cod_a
 
 function onlineSettled(o: { online_amount: number | null; payment_status: string | null }) {
   return (o.online_amount ?? 0) > 0 && ['partially_paid', 'paid'].includes(o.payment_status ?? '')
+}
+
+function dayLabel(dateKey: string) {
+  const d = new Date(`${dateKey}T00:00:00`)
+  if (isToday(d)) return 'Today'
+  if (isYesterday(d)) return 'Yesterday'
+  return format(d, 'EEEE, d MMM')
+}
+
+// Buckets orders by the rider's local day, most recent day first. Orders
+// within a day keep whatever relative order they already had (e.g. unaccepted
+// ones floated to the top), so grouping never reorders the underlying list —
+// it only adds headers over it.
+function groupByDay(list: Order[], dateOf: (o: Order) => string) {
+  // Plain object, not `Map` — lucide-react's `Map` icon is imported into this
+  // file's scope and shadows the global Map constructor.
+  const buckets: Record<string, Order[]> = {}
+  for (const o of list) {
+    const key = toLocalDateInput(dateOf(o))
+    ;(buckets[key] ??= []).push(o)
+  }
+  return Object.entries(buckets).sort((a, b) => b[0].localeCompare(a[0]))
 }
 
 export default function DeliveryOrdersPage() {
@@ -324,17 +347,25 @@ export default function DeliveryOrdersPage() {
     o.id.slice(0, 8), o.customer_name ?? '', o.customer_phone ?? '', o.address ?? '', restName(o) ?? '',
   ].some((f) => f.toLowerCase().includes(q))
 
-  const matchesDate = (o: Order) => !dateFilter || toLocalDateInput(o.delivered_at ?? o.placed_at) === dateFilter
+  // Delivered orders group by when they were delivered; active/pending ones
+  // by when they were placed — a still-open order keeps no delivered_at yet.
+  const dateOf = (o: Order) => tab === 'delivered' ? (o.delivered_at ?? o.placed_at) : o.placed_at
+  const matchesDate = (o: Order) => !dateFilter || toLocalDateInput(dateOf(o)) === dateFilter
 
   const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders)
     .filter(matches)
-    .filter((o) => tab !== 'delivered' || matchesDate(o))
+    .filter(matchesDate)
 
-  // "Today" is the rider's own day, not UTC.
-  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
-  const isToday = (d: string | null) => !!d && new Date(d) >= startOfToday
-  const deliveredToday = orders.filter((o) => o.status === 'delivered' && isToday(o.delivered_at))
-  const collectedToday = deliveredToday.reduce((sum, o) => sum + Number(o.cod_amount ?? 0), 0)
+  const dayGroups = groupByDay(shown, dateOf)
+
+  // The at-a-glance card tracks whatever day is selected above (today by
+  // default), so it's a real per-day record the rider can look back on via
+  // the calendar — not just a number that resets and is lost at midnight.
+  // Clearing the filter rolls it up to an all-time total instead.
+  const deliveredForStats = orders.filter((o) => o.status === 'delivered'
+    && (!dateFilter || toLocalDateInput(o.delivered_at ?? o.placed_at) === dateFilter))
+  const collectedForStats = deliveredForStats.reduce((sum, o) => sum + Number(o.cod_amount ?? 0), 0)
+  const statsLabel = dateFilter ? dayLabel(dateFilter).toLowerCase() : 'all time'
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -384,20 +415,21 @@ export default function DeliveryOrdersPage() {
             </div>
           )}
 
-          {/* Today at a glance, so the rider can see their own day's work and
-              what cash they should be holding without opening analytics. */}
+          {/* A per-day record, not a live-only snapshot — it tracks whichever
+              day is selected below (today by default), so switching the date
+              re-opens that day's own totals instead of losing them at midnight. */}
           <div className="grid grid-cols-3 gap-2 mb-2.5">
             <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-3 py-2">
-              <p className="text-[17px] font-[800] text-[#15803D] leading-none">{deliveredToday.length}</p>
-              <p className="text-[10.5px] text-[#15803D]/70 mt-1">delivered today</p>
+              <p className="text-[17px] font-[800] text-[#15803D] leading-none">{deliveredForStats.length}</p>
+              <p className="text-[10.5px] text-[#15803D]/70 mt-1">delivered {statsLabel}</p>
             </div>
             <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl px-3 py-2">
               <p className="text-[17px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
               <p className="text-[10.5px] text-[#6D28D9]/70 mt-1">still to deliver</p>
             </div>
             <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2">
-              <p className="text-[17px] font-[800] text-[#B45309] leading-none">₹{collectedToday.toFixed(0)}</p>
-              <p className="text-[10.5px] text-[#B45309]/70 mt-1">cash collected</p>
+              <p className="text-[17px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
+              <p className="text-[10.5px] text-[#B45309]/70 mt-1">cash collected {statsLabel}</p>
             </div>
           </div>
 
@@ -434,8 +466,11 @@ export default function DeliveryOrdersPage() {
             </button>
           </div>
 
-          {tab === 'delivered' && (
-            <div className="relative mt-2.5">
+          {/* Defaults to today; the calendar is how the rider reaches older
+              orders instead of scrolling a list spanning every day they've
+              ever ridden. Clearing it goes back to every day, grouped. */}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <div className="relative flex-1">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
               <input
                 type="date"
@@ -449,7 +484,13 @@ export default function DeliveryOrdersPage() {
                 </button>
               )}
             </div>
-          )}
+            {dateFilter !== toLocalDateInput(new Date().toISOString()) && (
+              <button onClick={() => setDateFilter(toLocalDateInput(new Date().toISOString()))}
+                className="px-3 py-2 rounded-xl text-[12.5px] font-[600] border border-[#E5E7EB] text-[#374151] hover:border-[#D1D5DB] transition-all whitespace-nowrap">
+                Today
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -459,16 +500,28 @@ export default function DeliveryOrdersPage() {
           <div className="flex flex-col items-center gap-3 py-24 text-[#9CA3AF]">
             <Truck className="w-12 h-12" strokeWidth={1} />
             <p className="text-[15px] font-semibold text-[#374151]">
-              {search ? 'Nothing matches that search' : tab === 'active' ? 'No deliveries right now' : tab === 'pending' ? 'Nothing waiting to be picked up' : 'No deliveries yet'}
+              {search
+                ? 'Nothing matches that search'
+                : dateFilter
+                  ? `No ${tab} orders on ${dayLabel(dateFilter).toLowerCase()}`
+                  : tab === 'active' ? 'No deliveries right now' : tab === 'pending' ? 'Nothing waiting to be picked up' : 'No deliveries yet'}
             </p>
-            {tab === 'active' && <p className="text-[13px]">New assignments from admin will show up here instantly.</p>}
+            {tab === 'active' && !dateFilter && <p className="text-[13px]">New assignments from admin will show up here instantly.</p>}
+            {dateFilter && <p className="text-[13px]">Pick another date above, or clear it to see every day.</p>}
           </div>
         ) : (
-          shown.map((o) => {
-            const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.confirmed
-            const Icon = cfg.icon
-            const isReady = o.status === 'out_for_delivery'
-            return (
+          dayGroups.map(([dateKey, dayOrders]) => (
+            <div key={dateKey} className="space-y-3">
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11.5px] font-[700] text-[#6B7280] uppercase tracking-wide">{dayLabel(dateKey)}</span>
+                <span className="text-[11px] text-[#9CA3AF]">({dayOrders.length})</span>
+                <div className="flex-1 h-px bg-[#E5E7EB]" />
+              </div>
+              {dayOrders.map((o) => {
+                const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.confirmed
+                const Icon = cfg.icon
+                const isReady = o.status === 'out_for_delivery'
+                return (
               <div key={o.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', isReady ? 'border-[#7C3AED]' : 'border-[#E5E7EB]')}>
                 {isReady && (
                   <div className="bg-[#F5F3FF] px-4 py-2 flex items-center gap-2">
@@ -586,8 +639,10 @@ export default function DeliveryOrdersPage() {
                   )}
                 </div>
               </div>
-            )
-          })
+                )
+              })}
+            </div>
+          ))
         )}
       </div>
 

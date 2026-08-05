@@ -10,6 +10,8 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+type GroceryCategory = { id: string; name: string; available: boolean }
+
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -25,10 +27,15 @@ export default function AdminSettingsPage() {
     maintenanceMode: false,
     groceriesAvailable: true,
   })
+  const [categories, setCategories] = useState<GroceryCategory[]>([])
+  const [togglingCategory, setTogglingCategory] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('platform_settings').select('*').eq('id', 1).single()
+      const [{ data }, { data: cats }] = await Promise.all([
+        supabase.from('platform_settings').select('*').eq('id', 1).single(),
+        supabase.from('grocery_categories').select('id, name, available').eq('is_active', true).order('sort_order'),
+      ])
       if (data) {
         setSettings((s) => ({
           ...s,
@@ -40,12 +47,26 @@ export default function AdminSettingsPage() {
           groceriesAvailable: data.groceries_available ?? true,
         }))
       }
+      setCategories((cats as GroceryCategory[]) ?? [])
       setLoading(false)
     }
     load()
   }, [])
 
   function set(k: string, v: unknown) { setSettings((s) => ({ ...s, [k]: v })) }
+
+  // Each category's pause takes effect immediately, unlike the fields above —
+  // it's a per-row DB write, not part of the single platform_settings row the
+  // "Save Changes" button writes, so batching it behind that button would be
+  // misleading (toggle it, walk away, and it never actually saved).
+  async function toggleCategory(cat: GroceryCategory) {
+    const next = !cat.available
+    setTogglingCategory(cat.id)
+    setCategories((cs) => cs.map((c) => c.id === cat.id ? { ...c, available: next } : c))
+    const { error } = await supabase.from('grocery_categories').update({ available: next }).eq('id', cat.id)
+    if (error) setCategories((cs) => cs.map((c) => c.id === cat.id ? { ...c, available: !next } : c))
+    setTogglingCategory(null)
+  }
 
   async function save() {
     setSaving(true)
@@ -135,6 +156,22 @@ export default function AdminSettingsPage() {
                 <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${settings.groceriesAvailable ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
+
+            {categories.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-1">
+                <p className="text-[12px] font-[600] text-[#374151] mb-1">Pause a single category</p>
+                <p className="text-[11.5px] text-[#9CA3AF] mb-2">Takes effect immediately — no need to hit Save. The rest of groceries stays open.</p>
+                {categories.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between py-1.5">
+                    <p className="text-[13px] text-[#111827]">{c.name}</p>
+                    <button onClick={() => toggleCategory(c)} disabled={togglingCategory === c.id}
+                      className={`relative w-9 h-5 rounded-full shrink-0 ml-4 transition-all duration-300 disabled:opacity-60 ${c.available ? 'bg-[#16A34A]' : 'bg-[#D1D5DB]'}`}>
+                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ${c.available ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Order defaults */}
