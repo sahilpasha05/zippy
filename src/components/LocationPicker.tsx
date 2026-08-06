@@ -81,31 +81,13 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     }
   }
 
-  // Opening the form asks for live location first: GPS is the only reliable way
-  // to confirm the delivery area here, and it also saves the customer typing
-  // their area by hand. If they decline we still open the form and explain at
-  // save time why the location is needed.
-  async function openManual() {
+  // Manual entry is a deliberately separate, unverified path: no GPS, no zone
+  // gate, the customer can type any address they like (a friend's place, an
+  // office across town, whatever). It saves without coordinates, and the shop
+  // confirms the area from the typed text when they call — unlike "Use current
+  // location", which is locked to what GPS actually detected.
+  function openManual() {
     setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftCoords(null); setDraftLabel('Home'); setError('')
-
-    setLocating(true)
-    try {
-      const pos = await getCurrentPosition()
-      const { latitude, longitude } = pos.coords
-      if (!isWithinDeliveryZone(latitude, longitude)) {
-        setError(OUT_OF_ZONE_MESSAGE)
-        setLocating(false)
-        return // stay on the list — there is nothing to add an address for
-      }
-      const address = await reverseGeocode(latitude, longitude)
-      setDraftCoords({ lat: latitude, lng: longitude })
-      setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
-      setAreaLine(address ?? '')
-    } catch {
-      // Declined or unavailable — saveDraft explains what's needed.
-    } finally {
-      setLocating(false)
-    }
     setStep('manual')
   }
 
@@ -219,9 +201,13 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 className={INPUT} />
             </div>
             <div>
-              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Apartment / Road / Area *</label>
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">
+                Apartment / Road / Area *
+                {step === 'confirm' && <span className="text-[#9CA3AF] font-normal"> — locked to your current location</span>}
+              </label>
               <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. MG Road, Koramangala"
-                className={INPUT} />
+                readOnly={step === 'confirm'}
+                className={cn(INPUT, step === 'confirm' && 'bg-[#F8FAFC] text-[#6B7280] cursor-not-allowed')} />
             </div>
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Landmark <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
