@@ -80,7 +80,11 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
       </div>
       <div className="flex flex-col items-end gap-2 shrink-0">
         <div className="w-32 h-32 rounded-full overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB]">
-          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
+          {/* Combo/offer items reuse a full promo poster as their image — cropping
+              a poster to fill a circle cuts off its title or price depending on
+              orientation, so those show the whole thing instead of cropping. */}
+          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized
+            className={cn('w-full h-full', item.image.startsWith('/banners/') ? 'object-contain' : 'object-cover')} />
         </div>
         {!orderingEnabled ? (
           <button disabled className="w-full flex items-center justify-center gap-1.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] text-[12px] font-[600] rounded-xl cursor-not-allowed">

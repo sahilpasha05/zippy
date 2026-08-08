@@ -68,6 +68,11 @@ export default function BannerCarousel() {
                 alt={b.title}
                 fill
                 className="object-cover"
+                // This frame is tuned for the 3:2/4:3 landscape posters most
+                // banners use (see comment above) — a portrait poster like
+                // this one loses its header and price to the crop either way,
+                // so bias down to keep the price/CTA over the branding.
+                style={b.image_url.includes('jaihind-dhamaka-weekend') ? { objectPosition: 'center 75%' } : undefined}
                 loading={i === 0 ? 'eager' : 'lazy'}
                 fetchPriority={i === 0 ? 'high' : 'auto'}
                 sizes="(max-width: 900px) 100vw, 900px"
