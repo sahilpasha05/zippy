@@ -3,10 +3,17 @@ import type { CartItem } from '@/types'
 // A margin applied once an item is in the cart — the product/menu card still
 // shows the plain stored price, but every cart-facing number (unit price,
 // subtotal, and what actually gets charged/stored on the order) is 4% higher.
-const PRICE_MARKUP = 1.04
+export const PRICE_MARKUP = 1.04
 
 function applyPriceMarkup(price: number): number {
   return Math.round(price * PRICE_MARKUP * 100) / 100
+}
+
+// Inverse of applyPriceMarkup — recovers the restaurant's actual menu price
+// from a stored order_items.price, for anywhere (restaurant/admin analytics)
+// that needs to show what the restaurant is owed, not what the customer paid.
+export function removePriceMarkup(markedUpPrice: number): number {
+  return Math.round((markedUpPrice / PRICE_MARKUP) * 100) / 100
 }
 
 // Flat delivery charge applied to every order, regardless of cart size.
