@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, Camera, Filter } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, Filter } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
@@ -93,6 +93,65 @@ function groupByDay(list: Order[], dateOf: (o: Order) => string) {
   return Object.entries(buckets).sort((a, b) => b[0].localeCompare(a[0]))
 }
 
+// Drag-to-confirm — a plain tap can happen by accident in a pocket or while
+// riding; requiring a deliberate full-width drag makes "mark delivered"
+// something the rider has to actually mean, with no camera step at all.
+function SlideToDeliver({ busy, onComplete }: { busy: boolean; onComplete: () => void }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const maxXRef = useRef(0)
+  const startXRef = useRef(0)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [completed, setCompleted] = useState(false)
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (busy || completed) return
+    const track = trackRef.current
+    if (!track) return
+    maxXRef.current = track.clientWidth - 56
+    startXRef.current = e.clientX - dragX
+    setDragging(true)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return
+    setDragX(Math.min(Math.max(0, e.clientX - startXRef.current), maxXRef.current))
+  }
+  function onPointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    if (maxXRef.current > 0 && dragX >= maxXRef.current * 0.85) {
+      setDragX(maxXRef.current)
+      setCompleted(true)
+      onComplete()
+    } else {
+      setDragX(0)
+    }
+  }
+
+  return (
+    <div ref={trackRef} className="relative h-14 rounded-full bg-[#DCFCE7] overflow-hidden select-none touch-none">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+        <span className="text-[13px] font-[700] text-[#15803D]">
+          {busy ? 'Marking delivered…' : completed ? 'Delivered!' : 'Slide to Mark as Delivered'}
+        </span>
+      </div>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 200ms ease' }}
+        className="absolute left-1 top-1 w-12 h-12 rounded-full bg-[#16A34A] flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing"
+      >
+        {busy || completed
+          ? <CheckCircle className="w-5 h-5 text-white" />
+          : <ChevronRight className="w-5 h-5 text-white" />}
+      </div>
+    </div>
+  )
+}
+
 export default function DeliveryOrdersPage() {
   const { slug } = useParams<{ slug: string }>()
   const [partner, setPartner] = useState<Partner | null>(null)
@@ -116,10 +175,10 @@ export default function DeliveryOrdersPage() {
   const announcedRef = useRef<Set<string>>(new Set())
   pendingAcceptRef.current = pendingAccept
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
-  const [uploadingProofFor, setUploadingProofFor] = useState<string | null>(null)
-  const [proofError, setProofError] = useState<{ orderId: string; message: string } | null>(null)
-  const proofInputOrderRef = useRef<string | null>(null)
-  const proofFileInputRef = useRef<HTMLInputElement>(null)
+  const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
+  const [deliveringBusy, setDeliveringBusy] = useState(false)
+  const [deliverError, setDeliverError] = useState('')
+  const [slideAttempt, setSlideAttempt] = useState(0)
 
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
@@ -279,49 +338,34 @@ export default function DeliveryOrdersPage() {
     supabase.from('orders').update({ accepted_at: new Date().toISOString() }).eq('id', orderId).then()
   }
 
-  function triggerProofCapture(orderId: string) {
-    proofInputOrderRef.current = orderId
-    setProofError(null)
-    proofFileInputRef.current?.click()
-  }
-
-  async function handleProofFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    const orderId = proofInputOrderRef.current
-    e.target.value = ''
-    if (!file || !orderId) return
-
-    setUploadingProofFor(orderId)
-    setProofError(null)
+  // Only the orders that actually hand over cash also settle the payment
+  // and stamp the cash-collection time — no photo involved anywhere here.
+  async function completeDelivery(orderId: string) {
+    setDeliveringBusy(true)
+    setDeliverError('')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/delivery/upload-cash-proof', { method: 'POST', body: formData })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Could not upload photo')
-
       const now = new Date().toISOString()
       const order = orders.find((o) => o.id === orderId)
       const collectsCash = order ? amountToCollect(order) > 0 : false
 
-      // Every delivery captures a photo; only the ones that actually hand over
-      // cash also settle the payment and stamp the cash-collection time.
-      await supabase.from('orders').update({
+      const { error } = await supabase.from('orders').update({
         status: 'delivered',
         delivered_at: now,
-        cash_proof_image_url: data.url,
         ...(collectsCash ? { payment_status: 'paid', cash_collected_at: now } : {}),
       }).eq('id', orderId)
+      if (error) throw error
 
       if (partner) {
         await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
         setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
       }
       setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'delivered' } : o))
+      setDeliveringBusy(false)
+      setTimeout(() => setConfirmingDelivery(null), 700)
     } catch (err: unknown) {
-      setProofError({ orderId, message: err instanceof Error ? err.message : 'Could not upload photo. Please try again.' })
-    } finally {
-      setUploadingProofFor(null)
+      setDeliveringBusy(false)
+      setDeliverError(err instanceof Error ? err.message : 'Could not mark delivered. Please try again.')
+      setSlideAttempt((n) => n + 1)
     }
   }
 
@@ -618,25 +662,18 @@ export default function DeliveryOrdersPage() {
                         </>
                       )}
                     </div>
-                    {/* Completing a delivery always goes through the camera —
-                        the photo is the delivery record, cash or no cash. */}
                     {isReady && (
-                      <button onClick={() => triggerProofCapture(o.id)} disabled={uploadingProofFor === o.id}
-                        title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then take the delivery photo` : 'Take the delivery photo to complete this order'}
-                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)] disabled:opacity-60">
-                        {uploadingProofFor === o.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                        {uploadingProofFor === o.id
-                          ? 'Uploading...'
-                          : amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Photo` : 'Delivered — Take Photo'}
+                      <button onClick={() => { setConfirmingDelivery(o); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
+                        title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then mark delivered` : 'Mark this order delivered'}
+                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)]">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}
                       </button>
                     )}
                     {!isReady && o.status !== 'delivered' && (
                       <span className="text-[11.5px] text-[#9CA3AF]">Waiting on restaurant</span>
                     )}
                   </div>
-                  {proofError?.orderId === o.id && (
-                    <p className="text-[11.5px] text-[#DC2626] mt-2">{proofError.message}</p>
-                  )}
                 </div>
               </div>
                 )
@@ -709,14 +746,27 @@ export default function DeliveryOrdersPage() {
         </div>
       )}
 
-      <input
-        ref={proofFileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleProofFileSelected}
-      />
+      {confirmingDelivery && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!deliveringBusy) setConfirmingDelivery(null) }} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center">
+            <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-[#16A34A]" />
+            </div>
+            <h2 className="text-[18px] font-[800] text-[#111827] mb-1">Are you sure delivery is complete?</h2>
+            <p className="text-[13px] text-[#6B7280] mb-5">
+              {confirmingDelivery.customer_name ?? 'Customer'} · {confirmingDelivery.id.slice(0, 8).toUpperCase()}
+              {amountToCollect(confirmingDelivery) > 0 && <> · collect ₹{amountToCollect(confirmingDelivery)}</>}
+            </p>
+            <SlideToDeliver key={slideAttempt} busy={deliveringBusy} onComplete={() => completeDelivery(confirmingDelivery.id)} />
+            {deliverError && <p className="text-[12px] text-[#DC2626] mt-3">{deliverError}</p>}
+            <button onClick={() => setConfirmingDelivery(null)} disabled={deliveringBusy}
+              className="mt-4 text-[12.5px] font-[600] text-[#9CA3AF] hover:text-[#374151] disabled:opacity-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
