@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAddressStore, type SavedAddress } from '@/lib/store/address'
+import { useDbAddressStore } from '@/lib/store/dbAddresses'
 
 type DbAddressRow = {
   id: string
@@ -33,12 +34,16 @@ function fromDbRow(row: DbAddressRow): SavedAddress {
 // auth state so LocationPicker/Navbar/checkout don't need to know which is active.
 export function useAddresses() {
   const [userId, setUserId] = useState<string | null | undefined>(undefined) // undefined = not checked yet
-  const [dbAddresses, setDbAddresses] = useState<SavedAddress[]>([])
-  const [dbSelectedId, setDbSelectedId] = useState<string | null>(null)
-  const [dbLoaded, setDbLoaded] = useState(false)
   const [localHydrated, setLocalHydrated] = useState(false)
 
   const local = useAddressStore()
+  // Selector reads so this component only re-renders when the field it
+  // actually uses changes — writes below go through the store directly
+  // (not through these), so this hook's own callbacks never need `db` in
+  // their dependency arrays (that would re-subscribe/refetch on every write).
+  const dbAddresses = useDbAddressStore((s) => s.addresses)
+  const dbSelectedId = useDbAddressStore((s) => s.selectedId)
+  const dbLoaded = useDbAddressStore((s) => s.loaded)
 
   const loadDbAddresses = useCallback(async (uid: string) => {
     const supabase = createClient()
@@ -49,10 +54,8 @@ export function useAddresses() {
       .order('created_at', { ascending: false })
 
     const rows = (data as DbAddressRow[] | null) ?? []
-    setDbAddresses(rows.map(fromDbRow))
     const def = rows.find((r) => r.is_default) ?? rows[0]
-    setDbSelectedId(def?.id ?? null)
-    setDbLoaded(true)
+    useDbAddressStore.setState({ addresses: rows.map(fromDbRow), selectedId: def?.id ?? null, loaded: true })
   }, [])
 
   useEffect(() => {
@@ -66,7 +69,7 @@ export function useAddresses() {
       const uid = session?.user?.id ?? null
       setUserId(uid)
       if (uid) loadDbAddresses(uid)
-      else { setDbAddresses([]); setDbSelectedId(null); setDbLoaded(false) }
+      else useDbAddressStore.setState({ addresses: [], selectedId: null, loaded: false })
     })
     return () => sub.subscription.unsubscribe()
   }, [loadDbAddresses])
@@ -100,8 +103,7 @@ export function useAddresses() {
       await supabase.from('addresses').update({ is_default: false }).eq('user_id', userId).neq('id', data.id)
 
       const saved = fromDbRow(data as DbAddressRow)
-      setDbAddresses((prev) => [saved, ...prev])
-      setDbSelectedId(saved.id)
+      useDbAddressStore.setState((s) => ({ addresses: [saved, ...s.addresses], selectedId: saved.id }))
       return saved
     }
     return local.addAddress(a)
@@ -111,10 +113,9 @@ export function useAddresses() {
     if (userId) {
       const supabase = createClient()
       await supabase.from('addresses').delete().eq('id', id).eq('user_id', userId)
-      setDbAddresses((prev) => {
-        const remaining = prev.filter((x) => x.id !== id)
-        setDbSelectedId((sel) => (sel === id ? remaining[0]?.id ?? null : sel))
-        return remaining
+      useDbAddressStore.setState((s) => {
+        const remaining = s.addresses.filter((x) => x.id !== id)
+        return { addresses: remaining, selectedId: s.selectedId === id ? (remaining[0]?.id ?? null) : s.selectedId }
       })
       return
     }
@@ -123,10 +124,13 @@ export function useAddresses() {
 
   const selectAddress = useCallback(async (id: string) => {
     if (userId) {
+      // Optimistic — every open useAddresses() consumer (checkout,
+      // LocationPicker, Navbar) shares this store, so the checkout button
+      // unlocks immediately instead of waiting on a reload to refetch.
+      useDbAddressStore.setState({ selectedId: id })
       const supabase = createClient()
       await supabase.from('addresses').update({ is_default: false }).eq('user_id', userId)
       await supabase.from('addresses').update({ is_default: true }).eq('id', id).eq('user_id', userId)
-      setDbSelectedId(id)
       return
     }
     local.selectAddress(id)

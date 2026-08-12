@@ -3,11 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.zippytarikere.com').replace(/\/+$/, '')
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: BASE_URL, changeFrequency: 'daily', priority: 1 },
@@ -19,22 +14,34 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/refunds`, changeFrequency: 'yearly', priority: 0.2 },
   ]
 
-  const [{ data: restaurants }, { data: categories }] = await Promise.all([
-    supabase.from('restaurants').select('slug').eq('is_active', true),
-    supabase.from('grocery_categories').select('slug').eq('is_active', true),
-  ])
+  // This page's data is collected at build time — a missing/misconfigured
+  // Supabase env var or a transient DB error should degrade to the static
+  // routes, not fail the entire production build over one sitemap entry.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) return staticRoutes
 
-  const restaurantRoutes: MetadataRoute.Sitemap = (restaurants ?? []).map((r) => ({
-    url: `${BASE_URL}/restaurants/${r.slug}`,
-    changeFrequency: 'daily',
-    priority: 0.8,
-  }))
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    const [{ data: restaurants }, { data: categories }] = await Promise.all([
+      supabase.from('restaurants').select('slug').eq('is_active', true),
+      supabase.from('grocery_categories').select('slug').eq('is_active', true),
+    ])
 
-  const categoryRoutes: MetadataRoute.Sitemap = (categories ?? []).map((c) => ({
-    url: `${BASE_URL}/essentials/${c.slug}`,
-    changeFrequency: 'daily',
-    priority: 0.7,
-  }))
+    const restaurantRoutes: MetadataRoute.Sitemap = (restaurants ?? []).map((r) => ({
+      url: `${BASE_URL}/restaurants/${r.slug}`,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }))
 
-  return [...staticRoutes, ...restaurantRoutes, ...categoryRoutes]
+    const categoryRoutes: MetadataRoute.Sitemap = (categories ?? []).map((c) => ({
+      url: `${BASE_URL}/essentials/${c.slug}`,
+      changeFrequency: 'daily',
+      priority: 0.7,
+    }))
+
+    return [...staticRoutes, ...restaurantRoutes, ...categoryRoutes]
+  } catch {
+    return staticRoutes
+  }
 }
