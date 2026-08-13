@@ -46,8 +46,16 @@ export default function PrivacyPolicyPage() {
               <p>If you choose to share your current location at checkout, or if a delivery partner enables live location sharing, that location data is used solely to enable accurate delivery and real-time order tracking on a map. It is not sold or used for advertising.</p>
             </Section>
 
+            <Section title="How we protect your data">
+              <p>Your data is stored on Supabase, a managed PostgreSQL database platform built on industry-standard cloud infrastructure. All data is encrypted in transit, and access to our database is protected by row-level security policies that restrict who — and what part of our system — can read or modify each piece of data. Only authorized personnel have access to production data, and only to the extent needed to operate and support the service.</p>
+            </Section>
+
+            <Section title="We do not sell or export your data">
+              <p>We do not sell, rent, or export your personal data to third parties for their own marketing or advertising purposes. Your data is never handed over in bulk or for external use — it is used solely to run Zippy: taking your order, delivering it, and supporting you if something goes wrong.</p>
+            </Section>
+
             <Section title="Third-party services">
-              <p>We use trusted third-party providers to operate Zippy, including cloud database and hosting infrastructure, mapping services for live delivery tracking, and payment processing partners. These providers only receive the data necessary to perform their function.</p>
+              <p>We use trusted third-party providers to operate Zippy, including cloud database and hosting infrastructure, mapping services for live delivery tracking, and payment processing partners. These providers only receive the minimum data necessary to perform their specific function, and are not permitted to use it for any other purpose.</p>
             </Section>
 
             <Section title="Data retention">

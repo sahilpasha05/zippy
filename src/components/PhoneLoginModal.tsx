@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { X, Loader2, Smartphone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,13 +16,14 @@ export default function PhoneLoginModal({
   onSuccess: (isNewUser: boolean) => void
 }) {
   const [phone, setPhone] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const isValid = /^[6-9]\d{9}$/.test(phone)
 
   async function submit() {
-    if (!isValid || submitting) return
+    if (!isValid || !agreed || submitting) return
     setSubmitting(true); setError('')
     try {
       const res = await fetch('/api/auth/phone', {
@@ -82,9 +84,24 @@ export default function PhoneLoginModal({
             {error && <p className="text-[11.5px] text-[#DC2626] mt-1.5">{error}</p>}
           </div>
 
+          <label className="flex items-start gap-2.5 text-[12px] text-[#6B7280] cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-[#D1D5DB] text-[#16A34A] focus:ring-[#16A34A] shrink-0"
+            />
+            <span>
+              I agree to Zippy&apos;s{' '}
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#16A34A] hover:underline">Terms &amp; Conditions</Link>
+              {' '}and{' '}
+              <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#16A34A] hover:underline">Privacy Policy</Link>, and consent to my data being processed as described.
+            </span>
+          </label>
+
           <button
             onClick={submit}
-            disabled={!isValid || submitting}
+            disabled={!isValid || !agreed || submitting}
             className="w-full py-3 bg-[#16A34A] text-white rounded-xl text-[14px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
             style={{ fontWeight: 700 }}
           >
