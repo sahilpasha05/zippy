@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useCartStore } from '@/lib/store/cart'
-import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
+import { useCartStore, FREE_PIZZA_PROMO } from '@/lib/store/cart'
+import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight, Gift } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,7 @@ export default function CartSidebar() {
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + DELIVERY_FEE + platformFee
   const deliveryEta = useDeliveryEta()
+  const hasFreePizza = items.some((i) => i.product_id === FREE_PIZZA_PROMO.productId)
 
   useEffect(() => {
     useCartStore.persist.rehydrate()
@@ -71,13 +72,26 @@ export default function CartSidebar() {
             </div>
           ) : (
             <div className="space-y-3">
+              {hasFreePizza && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#FEF3C7] to-[#FDE68A] rounded-2xl">
+                  <Gift className="w-4.5 h-4.5 text-[#B45309] shrink-0" />
+                  <p className="text-[12.5px] font-700 text-[#92400E]" style={{ fontWeight: 700 }}>
+                    🎉 Congratulations! You&apos;ve unlocked a FREE Pizza!
+                  </p>
+                </div>
+              )}
               {items.map((item) => {
                 const unitPrice = getAdjustedUnitPrice(item)
+                const isFreePizza = item.product_id === FREE_PIZZA_PROMO.productId
                 return (
-                <div key={item.id} className="flex items-center gap-3 p-3 bg-[#F8FAFC] rounded-2xl group">
+                <div key={item.id} className={cn('flex items-center gap-3 p-3 rounded-2xl group', isFreePizza ? 'bg-[#FFFBEB] border border-[#FDE68A]' : 'bg-[#F8FAFC]')}>
                   {/* Image */}
                   <div className="w-14 h-14 bg-white rounded-xl overflow-hidden shrink-0 border border-[#E5E7EB]">
-                    {item.image_url ? (
+                    {isFreePizza ? (
+                      <div className="w-full h-full bg-[#FEF3C7] flex items-center justify-center">
+                        <Gift className="w-5 h-5 text-[#B45309]" />
+                      </div>
+                    ) : item.image_url ? (
                       <Image src={item.image_url} alt={item.name} width={56} height={56} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-[#DCFCE7] flex items-center justify-center">
@@ -89,26 +103,34 @@ export default function CartSidebar() {
                   {/* Details */}
                   <div className="flex-1 min-w-0">
                     <p className="text-[13.5px] font-600 text-[#111827] truncate" style={{ fontWeight: 600 }}>{item.name}</p>
-                    <p className="text-[12px] text-[#6B7280] mt-0.5">₹{unitPrice} × {item.quantity}</p>
-                    <p className="text-[13px] font-700 text-[#16A34A]" style={{ fontWeight: 700 }}>₹{(unitPrice * item.quantity).toFixed(0)}</p>
+                    {isFreePizza ? (
+                      <p className="text-[12px] font-700 text-[#B45309] mt-0.5">FREE — reward unlocked</p>
+                    ) : (
+                      <>
+                        <p className="text-[12px] text-[#6B7280] mt-0.5">₹{unitPrice} × {item.quantity}</p>
+                        <p className="text-[13px] font-700 text-[#16A34A]" style={{ fontWeight: 700 }}>₹{(unitPrice * item.quantity).toFixed(0)}</p>
+                      </>
+                    )}
                   </div>
 
-                  {/* Qty Controls */}
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-[#E5E7EB] hover:border-[#16A34A] hover:text-[#16A34A] transition-all text-[#374151]"
-                    >
-                      {item.quantity === 1 ? <Trash2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                    </button>
-                    <span className="w-7 text-center text-[13px] font-700 text-[#111827]" style={{ fontWeight: 700 }}>{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#16A34A] text-white hover:bg-[#15803D] transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
+                  {/* Qty Controls — the free pizza is auto-managed, not user-editable */}
+                  {!isFreePizza && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-[#E5E7EB] hover:border-[#16A34A] hover:text-[#16A34A] transition-all text-[#374151]"
+                      >
+                        {item.quantity === 1 ? <Trash2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                      </button>
+                      <span className="w-7 text-center text-[13px] font-700 text-[#111827]" style={{ fontWeight: 700 }}>{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#16A34A] text-white hover:bg-[#15803D] transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 )
               })}

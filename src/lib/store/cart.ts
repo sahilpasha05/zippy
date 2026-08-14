@@ -16,6 +16,40 @@ export function conflictsWithCart(items: CartItem[], restaurantId: string | null
   return items.length > 0 && getCartSource(items) !== restaurantId
 }
 
+// Smiley Cafe promo: spend ₹499 on their menu, a free pizza appears in the
+// cart automatically — and disappears again if the order drops back below
+// that. Not a real menu product (no restaurant_products row), so it's kept
+// out of that table entirely and synthesized here instead.
+export const FREE_PIZZA_PROMO = {
+  restaurantId: 'd18abfca-6e63-41bd-a605-0883ef42bd33',
+  threshold: 499,
+  productId: '__free_pizza_499__',
+}
+
+// Re-run after every cart mutation so the free pizza tracks whatever the
+// paid items (everything else) currently add up to — never counting itself.
+function syncFreePizza(items: CartItem[]): CartItem[] {
+  const paidItems = items.filter((i) => i.product_id !== FREE_PIZZA_PROMO.productId)
+  const eligible = getCartSource(paidItems) === FREE_PIZZA_PROMO.restaurantId
+    && paidItems.reduce((sum, i) => sum + i.price * i.quantity, 0) >= FREE_PIZZA_PROMO.threshold
+
+  if (!eligible) return paidItems
+
+  return [
+    ...paidItems,
+    {
+      id: 'free-pizza-499',
+      product_id: FREE_PIZZA_PROMO.productId,
+      product_type: 'restaurant',
+      restaurant_id: FREE_PIZZA_PROMO.restaurantId,
+      name: 'Free Pizza 🎁',
+      image_url: null,
+      price: 0,
+      quantity: 1,
+    },
+  ]
+}
+
 interface CartStore {
   items: CartItem[]
   isOpen: boolean
@@ -41,27 +75,27 @@ export const useCartStore = create<CartStore>()(
         const existing = get().items.find((i) => i.product_id === item.product_id)
         if (existing) {
           set((s) => ({
-            items: s.items.map((i) =>
+            items: syncFreePizza(s.items.map((i) =>
               i.product_id === item.product_id
                 ? { ...i, quantity: i.quantity + 1 }
                 : i
-            ),
+            )),
           }))
         } else {
           set((s) => ({
-            items: [
+            items: syncFreePizza([
               ...s.items,
               { ...item, id: Math.random().toString(36).slice(2) },
-            ],
+            ]),
           }))
         }
       },
 
       replaceCartWith: (item) =>
-        set({ items: [{ ...item, id: Math.random().toString(36).slice(2) }] }),
+        set({ items: syncFreePizza([{ ...item, id: Math.random().toString(36).slice(2) }]) }),
 
       removeItem: (productId) =>
-        set((s) => ({ items: s.items.filter((i) => i.product_id !== productId) })),
+        set((s) => ({ items: syncFreePizza(s.items.filter((i) => i.product_id !== productId)) })),
 
       updateQuantity: (productId, quantity) => {
         if (quantity <= 0) {
@@ -69,9 +103,9 @@ export const useCartStore = create<CartStore>()(
           return
         }
         set((s) => ({
-          items: s.items.map((i) =>
+          items: syncFreePizza(s.items.map((i) =>
             i.product_id === productId ? { ...i, quantity } : i
-          ),
+          )),
         }))
       },
 
