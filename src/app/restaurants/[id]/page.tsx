@@ -139,7 +139,7 @@ export default function RestaurantDetailPage() {
       if (rest) {
         const [{ data: cats }, { data: prods }] = await Promise.all([
           supabase.from('restaurant_categories').select('id, name').eq('restaurant_id', rest.id).order('sort_order'),
-          supabase.from('restaurant_products').select('*, restaurant_categories(name)').eq('restaurant_id', rest.id).eq('is_available', true),
+          supabase.from('restaurant_products').select('*, restaurant_categories(name)').eq('restaurant_id', rest.id).eq('is_available', true).order('created_at'),
         ])
 
         const toMenuItem = (p: Record<string, unknown>): MenuItem => ({
