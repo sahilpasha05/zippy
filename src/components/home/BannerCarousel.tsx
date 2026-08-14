@@ -50,7 +50,7 @@ export default function BannerCarousel() {
   if (banners.length === 0) return null
 
   return (
-    <section>
+    <section id="offers">
       {/* Banner creatives are complete designs (own headline, own CTA), so the
           slide shows the artwork alone — `title` is the admin-side label and the
           alt text, not an overlay. The 7:5 frame sits between the poster aspects

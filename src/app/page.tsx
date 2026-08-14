@@ -1,7 +1,7 @@
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
-import HeroSection from '@/components/home/HeroSection'
+import IndependenceDayHero from '@/components/home/IndependenceDayHero'
 import BannerCarousel from '@/components/home/BannerCarousel'
 import TrendingProducts from '@/components/home/TrendingProducts'
 import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
@@ -17,12 +17,8 @@ export default function HomePage() {
       <ViewCartBar />
       <HomeSignInPrompt />
 
-      {/* Hero is desktop-only — mobile goes straight to categories like Blinkit */}
-      <div className="hidden lg:block">
-        <HeroSection />
-      </div>
-
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 space-y-10 lg:space-y-16 pb-20 pt-4 lg:pt-0">
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 space-y-10 lg:space-y-16 pb-20 pt-4">
+        <IndependenceDayHero />
         <BannerCarousel />
         <QuickCategories />
         <TrendingProducts />
