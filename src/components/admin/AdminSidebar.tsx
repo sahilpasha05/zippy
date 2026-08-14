@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Wallet, Warehouse, ShoppingBasket, ImageIcon, PiggyBank } from 'lucide-react'
+import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Wallet, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createBrowserClient(
@@ -22,6 +22,7 @@ const NAV = [
   { href: '/admin/ledger',       label: 'Ledger',       icon: Wallet },
   { href: '/admin/savings',      label: 'Savings & Expenses', icon: PiggyBank },
   { href: '/admin/delivery',     label: 'Delivery Partners', icon: Bike },
+  { href: '/admin/collections',  label: 'Delivery Collections', icon: HandCoins },
   { href: '/admin/grocery-partners', label: 'Grocery Partners', icon: Warehouse },
   { href: '/admin/store-partners', label: 'Store Partners', icon: ShoppingBasket },
   { href: '/admin/reviews',      label: 'Reviews',      icon: Star },
