@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useCartStore, FREE_PIZZA_PROMO } from '@/lib/store/cart'
+import { useCartStore, getCartSource, FREE_PIZZA_PROMO } from '@/lib/store/cart'
 import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight, Gift } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -16,6 +16,16 @@ export default function CartSidebar() {
   const grandTotal = cartTotal + DELIVERY_FEE + platformFee
   const deliveryEta = useDeliveryEta()
   const hasFreePizza = items.some((i) => i.product_id === FREE_PIZZA_PROMO.productId)
+  // Progress toward the promo — only meaningful while shopping Smiley Cafe,
+  // and only before it's already unlocked. Uses raw item prices (not the
+  // marked-up display price) to match exactly what syncFreePizza checks in
+  // the cart store, so this number and the actual unlock point never drift.
+  const paidSubtotal = items
+    .filter((i) => i.product_id !== FREE_PIZZA_PROMO.productId)
+    .reduce((s, i) => s + i.price * i.quantity, 0)
+  const remainingForFreePizza = FREE_PIZZA_PROMO.threshold - paidSubtotal
+  const showFreePizzaProgress = !hasFreePizza && remainingForFreePizza > 0
+    && getCartSource(items) === FREE_PIZZA_PROMO.restaurantId
 
   useEffect(() => {
     useCartStore.persist.rehydrate()
@@ -77,6 +87,14 @@ export default function CartSidebar() {
                   <Gift className="w-4.5 h-4.5 text-[#B45309] shrink-0" />
                   <p className="text-[12.5px] font-700 text-[#92400E]" style={{ fontWeight: 700 }}>
                     🎉 Congratulations! You&apos;ve unlocked a FREE Pizza!
+                  </p>
+                </div>
+              )}
+              {showFreePizzaProgress && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl">
+                  <Gift className="w-4.5 h-4.5 text-[#D97706] shrink-0" />
+                  <p className="text-[12.5px] font-700 text-[#92400E]" style={{ fontWeight: 700 }}>
+                    Add ₹{remainingForFreePizza.toFixed(0)} more to unlock a FREE Pizza! 🍕
                   </p>
                 </div>
               )}

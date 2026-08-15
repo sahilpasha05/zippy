@@ -47,6 +47,29 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
     addItem(draft)
   }
 
+  // ₹0 rows are promo announcements (e.g. "spend ₹X, get a free Y"), not a
+  // real purchasable product — no price line, no Add button, just the mention.
+  if (item.price === 0) {
+    return (
+      <div className="flex items-start gap-4 py-5 border-b border-[#F3F4F6] last:border-0 bg-[#FFFBEB] -mx-4 px-4 rounded-xl">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {item.isBestseller && (
+              <span className="flex items-center gap-1 text-[10.5px] font-semibold text-[#D97706] bg-white px-2 py-0.5 rounded-full">
+                <Flame className="w-3 h-3" /> Bestseller
+              </span>
+            )}
+          </div>
+          <h4 className="text-[14.5px] font-[700] text-[#111827] mb-1">{item.name}</h4>
+          <p className="text-[12.5px] text-[#92400E] leading-relaxed">{item.desc}</p>
+        </div>
+        <div className="w-32 h-32 rounded-full overflow-hidden bg-white border border-[#FDE68A] shrink-0">
+          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-start gap-4 py-5 border-b border-[#F3F4F6] last:border-0 group">
       <div className="flex-1 min-w-0">
