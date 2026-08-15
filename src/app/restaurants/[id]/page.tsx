@@ -47,10 +47,6 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
     addItem(draft)
   }
 
-  // A ₹0 row was the free-fries offer marker; that offer is retired, so it's
-  // no longer a purchasable or displayable menu item.
-  if (item.price === 0) return null
-
   return (
     <div className="flex items-start gap-4 py-5 border-b border-[#F3F4F6] last:border-0 group">
       <div className="flex-1 min-w-0">
