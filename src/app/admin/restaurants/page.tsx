@@ -25,6 +25,7 @@ export default function AdminRestaurantsPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [toggling, setToggling] = useState<string | null>(null)
+  const [togglingOpen, setTogglingOpen] = useState<string | null>(null)
 
   useEffect(() => {
     loadRestaurants()
@@ -41,9 +42,31 @@ export default function AdminRestaurantsPage() {
 
   async function toggleActive(id: string, current: boolean) {
     setToggling(id)
-    await supabase.from('restaurants').update({ is_active: !current }).eq('id', id)
-    setRestaurants((prev) => prev.map((r) => r.id === id ? { ...r, is_active: !current } : r))
+    // Only flip the local state on confirmed success — the previous version
+    // updated the UI unconditionally, so a failed write (bad session, RLS
+    // denial, network hiccup) looked identical to success: silently reverted
+    // on the next reload with no indication anything went wrong.
+    const { error } = await supabase.from('restaurants').update({ is_active: !current }).eq('id', id)
+    if (!error) {
+      setRestaurants((prev) => prev.map((r) => r.id === id ? { ...r, is_active: !current } : r))
+    } else {
+      alert(`Could not update: ${error.message}`)
+    }
     setToggling(null)
+  }
+
+  // Separate from is_active (whether the restaurant is listed at all) — this
+  // is the day-to-day "accepting orders right now" switch, previously only
+  // changeable directly in the database.
+  async function toggleOpen(id: string, current: boolean) {
+    setTogglingOpen(id)
+    const { error } = await supabase.from('restaurants').update({ is_open: !current }).eq('id', id)
+    if (!error) {
+      setRestaurants((prev) => prev.map((r) => r.id === id ? { ...r, is_open: !current } : r))
+    } else {
+      alert(`Could not update: ${error.message}`)
+    }
+    setTogglingOpen(null)
   }
 
   const filtered = restaurants.filter((r) =>
@@ -143,9 +166,14 @@ export default function AdminRestaurantsPage() {
                           <UserX className="w-3 h-3" /> No owner
                         </span>
                       )}
-                      <span className={cn('text-[11px] px-2 py-0.5 rounded-full font-medium', r.is_open ? 'text-[#16A34A] bg-[#DCFCE7]' : 'text-[#6B7280] bg-[#F3F4F6]')}>
-                        {r.is_open ? '● Open' : '○ Closed'}
-                      </span>
+                      <button
+                        onClick={() => toggleOpen(r.id, r.is_open)}
+                        disabled={togglingOpen === r.id}
+                        title={r.is_open ? 'Currently accepting orders — click to close' : 'Currently closed — click to reopen'}
+                        className={cn('flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium transition-all disabled:opacity-60',
+                          r.is_open ? 'text-[#16A34A] bg-[#DCFCE7] hover:bg-[#BBF7D0]' : 'text-[#6B7280] bg-[#F3F4F6] hover:bg-[#E5E7EB]')}>
+                        {togglingOpen === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : (r.is_open ? '● Open' : '○ Closed')}
+                      </button>
                     </div>
 
                     <div className="flex items-center justify-between pt-3 border-t border-[#F3F4F6]">

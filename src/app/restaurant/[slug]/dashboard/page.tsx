@@ -67,8 +67,13 @@ export default function SlugDashboard() {
   async function toggleOpen() {
     if (!restaurant) return
     setToggling(true)
-    await supabase.from('restaurants').update({ is_open: !isOpen }).eq('id', restaurant.id)
-    setIsOpen((v) => !v)
+    // Only flip on confirmed success — previously this always flipped the
+    // switch regardless of whether the write actually went through, so a
+    // failed update (stale session, RLS denial, flaky network — the kind of
+    // thing that happens more on mobile) looked identical to success.
+    const { error } = await supabase.from('restaurants').update({ is_open: !isOpen }).eq('id', restaurant.id)
+    if (!error) setIsOpen((v) => !v)
+    else alert(`Could not update: ${error.message}`)
     setToggling(false)
   }
 

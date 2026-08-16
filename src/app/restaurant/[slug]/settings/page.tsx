@@ -38,13 +38,18 @@ export default function SlugSettingsPage() {
   async function save() {
     if (!restaurant) return
     setSaving(true)
-    await supabase.from('restaurants').update({
+    const { error } = await supabase.from('restaurants').update({
       name: restaurant.name, address: restaurant.address, description: restaurant.description,
       delivery_time: restaurant.delivery_time, min_order: restaurant.min_order,
       delivery_fee: restaurant.delivery_fee, is_open: restaurant.is_open,
     }).eq('id', restaurant.id)
-    setSaving(false); setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setSaving(false)
+    if (!error) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } else {
+      alert(`Could not save: ${error.message}`)
+    }
   }
 
   if (loading) return (
