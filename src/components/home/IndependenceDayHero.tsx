@@ -76,7 +76,7 @@ function Confetti() {
 
 export default function IndependenceDayHero() {
   return (
-    <section className="relative">
+    <section className="relative overflow-hidden">
       <style>{`
         @keyframes chakra-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes confetti-fall {

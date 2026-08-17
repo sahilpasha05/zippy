@@ -85,18 +85,18 @@ export default function Navbar() {
         <div className="lg:hidden bg-white px-4 pt-2.5">
           <div className="flex items-center gap-2.5">
             <Link href="/" className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all',
+              'flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all',
               !onRestaurantSide ? 'bg-[#16A34A] shadow-[0_3px_10px_rgba(22,163,74,0.35)]' : 'bg-[#F3F4F6]'
             )}>
-              <ShoppingBag className={cn('w-[18px] h-[18px]', !onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} strokeWidth={2.25} />
-              <span className={cn('text-[14px] font-[800]', !onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} style={{ fontWeight: 800 }}>Zippy</span>
+              <ShoppingBag className={cn('w-[18px] h-[18px] shrink-0', !onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} strokeWidth={2.25} />
+              <span className={cn('text-[14px] font-[800] truncate', !onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} style={{ fontWeight: 800 }}>Zippy</span>
             </Link>
             <Link href="/restaurants" className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all',
+              'flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 rounded-xl transition-all',
               onRestaurantSide ? 'bg-[#EA580C] shadow-[0_3px_10px_rgba(234,88,12,0.35)]' : 'bg-[#F3F4F6]'
             )}>
-              <UtensilsCrossed className={cn('w-[18px] h-[18px]', onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} strokeWidth={2.25} />
-              <span className={cn('text-[14px] font-[800]', onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} style={{ fontWeight: 800 }}>Restaurants</span>
+              <UtensilsCrossed className={cn('w-[18px] h-[18px] shrink-0', onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} strokeWidth={2.25} />
+              <span className={cn('text-[14px] font-[800] truncate', onRestaurantSide ? 'text-white' : 'text-[#6B7280]')} style={{ fontWeight: 800 }}>Restaurants</span>
             </Link>
           </div>
         </div>
