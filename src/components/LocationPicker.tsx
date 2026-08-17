@@ -205,7 +205,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
                 Apartment / Road / Area *
                 {step === 'confirm' && <span className="text-[#9CA3AF] font-normal"> — locked to your current location</span>}
               </label>
-              <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. MG Road, Koramangala"
+              <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. Main Road, Tarikere"
                 readOnly={step === 'confirm'}
                 className={cn(INPUT, step === 'confirm' && 'bg-[#F8FAFC] text-[#6B7280] cursor-not-allowed')} />
             </div>

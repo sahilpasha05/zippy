@@ -146,7 +146,7 @@ export default function RestaurantsPage() {
               <div>
                 <h1 className="text-[28px] font-[800] text-[#111827] tracking-tight" style={{ fontWeight: 800 }}>Restaurants near you</h1>
                 <p className="text-[14px] text-[#6B7280] mt-1">
-                  {loading ? 'Loading…' : `${restaurants.length} restaurants delivering to Koramangala`}
+                  {loading ? 'Loading…' : `${restaurants.length} restaurants delivering to Tarikere`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
