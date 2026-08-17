@@ -77,7 +77,6 @@ export default function PhoneLoginModal({
                 placeholder="98765 43210"
                 inputMode="numeric"
                 type="tel"
-                autoFocus
                 className="flex-1 bg-transparent text-[13.5px] outline-none min-w-0"
               />
             </div>
