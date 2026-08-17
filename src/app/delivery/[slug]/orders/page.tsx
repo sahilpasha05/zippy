@@ -347,11 +347,21 @@ export default function DeliveryOrdersPage() {
       const now = new Date().toISOString()
       const order = orders.find((o) => o.id === orderId)
       const collectsCash = order ? amountToCollect(order) > 0 : false
+      // If the online leg was never confirmed by Cashfree (payment_status still
+      // pending/failed), the rider just collected the ENTIRE total in cash —
+      // amountToCollect() already accounts for that. Reclassify online_amount
+      // into cod_amount so the admin dashboard reports it as cash, not as a
+      // UPI payment that never actually went through Cashfree.
+      const onlineWasConfirmed = order ? ['partially_paid', 'paid'].includes(order.payment_status ?? '') : false
 
       const { error } = await supabase.from('orders').update({
         status: 'delivered',
         delivered_at: now,
-        ...(collectsCash ? { payment_status: 'paid', cash_collected_at: now } : {}),
+        ...(collectsCash ? {
+          payment_status: 'paid',
+          cash_collected_at: now,
+          ...(order && !onlineWasConfirmed ? { online_amount: 0, cod_amount: order.total } : {}),
+        } : {}),
       }).eq('id', orderId)
       if (error) throw error
 
