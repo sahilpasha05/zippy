@@ -56,7 +56,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
       {/* Image */}
       <div className="relative aspect-square mb-2">
         {p.image_url ? (
-          <Image src={p.image_url} alt={p.name} fill className="object-contain" sizes="(max-width: 640px) 40vw, 15vw" />
+          <Image src={p.image_url} alt={p.name} fill unoptimized className="object-contain" sizes="(max-width: 640px) 40vw, 15vw" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[#E5E7EB]">
             <Package className="w-10 h-10" strokeWidth={1} />

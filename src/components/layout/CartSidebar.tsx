@@ -78,7 +78,7 @@ export default function CartSidebar() {
                   {/* Image */}
                   <div className="w-14 h-14 bg-white rounded-xl overflow-hidden shrink-0 border border-[#E5E7EB]">
                     {item.image_url ? (
-                      <Image src={item.image_url} alt={item.name} width={56} height={56} className="w-full h-full object-cover" />
+                      <Image src={item.image_url} alt={item.name} width={56} height={56} unoptimized className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-[#DCFCE7] flex items-center justify-center">
                         <Zap className="w-5 h-5 text-[#16A34A]" />

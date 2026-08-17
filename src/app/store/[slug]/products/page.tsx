@@ -194,7 +194,7 @@ export default function StoreSlugProductsPage() {
                 <div key={p.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', p.is_active ? 'border-[#E5E7EB]' : 'border-[#E5E7EB] opacity-60')}>
                   <div className="h-32 bg-[#F8FAFC] relative">
                     {p.image_url ? (
-                      <Image src={p.image_url} alt={p.name} fill className="object-cover" sizes="300px" />
+                      <Image src={p.image_url} alt={p.name} fill unoptimized className="object-cover" sizes="300px" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-8 h-8" /></div>
                     )}

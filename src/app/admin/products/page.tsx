@@ -221,7 +221,7 @@ export default function AdminProductsPage() {
                   <button onClick={() => openDetail(p)} className="block w-full text-left">
                     <div className="h-32 bg-[#F8FAFC] relative">
                       {p.image_url ? (
-                        <Image src={p.image_url} alt={p.name} fill className="object-cover" sizes="300px" />
+                        <Image src={p.image_url} alt={p.name} fill unoptimized className="object-cover" sizes="300px" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-8 h-8" /></div>
                       )}
@@ -357,7 +357,7 @@ export default function AdminProductsPage() {
               <div className="grid sm:grid-cols-[160px_1fr] gap-5">
                 <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] relative shrink-0">
                   {detailForm.image_url ? (
-                    <Image src={detailForm.image_url} alt={detailForm.name} fill className="object-cover" sizes="160px" />
+                    <Image src={detailForm.image_url} alt={detailForm.name} fill unoptimized className="object-cover" sizes="160px" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-8 h-8" /></div>
                   )}

@@ -32,7 +32,6 @@ function RestaurantCard({ r }: { r: Restaurant }) {
             src={r.cover_url}
             alt={r.name}
             fill
-            unoptimized
             className="object-cover"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
           />
@@ -51,7 +50,7 @@ function RestaurantCard({ r }: { r: Restaurant }) {
         <div className="flex items-start gap-3 mb-2">
           {/* Logo */}
           <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0">
-            {r.logo_url && <Image src={r.logo_url} alt={r.name} width={40} height={40} unoptimized className="w-full h-full object-cover" />}
+            {r.logo_url && <Image src={r.logo_url} alt={r.name} width={40} height={40} className="w-full h-full object-cover" />}
           </div>
           <div className="min-w-0">
             <h3 className="text-[14.5px] font-[700] text-[#111827] truncate" style={{ fontWeight: 700 }}>{r.name}</h3>

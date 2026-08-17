@@ -158,7 +158,7 @@ export default function PricingBulkEditPage() {
                       <td className="pl-4 py-2.5">
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] relative shrink-0">
                           {p.image_url ? (
-                            <Image src={p.image_url} alt={p.name} fill className="object-cover" sizes="40px" />
+                            <Image src={p.image_url} alt={p.name} fill unoptimized className="object-cover" sizes="40px" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-4 h-4" /></div>
                           )}

@@ -64,7 +64,7 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
           <p className="text-[12.5px] text-[#92400E] leading-relaxed">{item.desc}</p>
         </div>
         <div className="w-32 h-32 rounded-full overflow-hidden bg-white border border-[#FDE68A] shrink-0">
-          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized className="w-full h-full object-cover" />
+          <Image src={item.image} alt={item.name} width={128} height={128} className="w-full h-full object-cover" />
         </div>
       </div>
     )
@@ -102,7 +102,7 @@ function MenuItemRow({ item, restaurantId, disabled }: { item: MenuItem; restaur
           {/* Combo/offer items reuse a full promo poster as their image — cropping
               a poster to fill a circle cuts off its title or price depending on
               orientation, so those show the whole thing instead of cropping. */}
-          <Image src={item.image} alt={item.name} width={128} height={128} unoptimized
+          <Image src={item.image} alt={item.name} width={128} height={128}
             className={cn('w-full h-full', item.image.startsWith('/banners/') ? 'object-contain' : 'object-cover')} />
         </div>
         {!orderingEnabled ? (
@@ -231,12 +231,12 @@ export default function RestaurantDetailPage() {
       <div className="min-h-screen bg-[#F8FAFC]">
         {/* Hero */}
         <div className="relative h-64 lg:h-80 bg-[#F8FAFC] overflow-hidden">
-          <Image src={cover} alt={restaurant.name} fill unoptimized className={cn('object-cover', !restaurant.is_open && 'grayscale')} priority sizes="100vw" />
+          <Image src={cover} alt={restaurant.name} fill className={cn('object-cover', !restaurant.is_open && 'grayscale')} priority sizes="100vw" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
             <div className="flex items-end gap-4">
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg">
-                <Image src={logo} alt="" width={64} height={64} unoptimized className="w-full h-full object-cover" />
+                <Image src={logo} alt="" width={64} height={64} className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="text-[24px] font-[800] text-white tracking-tight">{restaurant.name}</h1>

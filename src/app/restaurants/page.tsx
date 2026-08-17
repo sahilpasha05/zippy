@@ -48,7 +48,7 @@ function RestaurantCard({ r }: { r: Restaurant }) {
       r.is_open ? 'hover:shadow-zippy hover:border-[#D1D5DB] hover:-translate-y-0.5' : '')}>
       <div className="relative h-44 bg-[#F8FAFC] overflow-hidden">
         {r.cover_url && (
-          <Image src={r.cover_url} alt={r.name} fill unoptimized className={cn('object-cover', !r.is_open && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw" />
+          <Image src={r.cover_url} alt={r.name} fill className={cn('object-cover', !r.is_open && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw" />
         )}
         <div className={cn('absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold border', r.is_open ? 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]' : 'bg-white text-[#6B7280] border-[#E5E7EB]')}>
           {r.is_open ? '● Open now' : '○ Closed'}
@@ -57,7 +57,7 @@ function RestaurantCard({ r }: { r: Restaurant }) {
       <div className={cn('p-4', !r.is_open && 'opacity-60')}>
         <div className="flex items-start gap-3 mb-3">
           <div className="w-11 h-11 rounded-full overflow-hidden border border-[#E5E7EB] shrink-0 bg-[#F8FAFC]">
-            {r.logo_url && <Image src={r.logo_url} alt="" width={44} height={44} unoptimized className="w-full h-full object-cover" />}
+            {r.logo_url && <Image src={r.logo_url} alt="" width={44} height={44} className="w-full h-full object-cover" />}
           </div>
           <div className="min-w-0">
             <h3 className="text-[15px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>{r.name}</h3>

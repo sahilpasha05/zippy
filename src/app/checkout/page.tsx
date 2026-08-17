@@ -454,7 +454,7 @@ export default function CheckoutPage() {
                       <div key={item.id} className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0">
                           {item.image_url ? (
-                            <Image src={item.image_url} alt={item.name} width={40} height={40} className="w-full h-full object-cover" />
+                            <Image src={item.image_url} alt={item.name} width={40} height={40} unoptimized className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-[#DCFCE7] flex items-center justify-center">
                               <Zap className="w-4 h-4 text-[#16A34A]" />

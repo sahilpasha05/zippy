@@ -22,7 +22,7 @@ export default function ViewCartBar() {
       >
         <div className="w-9 h-9 bg-white/15 rounded-xl flex items-center justify-center shrink-0 overflow-hidden">
           {firstItem?.image_url ? (
-            <Image src={firstItem.image_url} alt="" width={36} height={36} className="w-full h-full object-cover" />
+            <Image src={firstItem.image_url} alt="" width={36} height={36} unoptimized className="w-full h-full object-cover" />
           ) : (
             <ShoppingBag className="w-4.5 h-4.5 text-white" strokeWidth={2} />
           )}

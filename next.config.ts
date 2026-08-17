@@ -2,13 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Grocery product photos are hotlinked from ~100+ retailer/brand sites we
-    // don't control (see the product image library import) — far past the
-    // 50-entry cap this config enforces on remotePatterns, and some of those
-    // hosts block a server-side fetch even once trusted. Unoptimized skips
-    // Next's server-side proxy entirely: the browser loads the src directly,
-    // so no host list is needed and none of this can 400 the build or a page.
-    unoptimized: true,
+    // Only our own storage + Unsplash go through Next's optimizer (resized,
+    // compressed, served as WebP/AVIF). Grocery product photos are hotlinked
+    // from ~100+ retailer/brand sites we don't control — far past the
+    // remotePatterns cap, and some of those hosts block a server-side fetch
+    // even once trusted — so every <Image> that can render one of those sets
+    // `unoptimized` itself instead of relying on a global default.
+    remotePatterns: [
+      { protocol: 'https', hostname: 'bpxyweqryjshpclshzzp.supabase.co' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+    ],
   },
 };
 

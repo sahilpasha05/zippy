@@ -120,7 +120,7 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left">
                     <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0 relative">
                       {p.image_url ? (
-                        <Image src={p.image_url} alt={p.name} fill className="object-contain" sizes="36px" />
+                        <Image src={p.image_url} alt={p.name} fill unoptimized className="object-contain" sizes="36px" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-4 h-4" /></div>
                       )}
