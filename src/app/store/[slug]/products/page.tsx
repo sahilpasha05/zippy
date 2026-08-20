@@ -39,6 +39,7 @@ export default function StoreSlugProductsPage() {
   const [editItem, setEditItem] = useState<Product | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formImage, setFormImage] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -248,7 +249,7 @@ export default function StoreSlugProductsPage() {
                 </div>
               )}
               <form className="space-y-4" onSubmit={handleSubmit}>
-                <ImageUploadField label="Photo" value={formImage} onChange={setFormImage} endpoint="/api/grocery/upload-image" />
+                <ImageUploadField label="Photo" value={formImage} onChange={setFormImage} endpoint="/api/grocery/upload-image" onUploadingChange={setImageUploading} />
                 <div>
                   <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Category</label>
                   <select value={form.category_id} onChange={(e) => setF('category_id', e.target.value)}
@@ -282,10 +283,10 @@ export default function StoreSlugProductsPage() {
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={closeModal}
                     className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Cancel</button>
-                  <button type="submit" disabled={saving}
+                  <button type="submit" disabled={saving || imageUploading}
                     className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {editItem ? 'Save Changes' : 'Add Product'}
+                    {(saving || imageUploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {imageUploading ? 'Uploading photo...' : editItem ? 'Save Changes' : 'Add Product'}
                   </button>
                 </div>
               </form>

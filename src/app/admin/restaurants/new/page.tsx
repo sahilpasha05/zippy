@@ -20,6 +20,8 @@ export default function NewRestaurantPage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [ownerEmail, setOwnerEmail] = useState('')
   const [ownerLookupMsg, setOwnerLookupMsg] = useState('')
 
@@ -175,8 +177,8 @@ export default function NewRestaurantPage() {
               {/* Images */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 space-y-4">
                 <h2 className="text-[14px] font-[700] text-[#111827]">Images</h2>
-                <ImageUploadField label="Cover Image" value={form.cover_url || null} onChange={(url) => set('cover_url', url ?? '')} />
-                <ImageUploadField label="Logo Image" value={form.logo_url || null} onChange={(url) => set('logo_url', url ?? '')} />
+                <ImageUploadField label="Cover Image" value={form.cover_url || null} onChange={(url) => set('cover_url', url ?? '')} onUploadingChange={setCoverUploading} />
+                <ImageUploadField label="Logo Image" value={form.logo_url || null} onChange={(url) => set('logo_url', url ?? '')} onUploadingChange={setLogoUploading} />
               </div>
 
               {/* Delivery Settings */}
@@ -239,9 +241,9 @@ export default function NewRestaurantPage() {
               </div>
 
               {/* Submit */}
-              <button type="submit" disabled={saving}
+              <button type="submit" disabled={saving || coverUploading || logoUploading}
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#7C3AED] text-white text-[15px] font-[700] rounded-2xl hover:bg-[#6D28D9] active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(124,58,237,0.35)] disabled:opacity-60">
-                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create Restaurant'}
+                {coverUploading || logoUploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Uploading photo...</> : saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create Restaurant'}
               </button>
             </form>
           )}

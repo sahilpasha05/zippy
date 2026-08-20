@@ -27,6 +27,7 @@ export default function AdminBannersPage() {
   const [editItem, setEditItem] = useState<Banner | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [formImage, setFormImage] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
   const [formPinned, setFormPinned] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -185,7 +186,7 @@ export default function AdminBannersPage() {
                 </div>
               )}
               <form className="space-y-4" onSubmit={handleSubmit}>
-                <ImageUploadField label="Banner Image" value={formImage} onChange={setFormImage} />
+                <ImageUploadField label="Banner Image" value={formImage} onChange={setFormImage} onUploadingChange={setImageUploading} />
                 <div>
                   <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Title</label>
                   <input value={form.title} onChange={(e) => setF('title', e.target.value)} placeholder="e.g. Pharmacy at your doorstep!"
@@ -217,10 +218,10 @@ export default function AdminBannersPage() {
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={closeModal}
                     className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Cancel</button>
-                  <button type="submit" disabled={saving}
+                  <button type="submit" disabled={saving || imageUploading}
                     className="flex-1 py-3 bg-[#7C3AED] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#6D28D9] transition-all disabled:opacity-60 flex items-center justify-center gap-2">
-                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {editItem ? 'Save Changes' : 'Add Banner'}
+                    {(saving || imageUploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {imageUploading ? 'Uploading photo...' : editItem ? 'Save Changes' : 'Add Banner'}
                   </button>
                 </div>
               </form>

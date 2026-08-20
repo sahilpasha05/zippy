@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { Upload, X, Loader2, ImageIcon } from 'lucide-react'
 
-export default function ImageUploadField({ label, value, onChange, endpoint = '/api/admin/upload-image' }: { label: string; value: string | null; onChange: (url: string | null) => void; endpoint?: string }) {
+export default function ImageUploadField({ label, value, onChange, endpoint = '/api/admin/upload-image', onUploadingChange }: { label: string; value: string | null; onChange: (url: string | null) => void; endpoint?: string; onUploadingChange?: (uploading: boolean) => void }) {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -11,6 +11,7 @@ export default function ImageUploadField({ label, value, onChange, endpoint = '/
 
   async function upload(file: File) {
     setUploading(true)
+    onUploadingChange?.(true)
     setError('')
     try {
       const formData = new FormData()
@@ -23,6 +24,7 @@ export default function ImageUploadField({ label, value, onChange, endpoint = '/
       setError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploading(false)
+      onUploadingChange?.(false)
     }
   }
 

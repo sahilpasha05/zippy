@@ -28,6 +28,8 @@ export default function ManageRestaurantPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [ownerEmail, setOwnerEmail] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [ownerLookupMsg, setOwnerLookupMsg] = useState('')
@@ -144,10 +146,10 @@ export default function ManageRestaurantPage() {
                 <p className="text-[12.5px] text-[#9CA3AF]">Edit restaurant details</p>
               </div>
             </div>
-            <button onClick={save} disabled={saving}
+            <button onClick={save} disabled={saving || coverUploading || logoUploading}
               className="flex items-center gap-2 px-4 py-2 bg-[#7C3AED] text-white text-[13px] font-[600] rounded-xl hover:bg-[#6D28D9] transition-all shadow-[0_2px_8px_rgba(124,58,237,0.3)] disabled:opacity-60">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-              {saved ? 'Saved!' : 'Save Changes'}
+              {saving || coverUploading || logoUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              {coverUploading || logoUploading ? 'Uploading photo...' : saved ? 'Saved!' : 'Save Changes'}
             </button>
           </div>
         </div>
@@ -189,8 +191,8 @@ export default function ManageRestaurantPage() {
                 <textarea value={restaurant.description ?? ''} onChange={(e) => setField('description', e.target.value)}
                   rows={2} className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all resize-none" />
               </div>
-              <ImageUploadField label="Cover Image" value={restaurant.cover_url} onChange={(url) => setField('cover_url', url)} />
-              <ImageUploadField label="Logo Image" value={restaurant.logo_url} onChange={(url) => setField('logo_url', url)} />
+              <ImageUploadField label="Cover Image" value={restaurant.cover_url} onChange={(url) => setField('cover_url', url)} onUploadingChange={setCoverUploading} />
+              <ImageUploadField label="Logo Image" value={restaurant.logo_url} onChange={(url) => setField('logo_url', url)} onUploadingChange={setLogoUploading} />
             </div>
           </div>
 

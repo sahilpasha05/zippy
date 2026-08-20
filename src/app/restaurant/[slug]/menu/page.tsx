@@ -43,6 +43,7 @@ export default function SlugMenuPage() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [formImage, setFormImage] = useState<string | null>(null)
+  const [imageUploading, setImageUploading] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -305,7 +306,7 @@ export default function SlugMenuPage() {
                 <input name="name" defaultValue={editItem?.name ?? ''} placeholder="e.g. Chicken Biryani"
                   className="w-full px-4 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#16A34A] transition-all" />
               </div>
-              <ImageUploadField label="Item Photo" value={formImage} onChange={setFormImage} />
+              <ImageUploadField label="Item Photo" value={formImage} onChange={setFormImage} onUploadingChange={setImageUploading} />
               <div>
                 <label className="block text-[12.5px] font-[600] text-[#374151] mb-1.5">Description</label>
                 <textarea name="description" defaultValue={editItem?.description ?? ''} placeholder="Short description..." rows={2}
@@ -344,9 +345,9 @@ export default function SlugMenuPage() {
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowAddModal(false); setEditItem(null); setFormImage(null) }}
                   className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-all">Cancel</button>
-                <button type="submit" disabled={saving}
+                <button type="submit" disabled={saving || imageUploading}
                   className="flex-1 py-3 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D] transition-all disabled:opacity-60">
-                  {saving ? 'Saving...' : editItem ? 'Save Changes' : 'Add Item'}
+                  {imageUploading ? 'Uploading photo...' : saving ? 'Saving...' : editItem ? 'Save Changes' : 'Add Item'}
                 </button>
               </div>
             </form>
