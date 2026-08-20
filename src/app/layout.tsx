@@ -4,7 +4,7 @@ import CanonicalUrl from "@/components/CanonicalUrl";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://zippytarikere.com"),
+  metadataBase: new URL("https://www.zippytarikere.com"),
   title: "Zippy — Groceries & Restaurants Delivered Fast",
   description: "India's most premium grocery and restaurant ordering platform. Delivered in minutes.",
   keywords: "groceries, restaurants, delivery, hyperlocal, India, Zippy",
