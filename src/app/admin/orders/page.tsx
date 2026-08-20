@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink } from 'lucide-react'
+import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink, AlertTriangle } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { cn, formatMoney, formatDateTime } from '@/lib/utils'
@@ -29,6 +29,7 @@ type Order = {
   placed_at: string; address: string | null; payment_method: string | null; payment_status: string | null
   online_amount: number | null; cod_amount: number | null; cash_collected_at: string | null
   notes: string | null
+  delay_issue: string | null; delay_minutes: number | null; delay_reported_at: string | null
   order_type: string | null
   delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
@@ -85,7 +86,7 @@ export default function AdminOrdersPage() {
     const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }, { data: rests }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, delay_issue, delay_minutes, delay_reported_at, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
         .order('placed_at', { ascending: false })
         // The header counts (active / unassigned) and every tab are derived
         // from this list, so capping at 100 under-reported them once there were
@@ -130,6 +131,17 @@ export default function AdminOrdersPage() {
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, notes: note || null } : o))
   }
 
+  // Surfaces on the customer's tracking page as a banner — this is the only
+  // way an issue/delay reaches them short of calling.
+  async function saveDelay(orderId: string, issue: string, minutes: number | null) {
+    const patch = issue
+      ? { delay_issue: issue, delay_minutes: minutes, delay_reported_at: new Date().toISOString() }
+      : { delay_issue: null, delay_minutes: null, delay_reported_at: null }
+    await supabase.from('orders').update(patch).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, ...patch } : o))
+    setEditingDelay(null)
+  }
+
   // Cancelling clears the rider too — a cancelled order shouldn't sit on
   // anyone's run sheet.
   async function cancelOrder(orderId: string) {
@@ -159,6 +171,9 @@ export default function AdminOrdersPage() {
   }
 
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
+  const [editingDelay, setEditingDelay] = useState<string | null>(null)
+  const [delayIssueDraft, setDelayIssueDraft] = useState('')
+  const [delayMinutesDraft, setDelayMinutesDraft] = useState('')
   const [reconciling, setReconciling] = useState(false)
   const [reconcileMsg, setReconcileMsg] = useState('')
 
@@ -358,6 +373,12 @@ export default function AdminOrdersPage() {
                               Not placed · {notPlaced(o)}
                             </span>
                           )}
+                          {o.delay_issue && (
+                            <span className="flex items-center gap-1 mt-1 text-[10.5px] font-[600] text-[#D97706] leading-tight">
+                              <AlertTriangle className="w-3 h-3 shrink-0" />
+                              {o.delay_minutes ? `+${o.delay_minutes}m — ` : ''}{o.delay_issue}
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
                           {isFinal ? (
@@ -514,6 +535,25 @@ export default function AdminOrdersPage() {
                                     Unassign rider
                                   </button>
                                 )}
+                                {editingDelay !== o.id && (
+                                  o.delay_issue ? (
+                                    <>
+                                      <button onClick={() => { setEditingDelay(o.id); setDelayIssueDraft(o.delay_issue ?? ''); setDelayMinutesDraft(o.delay_minutes?.toString() ?? '') }}
+                                        className="px-3 py-1.5 border border-[#FDE68A] text-[#D97706] rounded-lg text-[12px] font-[600] hover:bg-[#FFFBEB] transition-all">
+                                        Edit delay
+                                      </button>
+                                      <button onClick={() => saveDelay(o.id, '', null)}
+                                        className="px-3 py-1.5 border border-[#E5E7EB] rounded-lg text-[12px] font-[600] text-[#374151] hover:bg-white transition-all">
+                                        Clear delay
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button onClick={() => { setEditingDelay(o.id); setDelayIssueDraft(''); setDelayMinutesDraft('') }}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#FDE68A] text-[#D97706] rounded-lg text-[12px] font-[600] hover:bg-[#FFFBEB] transition-all">
+                                      <AlertTriangle className="w-3.5 h-3.5" /> Report delay
+                                    </button>
+                                  )
+                                )}
                                 {confirmCancel === o.id ? (
                                   <>
                                     <span className="text-[12px] text-[#6B7280]">Cancel this order?</span>
@@ -532,6 +572,35 @@ export default function AdminOrdersPage() {
                                     Cancel order
                                   </button>
                                 )}
+                              </div>
+                            )}
+
+                            {editingDelay === o.id && (
+                              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-[#F3F4F6] bg-[#FFFBEB] -mx-5 px-5 py-3">
+                                <input
+                                  value={delayIssueDraft}
+                                  onChange={(e) => setDelayIssueDraft(e.target.value)}
+                                  placeholder="What's the issue? e.g. Restaurant is busy"
+                                  className="flex-1 min-w-[200px] px-3 py-1.5 border border-[#FDE68A] rounded-lg text-[12.5px] outline-none focus:border-[#D97706] bg-white"
+                                />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={delayMinutesDraft}
+                                  onChange={(e) => setDelayMinutesDraft(e.target.value)}
+                                  placeholder="Delay (min)"
+                                  className="w-28 px-3 py-1.5 border border-[#FDE68A] rounded-lg text-[12.5px] outline-none focus:border-[#D97706] bg-white"
+                                />
+                                <button
+                                  disabled={!delayIssueDraft.trim()}
+                                  onClick={() => saveDelay(o.id, delayIssueDraft.trim(), delayMinutesDraft ? Number(delayMinutesDraft) : null)}
+                                  className="px-3 py-1.5 bg-[#D97706] text-white rounded-lg text-[12px] font-[700] hover:bg-[#B45309] transition-all disabled:opacity-50">
+                                  Save — shows on customer&apos;s tracking page
+                                </button>
+                                <button onClick={() => setEditingDelay(null)}
+                                  className="px-3 py-1.5 border border-[#E5E7EB] rounded-lg text-[12px] font-[600] text-[#374151] hover:bg-white transition-all">
+                                  Cancel
+                                </button>
                               </div>
                             )}
                           </td>

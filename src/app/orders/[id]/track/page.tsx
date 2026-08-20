@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin, Store } from 'lucide-react'
+import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin, Store, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import LiveTrackingMap, { type LatLng } from '@/components/LiveTrackingMap'
@@ -30,6 +30,7 @@ type Order = {
   created_at: string; order_type: string
   delivery_fee: number | null; discount: number | null
   payment_method: string | null; payment_status: string | null
+  delay_issue: string | null; delay_minutes: number | null; delay_reported_at: string | null
   restaurants: { name: string; phone: string | null; address: string | null } | { name: string; phone: string | null; address: string | null }[] | null
   order_items: OrderItem[] | null
 }
@@ -65,7 +66,7 @@ export default function TrackOrderPage() {
   const loadOrder = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, created_at, order_type, delivery_fee, discount, payment_method, payment_status, restaurants(name, phone, address), order_items(name, quantity, price, image_url)')
+      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, created_at, order_type, delivery_fee, discount, payment_method, payment_status, delay_issue, delay_minutes, delay_reported_at, restaurants(name, phone, address), order_items(name, quantity, price, image_url)')
       .eq('id', id)
       .single()
     if (!data) { setNotFound(true); return null }
@@ -187,6 +188,18 @@ export default function TrackOrderPage() {
               <span className="text-[15px] font-[800] text-[#111827]">₹{order.total}</span>
             </div>
           </div>
+
+          {order.delay_issue && !isCancelled && !isDelivered && (
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#92400E] mb-5">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-[700]">
+                  {order.delay_minutes ? `Running about ${order.delay_minutes} min late` : 'Your order is delayed'}
+                </p>
+                <p className="text-[12.5px] mt-0.5">{order.delay_issue}</p>
+              </div>
+            </div>
+          )}
 
           {isCancelled ? (
             <div className="flex items-center gap-2 px-4 py-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-[13px] text-[#DC2626] mb-5">
