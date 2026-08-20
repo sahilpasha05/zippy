@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     // even once trusted — so every <Image> that can render one of those sets
     // `unoptimized` itself instead of relying on a global default.
     remotePatterns: [
-      { protocol: 'https', hostname: 'bpxyweqryjshpclshzzp.supabase.co' },
+      { protocol: 'https', hostname: 'wdvonmzfbwnsluaxjptw.supabase.co' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
   },
