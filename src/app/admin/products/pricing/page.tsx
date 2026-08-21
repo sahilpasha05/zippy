@@ -3,15 +3,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Search, Loader2, CheckCircle, Package } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Category = { id: string; name: string }
 type Product = {

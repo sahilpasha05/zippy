@@ -1,16 +1,13 @@
 'use client'
 
 import { Fragment, useEffect, useState, useCallback } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink, AlertTriangle } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { cn, formatMoney, formatDateTime } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
   pending:          { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6', icon: Clock },

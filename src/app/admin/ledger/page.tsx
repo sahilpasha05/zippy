@@ -1,15 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { Smartphone, Banknote, Clock, ShoppingBag, Loader2 } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Order = {
   id: string; placed_at: string; customer_name: string | null

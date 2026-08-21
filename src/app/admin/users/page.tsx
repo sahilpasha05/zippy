@@ -1,15 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { Search, UserCheck, UserX, Shield, Store, KeyRound, X, Loader2 } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Profile = { id: string; full_name: string | null; email: string | null; role: string | null; created_at: string }
 type Restaurant = { owner_id: string | null; name: string }

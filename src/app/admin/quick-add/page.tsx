@@ -1,14 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { Loader2, CheckCircle, AlertCircle, PlusCircle, Package } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Category = { id: string; name: string }
 type RecentProduct = { id: string; name: string; price: number; mrp: number | null; category_id: string; created_at: string }

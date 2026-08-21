@@ -1,17 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle, UserPlus, UserCheck, UserX, Save, Copy, ExternalLink, Trash2, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import ImageUploadField from '@/components/admin/ImageUploadField'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Restaurant = {
   id: string; name: string; slug: string; cuisine: string[]; description: string

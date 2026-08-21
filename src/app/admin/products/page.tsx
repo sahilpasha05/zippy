@@ -2,16 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { Plus, Search, Trash2, ToggleLeft, ToggleRight, Loader2, CheckCircle, AlertCircle, Package, Flame, X, Star, Save, Calendar, Hash, Tag as TagIcon, IndianRupee } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Category = { id: string; name: string; slug: string }
 type Subcategory = { id: string; category_id: string; name: string }

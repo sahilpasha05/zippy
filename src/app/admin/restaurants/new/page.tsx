@@ -1,17 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { ArrowLeft, Store, Loader2, CheckCircle, AlertCircle, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import ImageUploadField from '@/components/admin/ImageUploadField'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 const CUISINE_OPTIONS = ['Biryani', 'North Indian', 'South Indian', 'Chinese', 'Pizza', 'Burgers', 'Sushi', 'Italian', 'Mexican', 'Mughlai', 'Desserts', 'Healthy', 'Seafood', 'Wraps', 'Sandwiches']
 

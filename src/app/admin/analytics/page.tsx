@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { TrendingUp, ShoppingBag, Store, Users, X, ChevronLeft, ChevronRight, Package, Clock } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
@@ -9,10 +9,7 @@ import { getDailyRevenue, todayKey } from '@/lib/analytics'
 import { removePriceMarkup } from '@/lib/cartPricing'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Order = { id: string; status: string; total: number; placed_at: string; restaurant_id: string | null }
 

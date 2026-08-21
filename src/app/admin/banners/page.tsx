@@ -1,17 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 import { Plus, Trash2, ToggleLeft, ToggleRight, Loader2, AlertCircle, ImageIcon, X, Edit2, Pin } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import ImageUploadField from '@/components/admin/ImageUploadField'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 type Banner = {
   id: string; title: string; subtitle: string | null; image_url: string

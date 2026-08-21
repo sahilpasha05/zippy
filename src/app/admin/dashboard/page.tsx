@@ -1,16 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient } from '@/lib/supabase/client'
 import { Store, ShoppingBag, Users, TrendingUp, ArrowUpRight, Clock, CheckCircle, ChefHat, Truck, XCircle, AlertCircle, Plus, Eye } from 'lucide-react'
 import Link from 'next/link'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
 
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabase = createClient()
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
   pending:          { label: 'Pending',     color: '#6B7280', bg: '#F3F4F6', icon: Clock },
