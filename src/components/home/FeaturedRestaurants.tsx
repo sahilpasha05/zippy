@@ -109,7 +109,7 @@ export default function FeaturedRestaurants() {
       .from('restaurants')
       .select('id, name, slug, cuisine, rating, rating_count, distance, delivery_time, is_open, cover_url, logo_url, min_order')
       .eq('is_active', true)
-      .order('rating', { ascending: false })
+      .order('sort_order', { ascending: true })
       .limit(4)
       .then(({ data }) => {
         if (data) setRestaurants(data as Restaurant[])

@@ -114,7 +114,7 @@ export default function RestaurantsPage() {
       .from('restaurants')
       .select('id, name, slug, cuisine, rating, rating_count, distance, delivery_time, is_open, cover_url, logo_url, min_order, delivery_fee')
       .eq('is_active', true)
-      .order('rating', { ascending: false })
+      .order('sort_order', { ascending: true })
       .then(({ data }) => {
         // Sort is stable, so unlisted restaurants keep the rating order above.
         if (data) setRestaurants([...(data as Restaurant[])].sort((a, b) => displayRank(a.slug) - displayRank(b.slug)))
