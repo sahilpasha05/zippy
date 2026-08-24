@@ -15,8 +15,8 @@ const supabase = createBrowserClient(
 )
 
 // This portal is scoped to a single fixed category — partners add produce only.
-// Points at "Vegetables & Fruits"; the old fruits-only category is retired.
-const PRODUCE_CATEGORY_ID = 'beec9b69-bce0-436c-9d3b-e6260ba88ef4'
+// Points at "Fruits & Vegetables".
+const PRODUCE_CATEGORY_ID = '24a7bbe4-a22b-4dd9-9d05-cd58dacb3a1b'
 
 type Partner = { id: string; name: string; slug: string }
 type Product = {

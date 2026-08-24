@@ -14,9 +14,9 @@ const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Vegetables & Fruits has its own separate partner portal — store partners
+// Fruits & Vegetables has its own separate partner portal — store partners
 // manage every other category.
-const PRODUCE_CATEGORY_ID = 'beec9b69-bce0-436c-9d3b-e6260ba88ef4'
+const PRODUCE_CATEGORY_ID = '24a7bbe4-a22b-4dd9-9d05-cd58dacb3a1b'
 
 type Category = { id: string; name: string }
 type Partner = { id: string; name: string; slug: string }
