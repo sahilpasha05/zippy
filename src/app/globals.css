@@ -182,3 +182,14 @@
 .order-success-pop {
   animation: order-success-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* Two back-to-back copies of the ticker text sit side by side; sliding the
+   pair left by exactly 50% moves the first copy fully off-screen just as
+   the second reaches its start position, so the loop reads as continuous. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 18s linear infinite;
+}
