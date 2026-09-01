@@ -65,11 +65,31 @@ export function useAddresses() {
       setUserId(uid)
       if (uid) loadDbAddresses(uid)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const uid = session?.user?.id ?? null
       setUserId(uid)
-      if (uid) loadDbAddresses(uid)
-      else useDbAddressStore.setState({ addresses: [], selectedId: null, loaded: false })
+      if (uid) {
+        // Migrate anonymous local addresses into the user's account so they
+        // aren't lost when the hook switches to the DB store on sign-in.
+        const localStore = useAddressStore.getState()
+        if (localStore.addresses.length > 0) {
+          const inserts = localStore.addresses.map((a) => ({
+            user_id: uid,
+            label: a.label,
+            full_address: a.address,
+            latitude: a.lat,
+            longitude: a.lng,
+            contact_name: a.contactName || null,
+            contact_phone: a.contactPhone || null,
+            is_default: a.id === localStore.selectedId,
+          }))
+          await supabase.from('addresses').insert(inserts)
+          localStore.clearAddresses()
+        }
+        loadDbAddresses(uid)
+      } else {
+        useDbAddressStore.setState({ addresses: [], selectedId: null, loaded: false })
+      }
     })
     return () => sub.subscription.unsubscribe()
   }, [loadDbAddresses])
