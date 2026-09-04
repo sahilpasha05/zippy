@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink, AlertTriangle } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
@@ -77,6 +77,12 @@ export default function AdminOrdersPage() {
   const [autoAssignPartner, setAutoAssignPartner] = useState('')
   const [autoAssigning, setAutoAssigning] = useState(false)
   const [autoAssignMsg, setAutoAssignMsg] = useState('')
+  const [autoAssignOn, setAutoAssignOn] = useState(false)
+  const autoAssignPartnerRef = useRef('')
+  const [rrPartners, setRrPartners] = useState<string[]>([])
+  const [rrOn, setRrOn] = useState(false)
+  const rrPartnersRef = useRef<string[]>([])
+  const rrIndexRef = useRef(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -113,6 +119,42 @@ export default function AdminOrdersPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [load])
+
+  useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner }, [autoAssignPartner])
+  useEffect(() => { rrPartnersRef.current = rrPartners }, [rrPartners])
+
+  useEffect(() => {
+    if (!autoAssignOn) return
+    const ch = supabase
+      .channel('admin-orders-auto-assign')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
+        const partnerId = autoAssignPartnerRef.current
+        if (!partnerId) return
+        const newOrder = payload.new as { id: string; delivery_partner_id: string | null }
+        if (newOrder.delivery_partner_id) return
+        await supabase.from('orders').update({ delivery_partner_id: partnerId, accepted_at: null, updated_at: new Date().toISOString() }).eq('id', newOrder.id)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [autoAssignOn])
+
+  useEffect(() => {
+    if (!rrOn) return
+    rrIndexRef.current = 0
+    const ch = supabase
+      .channel('admin-orders-round-robin')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
+        const list = rrPartnersRef.current
+        if (!list.length) return
+        const newOrder = payload.new as { id: string; delivery_partner_id: string | null }
+        if (newOrder.delivery_partner_id) return
+        const partnerId = list[rrIndexRef.current % list.length]
+        rrIndexRef.current += 1
+        await supabase.from('orders').update({ delivery_partner_id: partnerId, accepted_at: null, updated_at: new Date().toISOString() }).eq('id', newOrder.id)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [rrOn])
 
   // Lets an admin move an order to a different kitchen, or clear it when the
   // restaurant can't take it — the order itself stays on file either way.
@@ -257,20 +299,56 @@ export default function AdminOrdersPage() {
           </div>
 
           {/* Auto-assign toolbar */}
-          <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl">
-            <Bike className="w-4 h-4 text-[#7C3AED] shrink-0" />
-            <span className="text-[12.5px] text-[#5B21B6] font-medium shrink-0">Auto-assign</span>
+          <div className={cn("flex flex-wrap items-center gap-2 mb-4 p-3 border rounded-xl transition-colors", autoAssignOn ? "bg-[#ECFDF5] border-[#6EE7B7]" : "bg-[#F5F3FF] border-[#DDD6FE]")}>
+            <Bike className={cn("w-4 h-4 shrink-0", autoAssignOn ? "text-[#059669]" : "text-[#7C3AED]")} />
+            <span className={cn("text-[12.5px] font-medium shrink-0", autoAssignOn ? "text-[#065F46]" : "text-[#5B21B6]")}>Auto-assign</span>
             <select value={autoAssignPartner} onChange={(e) => setAutoAssignPartner(e.target.value)}
               className="flex-1 min-w-[160px] sm:max-w-[220px] px-3 py-1.5 border border-[#DDD6FE] rounded-lg text-[12.5px] bg-white outline-none focus:border-[#7C3AED]">
               <option value="">Select delivery partner...</option>
               {partners.filter((p) => p.is_active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={autoAssign} disabled={!autoAssignPartner || autoAssigning}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#7C3AED] text-white text-[12px] font-[600] rounded-lg hover:bg-[#6D28D9] transition-all disabled:opacity-50 shrink-0">
+            <button
+              onClick={() => { if (!autoAssignPartner && !autoAssignOn) return; setAutoAssignOn((v) => !v) }}
+              className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-[600] rounded-lg transition-all shrink-0", autoAssignOn ? "bg-[#059669] text-white hover:bg-[#047857]" : "bg-[#7C3AED] text-white hover:bg-[#6D28D9]", !autoAssignPartner && !autoAssignOn ? "opacity-50 cursor-not-allowed" : "")}>
               <Zap className="w-3.5 h-3.5" />
-              {autoAssigning ? 'Assigning...' : `Assign all ${unassignedCnt}`}
+              {autoAssignOn ? 'ON — new orders auto-assigned' : 'Enable auto-assign'}
+            </button>
+            <button onClick={autoAssign} disabled={!autoAssignPartner || autoAssigning}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 border border-[#DDD6FE] bg-white text-[#5B21B6] text-[12px] font-[600] rounded-lg hover:bg-[#F5F3FF] transition-all disabled:opacity-50 shrink-0">
+              {autoAssigning ? 'Assigning...' : `Assign existing ${unassignedCnt}`}
             </button>
             {autoAssignMsg && <span className="text-[12px] text-[#16A34A] font-medium">{autoAssignMsg}</span>}
+            {autoAssignOn && (
+              <span className="text-[11.5px] text-[#065F46] font-medium w-full">
+                New orders will be assigned to <strong>{partners.find(p => p.id === autoAssignPartner)?.name}</strong> automatically until you turn this off.
+              </span>
+            )}
+          </div>
+
+          {/* Round-robin auto-assign */}
+          <div className={cn("flex flex-wrap items-center gap-2 mb-4 p-3 border rounded-xl transition-colors", rrOn ? "bg-[#FFF7ED] border-[#FED7AA]" : "bg-[#F8FAFC] border-[#E5E7EB]")}>
+            <Bike className={cn("w-4 h-4 shrink-0", rrOn ? "text-[#EA580C]" : "text-[#6B7280]")} />
+            <span className={cn("text-[12.5px] font-medium shrink-0", rrOn ? "text-[#9A3412]" : "text-[#374151]")}>Round-robin</span>
+            <div className="flex flex-wrap gap-1.5 flex-1">
+              {partners.filter((p) => p.is_active).map((p) => (
+                <label key={p.id} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] cursor-pointer select-none transition-colors", rrPartners.includes(p.id) ? "bg-[#EA580C] border-[#EA580C] text-white" : "bg-white border-[#E5E7EB] text-[#374151] hover:border-[#EA580C]")}>
+                  <input type="checkbox" className="sr-only" checked={rrPartners.includes(p.id)}
+                    onChange={(e) => setRrPartners((prev) => e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id))} />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={() => { if (!rrPartners.length && !rrOn) return; setRrOn((v) => !v) }}
+              className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-[600] rounded-lg transition-all shrink-0", rrOn ? "bg-[#EA580C] text-white hover:bg-[#C2410C]" : "bg-[#6B7280] text-white hover:bg-[#4B5563]", !rrPartners.length && !rrOn ? "opacity-50 cursor-not-allowed" : "")}>
+              <Zap className="w-3.5 h-3.5" />
+              {rrOn ? 'ON — distributing' : 'Enable round-robin'}
+            </button>
+            {rrOn && (
+              <span className="text-[11.5px] text-[#9A3412] font-medium w-full">
+                New orders rotating between: <strong>{rrPartners.map((id) => partners.find((p) => p.id === id)?.name).join(' → ')}</strong>
+              </span>
+            )}
           </div>
 
           {/* Re-asks Cashfree about every order still marked unpaid and settles

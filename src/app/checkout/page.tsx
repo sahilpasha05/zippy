@@ -61,8 +61,16 @@ export default function CheckoutPage() {
   }, [])
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(!!session?.user))
+    supabase.auth.getUser().then(({ data }) => {
+      const loggedIn = !!data.user
+      setSignedIn(loggedIn)
+      if (!loggedIn) setShowAuth(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      const loggedIn = !!session?.user
+      setSignedIn(loggedIn)
+      if (loggedIn) setShowAuth(false)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -330,6 +338,16 @@ export default function CheckoutPage() {
 
           <h1 className="text-[28px] font-[800] text-[#111827] mb-8" style={{ fontWeight: 800 }}>Checkout</h1>
 
+          {signedIn === false && (
+            <div className="mb-6 px-4 py-3.5 bg-[#FFF7ED] border border-[#FED7AA] rounded-xl flex items-center gap-3">
+              <span className="text-[13px] text-[#92400E] flex-1">You need to sign in before you can place an order.</span>
+              <button onClick={() => setShowAuth(true)}
+                className="shrink-0 px-4 py-1.5 bg-[#EA580C] text-white text-[12.5px] font-[600] rounded-lg hover:bg-[#C2410C] transition-colors">
+                Sign in
+              </button>
+            </div>
+          )}
+
           {placeError && (
             <div className="mb-6 px-4 py-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-[13px] text-[#DC2626]">
               {placeError}
@@ -363,9 +381,9 @@ export default function CheckoutPage() {
                 ) : addresses.length === 0 ? (
                   <div className="text-center py-6">
                     <p className="text-[13.5px] text-[#6B7280] mb-4">You haven&apos;t saved a delivery address yet.</p>
-                    <button onClick={() => setShowLocationPicker(true)}
+                    <button onClick={() => signedIn ? setShowLocationPicker(true) : setShowAuth(true)}
                       className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#16A34A] text-white text-[13.5px] font-[600] rounded-xl hover:bg-[#15803D] transition-all">
-                      <Plus className="w-4 h-4" /> Add delivery address
+                      <Plus className="w-4 h-4" /> {signedIn ? 'Add delivery address' : 'Sign in to add address'}
                     </button>
                   </div>
                 ) : (
@@ -394,7 +412,7 @@ export default function CheckoutPage() {
                         </button>
                       )
                     })}
-                    <button onClick={() => setShowLocationPicker(true)}
+                    <button onClick={() => signedIn ? setShowLocationPicker(true) : setShowAuth(true)}
                       className="w-full flex items-center justify-center gap-2 py-3 text-[13.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
                       <Plus className="w-4 h-4" /> Add new address
                     </button>
