@@ -64,7 +64,6 @@ export default function CheckoutPage() {
     supabase.auth.getUser().then(({ data }) => {
       const loggedIn = !!data.user
       setSignedIn(loggedIn)
-      if (!loggedIn) setShowAuth(true)
     })
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       const loggedIn = !!session?.user
