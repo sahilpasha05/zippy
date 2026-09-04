@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Star, Clock, ChevronRight, Filter } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -42,14 +42,32 @@ type Restaurant = {
   delivery_fee: number
 }
 
+function RestaurantPlaceholder({ name }: { name: string }) {
+  return (
+    <div className="w-full h-full bg-gradient-to-br from-[#F5F3FF] to-[#EDE9FE] flex items-center justify-center">
+      <span className="text-5xl font-bold text-[#7C3AED] opacity-20">{name[0]?.toUpperCase()}</span>
+    </div>
+  )
+}
+
+function CoverImage({ src, alt, grayscale }: { src: string; alt: string; grayscale: boolean }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <RestaurantPlaceholder name={alt} />
+  return (
+    <Image src={src} alt={alt} fill className={cn('object-cover', grayscale && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw"
+      onError={() => setFailed(true)} />
+  )
+}
+
 function RestaurantCard({ r }: { r: Restaurant }) {
   return (
     <Link href={`/restaurants/${r.slug}`} className={cn('group relative bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden transition-all duration-200 block',
       r.is_open ? 'hover:shadow-zippy hover:border-[#D1D5DB] hover:-translate-y-0.5' : '')}>
       <div className="relative h-44 bg-[#F8FAFC] overflow-hidden">
-        {r.cover_url && (
-          <Image src={r.cover_url} alt={r.name} fill className={cn('object-cover', !r.is_open && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw" />
-        )}
+        {r.cover_url
+          ? <CoverImage src={r.cover_url} alt={r.name} grayscale={!r.is_open} />
+          : <RestaurantPlaceholder name={r.name} />
+        }
         <div className={cn('absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-semibold border', r.is_open ? 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]' : 'bg-white text-[#6B7280] border-[#E5E7EB]')}>
           {r.is_open ? '● Open now' : '○ Closed'}
         </div>

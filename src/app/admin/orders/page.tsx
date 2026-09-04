@@ -74,13 +74,13 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState('All')
   const [lastRefresh, setLastRefresh] = useState(new Date())
-  const [autoAssignPartner, setAutoAssignPartner] = useState('')
+  const [autoAssignPartner, setAutoAssignPartner] = useState(() => { try { return localStorage.getItem('zippy-aa-partner') ?? '' } catch { return '' } })
   const [autoAssigning, setAutoAssigning] = useState(false)
   const [autoAssignMsg, setAutoAssignMsg] = useState('')
-  const [autoAssignOn, setAutoAssignOn] = useState(false)
+  const [autoAssignOn, setAutoAssignOn] = useState(() => { try { return localStorage.getItem('zippy-aa-on') === '1' } catch { return false } })
   const autoAssignPartnerRef = useRef('')
-  const [rrPartners, setRrPartners] = useState<string[]>([])
-  const [rrOn, setRrOn] = useState(false)
+  const [rrPartners, setRrPartners] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('zippy-rr-partners') ?? '[]') } catch { return [] } })
+  const [rrOn, setRrOn] = useState(() => { try { return localStorage.getItem('zippy-rr-on') === '1' } catch { return false } })
   const rrPartnersRef = useRef<string[]>([])
   const rrIndexRef = useRef(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -120,8 +120,10 @@ export default function AdminOrdersPage() {
     return () => { supabase.removeChannel(channel) }
   }, [load])
 
-  useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner }, [autoAssignPartner])
-  useEffect(() => { rrPartnersRef.current = rrPartners }, [rrPartners])
+  useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner; try { localStorage.setItem('zippy-aa-partner', autoAssignPartner) } catch {} }, [autoAssignPartner])
+  useEffect(() => { try { localStorage.setItem('zippy-aa-on', autoAssignOn ? '1' : '0') } catch {} }, [autoAssignOn])
+  useEffect(() => { rrPartnersRef.current = rrPartners; try { localStorage.setItem('zippy-rr-partners', JSON.stringify(rrPartners)) } catch {} }, [rrPartners])
+  useEffect(() => { try { localStorage.setItem('zippy-rr-on', rrOn ? '1' : '0') } catch {} }, [rrOn])
 
   useEffect(() => {
     if (!autoAssignOn) return

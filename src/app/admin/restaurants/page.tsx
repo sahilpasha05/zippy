@@ -17,6 +17,18 @@ type Restaurant = {
   delivery_time: number; min_order: number
 }
 
+function AdminCoverImage({ src, name }: { src: string | null; name: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-[#F5F3FF] to-[#EDE9FE] flex items-center justify-center">
+        <span className="text-3xl font-bold text-[#7C3AED] opacity-30">{name[0]}</span>
+      </div>
+    )
+  }
+  return <Image src={src} alt={name} fill className="object-cover" sizes="400px" onError={() => setFailed(true)} />
+}
+
 export default function AdminRestaurantsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const [loading, setLoading] = useState(true)
@@ -121,13 +133,7 @@ export default function AdminRestaurantsPage() {
                 <div key={r.id} className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm hover:shadow-zippy transition-all group">
                   {/* Cover */}
                   <div className="relative h-32 bg-[#F3F4F6]">
-                    {r.cover_url ? (
-                      <Image src={r.cover_url} alt={r.name} fill className="object-cover" sizes="400px" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#F5F3FF] to-[#EDE9FE] flex items-center justify-center">
-                        <span className="text-3xl font-bold text-[#7C3AED] opacity-30">{r.name[0]}</span>
-                      </div>
-                    )}
+                    <AdminCoverImage src={r.cover_url} name={r.name} />
                     {/* Active toggle */}
                     <div className="absolute top-3 right-3">
                       <button
