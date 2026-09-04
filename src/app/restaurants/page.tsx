@@ -54,7 +54,7 @@ function CoverImage({ src, alt, grayscale }: { src: string; alt: string; graysca
   const [failed, setFailed] = useState(false)
   if (failed) return <RestaurantPlaceholder name={alt} />
   return (
-    <Image src={src} alt={alt} fill className={cn('object-cover', grayscale && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw"
+    <Image src={src} alt={alt} fill unoptimized className={cn('object-cover', grayscale && 'grayscale')} sizes="(max-width: 640px) 100vw, 50vw"
       onError={() => setFailed(true)} />
   )
 }

@@ -26,7 +26,7 @@ function AdminCoverImage({ src, name }: { src: string | null; name: string }) {
       </div>
     )
   }
-  return <Image src={src} alt={name} fill className="object-cover" sizes="400px" onError={() => setFailed(true)} />
+  return <Image src={src} alt={name} fill unoptimized className="object-cover" sizes="400px" onError={() => setFailed(true)} />
 }
 
 export default function AdminRestaurantsPage() {
