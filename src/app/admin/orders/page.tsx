@@ -128,7 +128,7 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     if (!autoAssignOn) return
     const ch = supabase
-      .channel('admin-orders-auto-assign')
+      .channel(`admin-orders-auto-assign-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
         const partnerId = autoAssignPartnerRef.current
         if (!partnerId) return
@@ -144,7 +144,7 @@ export default function AdminOrdersPage() {
     if (!rrOn) return
     rrIndexRef.current = 0
     const ch = supabase
-      .channel('admin-orders-round-robin')
+      .channel(`admin-orders-round-robin-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
         const list = rrPartnersRef.current
         if (!list.length) return
