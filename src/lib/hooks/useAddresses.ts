@@ -1,0 +1,163 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useAddressStore, type SavedAddress } from '@/lib/store/address'
+import { useDbAddressStore } from '@/lib/store/dbAddresses'
+
+type DbAddressRow = {
+  id: string
+  label: string
+  full_address: string
+  latitude: number | null
+  longitude: number | null
+  contact_name: string | null
+  contact_phone: string | null
+  is_default: boolean | null
+}
+
+function fromDbRow(row: DbAddressRow): SavedAddress {
+  return {
+    id: row.id,
+    label: row.label,
+    address: row.full_address,
+    lat: row.latitude,
+    lng: row.longitude,
+    contactName: row.contact_name ?? '',
+    contactPhone: row.contact_phone ?? '',
+  }
+}
+
+// Logged-in users get addresses stored per-account in Supabase (private, persists
+// across devices). Logged-out users keep the existing anonymous localStorage
+// behavior (useAddressStore) unchanged — this hook picks the source based on
+// auth state so LocationPicker/Navbar/checkout don't need to know which is active.
+export function useAddresses() {
+  const [userId, setUserId] = useState<string | null | undefined>(undefined) // undefined = not checked yet
+  const [localHydrated, setLocalHydrated] = useState(false)
+
+  const local = useAddressStore()
+  // Selector reads so this component only re-renders when the field it
+  // actually uses changes — writes below go through the store directly
+  // (not through these), so this hook's own callbacks never need `db` in
+  // their dependency arrays (that would re-subscribe/refetch on every write).
+  const dbAddresses = useDbAddressStore((s) => s.addresses)
+  const dbSelectedId = useDbAddressStore((s) => s.selectedId)
+  const dbLoaded = useDbAddressStore((s) => s.loaded)
+
+  const loadDbAddresses = useCallback(async (uid: string) => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('addresses')
+      .select('id, label, full_address, latitude, longitude, contact_name, contact_phone, is_default')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+
+    const rows = (data as DbAddressRow[] | null) ?? []
+    const def = rows.find((r) => r.is_default) ?? rows[0]
+    useDbAddressStore.setState({ addresses: rows.map(fromDbRow), selectedId: def?.id ?? null, loaded: true })
+  }, [])
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id ?? null
+      setUserId(uid)
+      if (uid) loadDbAddresses(uid)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const uid = session?.user?.id ?? null
+      setUserId(uid)
+      if (uid) {
+        // Migrate anonymous local addresses into the user's account so they
+        // aren't lost when the hook switches to the DB store on sign-in.
+        const localStore = useAddressStore.getState()
+        if (localStore.addresses.length > 0) {
+          const inserts = localStore.addresses.map((a) => ({
+            user_id: uid,
+            label: a.label,
+            full_address: a.address,
+            latitude: a.lat,
+            longitude: a.lng,
+            contact_name: a.contactName || null,
+            contact_phone: a.contactPhone || null,
+            is_default: a.id === localStore.selectedId,
+          }))
+          await supabase.from('addresses').insert(inserts)
+          localStore.clearAddresses()
+        }
+        loadDbAddresses(uid)
+      } else {
+        useDbAddressStore.setState({ addresses: [], selectedId: null, loaded: false })
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [loadDbAddresses])
+
+  useEffect(() => {
+    if (userId === null) {
+      useAddressStore.persist.rehydrate()
+      setLocalHydrated(true)
+    }
+  }, [userId])
+
+  const addAddress = useCallback(async (a: Omit<SavedAddress, 'id'>) => {
+    if (userId) {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('addresses')
+        .insert({
+          user_id: userId,
+          label: a.label,
+          full_address: a.address,
+          latitude: a.lat,
+          longitude: a.lng,
+          contact_name: a.contactName || null,
+          contact_phone: a.contactPhone || null,
+          is_default: true,
+        })
+        .select('id, label, full_address, latitude, longitude, contact_name, contact_phone, is_default')
+        .single()
+      if (error || !data) throw error ?? new Error('Failed to save address')
+
+      await supabase.from('addresses').update({ is_default: false }).eq('user_id', userId).neq('id', data.id)
+
+      const saved = fromDbRow(data as DbAddressRow)
+      useDbAddressStore.setState((s) => ({ addresses: [saved, ...s.addresses], selectedId: saved.id }))
+      return saved
+    }
+    return local.addAddress(a)
+  }, [userId, local])
+
+  const removeAddress = useCallback(async (id: string) => {
+    if (userId) {
+      const supabase = createClient()
+      await supabase.from('addresses').delete().eq('id', id).eq('user_id', userId)
+      useDbAddressStore.setState((s) => {
+        const remaining = s.addresses.filter((x) => x.id !== id)
+        return { addresses: remaining, selectedId: s.selectedId === id ? (remaining[0]?.id ?? null) : s.selectedId }
+      })
+      return
+    }
+    local.removeAddress(id)
+  }, [userId, local])
+
+  const selectAddress = useCallback(async (id: string) => {
+    if (userId) {
+      // Optimistic — every open useAddresses() consumer (checkout,
+      // LocationPicker, Navbar) shares this store, so the checkout button
+      // unlocks immediately instead of waiting on a reload to refetch.
+      useDbAddressStore.setState({ selectedId: id })
+      const supabase = createClient()
+      await supabase.from('addresses').update({ is_default: false }).eq('user_id', userId)
+      await supabase.from('addresses').update({ is_default: true }).eq('id', id).eq('user_id', userId)
+      return
+    }
+    local.selectAddress(id)
+  }, [userId, local])
+
+  if (userId) {
+    return { addresses: dbAddresses, selectedId: dbSelectedId, addAddress, removeAddress, selectAddress, ready: dbLoaded }
+  }
+  return { addresses: local.addresses, selectedId: local.selectedId, addAddress, removeAddress, selectAddress, ready: userId === null && localHydrated }
+}

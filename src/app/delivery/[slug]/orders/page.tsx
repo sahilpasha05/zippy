@@ -1,0 +1,782 @@
+'use client'
+
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useParams } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
+import { format, isToday, isYesterday } from 'date-fns'
+import Link from 'next/link'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, Filter } from 'lucide-react'
+import { cn, toLocalDateInput } from '@/lib/utils'
+import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
+import LiveTrackingMap from '@/components/LiveTrackingMap'
+
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
+  confirmed:        { label: 'Confirmed',   color: '#0891B2', bg: '#ECFEFF', icon: AlertCircle },
+  preparing:        { label: 'Preparing',   color: '#D97706', bg: '#FFFBEB', icon: ChefHat },
+  out_for_delivery: { label: 'Out for delivery', color: '#7C3AED', bg: '#F5F3FF', icon: Truck },
+  delivered:        { label: 'Delivered',   color: '#16A34A', bg: '#DCFCE7', icon: CheckCircle },
+  cancelled:        { label: 'Cancelled',   color: '#DC2626', bg: '#FEF2F2', icon: XCircle },
+}
+
+type Partner = { id: string; name: string; slug: string; vehicle_type: string | null; total_deliveries: number | null }
+type OrderItem = { name: string; quantity: number; price: number }
+type Order = {
+  id: string; status: string; total: number; customer_name: string | null
+  customer_phone: string | null; address: string | null; placed_at: string
+  delivery_latitude: number | null; delivery_longitude: number | null
+  accepted_at: string | null
+  online_amount: number | null; cod_amount: number | null
+  payment_status: string | null; cash_collected_at: string | null; delivered_at: string | null
+  order_items: OrderItem[]
+  restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
+}
+
+function timeAgo(d: string) {
+  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  return `${Math.floor(m / 60)}h ago`
+}
+
+function restName(o: Order) {
+  if (!o.restaurants) return 'Zippy Mart'
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.name : o.restaurants.name
+}
+function restAddress(o: Order) {
+  if (!o.restaurants) return null
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.address : o.restaurants.address
+}
+function restPhone(o: Order) {
+  if (!o.restaurants) return null
+  return Array.isArray(o.restaurants) ? o.restaurants[0]?.phone ?? null : o.restaurants.phone
+}
+
+
+// What the rider must actually take at the door. A split order only leaves the
+// cash half outstanding once the online half has really been received — if that
+// payment never completed, the whole total is still owed, and telling the rider
+// to collect only the cash half hands the difference away.
+function amountToCollect(o: { total: number; online_amount: number | null; cod_amount: number | null; payment_status: string | null; cash_collected_at: string | null }) {
+  const onlinePaid = ['partially_paid', 'paid'].includes(o.payment_status ?? '') ? Number(o.online_amount ?? 0) : 0
+  const cashPaid = (o.payment_status === 'paid' || o.cash_collected_at) ? Number(o.cod_amount ?? 0) : 0
+  return Math.max(0, Number(o.total) - onlinePaid - cashPaid)
+}
+
+function onlineSettled(o: { online_amount: number | null; payment_status: string | null }) {
+  return (o.online_amount ?? 0) > 0 && ['partially_paid', 'paid'].includes(o.payment_status ?? '')
+}
+
+function dayLabel(dateKey: string) {
+  const d = new Date(`${dateKey}T00:00:00`)
+  if (isToday(d)) return 'Today'
+  if (isYesterday(d)) return 'Yesterday'
+  return format(d, 'EEEE, d MMM')
+}
+
+// Buckets orders by the rider's local day, most recent day first. Orders
+// within a day keep whatever relative order they already had (e.g. unaccepted
+// ones floated to the top), so grouping never reorders the underlying list —
+// it only adds headers over it.
+function groupByDay(list: Order[], dateOf: (o: Order) => string) {
+  // Plain object, not `Map` — lucide-react's `Map` icon is imported into this
+  // file's scope and shadows the global Map constructor.
+  const buckets: Record<string, Order[]> = {}
+  for (const o of list) {
+    const key = toLocalDateInput(dateOf(o))
+    ;(buckets[key] ??= []).push(o)
+  }
+  return Object.entries(buckets).sort((a, b) => b[0].localeCompare(a[0]))
+}
+
+// Drag-to-confirm — a plain tap can happen by accident in a pocket or while
+// riding; requiring a deliberate full-width drag makes "mark delivered"
+// something the rider has to actually mean, with no camera step at all.
+function SlideToDeliver({ busy, onComplete }: { busy: boolean; onComplete: () => void }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const maxXRef = useRef(0)
+  const startXRef = useRef(0)
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [completed, setCompleted] = useState(false)
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (busy || completed) return
+    const track = trackRef.current
+    if (!track) return
+    maxXRef.current = track.clientWidth - 56
+    startXRef.current = e.clientX - dragX
+    setDragging(true)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return
+    setDragX(Math.min(Math.max(0, e.clientX - startXRef.current), maxXRef.current))
+  }
+  function onPointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    if (maxXRef.current > 0 && dragX >= maxXRef.current * 0.85) {
+      setDragX(maxXRef.current)
+      setCompleted(true)
+      onComplete()
+    } else {
+      setDragX(0)
+    }
+  }
+
+  return (
+    <div ref={trackRef} className="relative h-14 rounded-full bg-[#DCFCE7] overflow-hidden select-none touch-none">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-14">
+        <span className="text-[13px] font-[700] text-[#15803D]">
+          {busy ? 'Marking delivered…' : completed ? 'Delivered!' : 'Slide to Mark as Delivered'}
+        </span>
+      </div>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        style={{ transform: `translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 200ms ease' }}
+        className="absolute left-1 top-1 w-12 h-12 rounded-full bg-[#16A34A] flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing"
+      >
+        {busy || completed
+          ? <CheckCircle className="w-5 h-5 text-white" />
+          : <ChevronRight className="w-5 h-5 text-white" />}
+      </div>
+    </div>
+  )
+}
+
+export default function DeliveryOrdersPage() {
+  const { slug } = useParams<{ slug: string }>()
+  const [partner, setPartner] = useState<Partner | null>(null)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'active' | 'pending' | 'delivered'>('active')
+  const [search, setSearch] = useState('')
+  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
+  const [soundOn, setSoundOn] = useState(true)
+  const [newOrderFlash, setNewOrderFlash] = useState(false)
+  const soundOnRef = useRef(true)
+  soundOnRef.current = soundOn
+  const [sharingLocation, setSharingLocation] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const watchIdRef = useRef<number | null>(null)
+  const lastSentRef = useRef(0)
+  const partnerIdRef = useRef<string | null>(null)
+  const [pendingAccept, setPendingAccept] = useState<Order[]>([])
+  const pendingAcceptRef = useRef<Order[]>([])
+  // Orders already announced, so an unrelated update to the same row doesn't re-ring.
+  const announcedRef = useRef<Set<string>>(new Set())
+  pendingAcceptRef.current = pendingAccept
+  const [mapOrder, setMapOrder] = useState<Order | null>(null)
+  const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
+  const [deliveringBusy, setDeliveringBusy] = useState(false)
+  const [deliverError, setDeliverError] = useState('')
+  const [slideAttempt, setSlideAttempt] = useState(0)
+
+  const loadOrders = useCallback(async (partnerId: string) => {
+    const { data } = await supabase
+      .from('orders')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, online_amount, cod_amount, payment_status, cash_collected_at, order_items(name, quantity, price), restaurants(name, address, phone)')
+      .eq('delivery_partner_id', partnerId)
+      // Most recently assigned first — admin stamps updated_at when it assigns,
+      // so a re-assignment brings the order back to the top of this board.
+      .order('updated_at', { ascending: false })
+      .order('placed_at', { ascending: false })
+      // A rider can hold well past 50 orders — capping here meant an order
+      // assigned from admin simply never appeared on their board.
+      .limit(500)
+    const raw = (data as unknown as Order[]) ?? []
+    // Anything still awaiting acceptance floats above the rest.
+    const fetched = [...raw].sort((a, b) => Number(!!a.accepted_at) - Number(!!b.accepted_at))
+    setOrders(fetched)
+    const pending = fetched.filter((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status))
+    setPendingAccept(pending)
+    // Authoritative: if the server says nothing is waiting to be accepted, the
+    // alarm has nothing to ring about. Guarantees it stops after an accept even
+    // if some other path started it.
+    if (pending.length === 0) stopAlarm()
+    return fetched
+  }, [])
+
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+    let pollId: ReturnType<typeof setInterval> | null = null
+
+    // The board used to rely entirely on the realtime socket. On a phone that
+    // socket drops whenever the app is backgrounded or the network switches
+    // between wifi and data, and nothing ever reconnected the data — the board
+    // silently froze on whatever it had loaded. These refresh it regardless.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && partnerIdRef.current) {
+        loadOrders(partnerIdRef.current)
+      }
+    }
+
+    async function init() {
+      const { data: p } = await supabase.from('delivery_partners')
+        .select('id, name, slug, vehicle_type, total_deliveries')
+        .eq('slug', slug).single()
+      if (!p || cancelled) { setLoading(false); return }
+      setPartner(p as Partner)
+      partnerIdRef.current = p.id
+      const fetched = await loadOrders(p.id)
+      setLoading(false)
+      startLocationSharing() // auto-share — the rider just needs to allow the permission prompt
+
+      const hasPendingOnLoad = fetched.some((o) => o.accepted_at === null && !['delivered', 'cancelled'].includes(o.status))
+      if (hasPendingOnLoad && soundOnRef.current) startAlarm()
+
+      channel = supabase
+        .channel(`delivery-orders-${p.id}-${Date.now()}`)
+        .on('postgres_changes', {
+          event: '*', schema: 'public', table: 'orders',
+          filter: `delivery_partner_id=eq.${p.id}`,
+        }, (payload) => {
+          // Don't test payload.old: Postgres only ships the previous values of
+          // REPLICA IDENTITY columns (the primary key by default), so
+          // old.delivery_partner_id is undefined on every update — which made
+          // `old.delivery_partner_id !== p.id` true even for the rider's own
+          // "accepted_at" write, restarting the alarm the instant they accepted.
+          // Ring on what the row now says instead: still unaccepted and live.
+          const row = payload.new as { id?: string; accepted_at?: string | null; status?: string } | undefined
+          const rowId = row?.id
+          const awaitingAccept = !!row && row.accepted_at == null
+            && !['delivered', 'cancelled'].includes(row.status ?? '')
+          if (awaitingAccept && rowId && !announcedRef.current.has(rowId)) {
+            announcedRef.current.add(rowId)
+            if (soundOnRef.current) startAlarm('New delivery')
+            setNewOrderFlash(true)
+            setTimeout(() => setNewOrderFlash(false), 4000)
+          }
+          loadOrders(p.id)
+          // Replication can trail the notification by a moment; a single retry
+          // stops an assignment ringing without ever landing on the board.
+          setTimeout(() => loadOrders(p.id), 1500)
+        })
+        .subscribe()
+
+      // Cheap safety net: a periodic reload, plus one whenever the rider comes
+      // back to the tab or the connection returns.
+      pollId = setInterval(() => { if (partnerIdRef.current) loadOrders(partnerIdRef.current) }, 30000)
+      document.addEventListener('visibilitychange', onVisible)
+      window.addEventListener('online', onVisible)
+      window.addEventListener('focus', onVisible)
+    }
+    init()
+
+    return () => {
+      cancelled = true
+      if (pollId) clearInterval(pollId)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
+      window.removeEventListener('focus', onVisible)
+      if (channel) supabase.removeChannel(channel)
+      stopAlarm()
+    }
+  }, [slug, loadOrders])
+
+  // Stop the GPS watcher if the tab closes while sharing is on
+  useEffect(() => {
+    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current) }
+  }, [])
+
+  // Browsers block audio without a prior user gesture — if a ring was already due on
+  // load (see init() above), the very first tap anywhere unlocks it and retries.
+  // The retry is deferred because pointerdown precedes click: if that first tap
+  // is the Accept button itself, checking synchronously would still see the
+  // order as pending and restart the alarm the rider is dismissing.
+  useEffect(() => {
+    function unlockOnFirstTap() {
+      unlockAudio()
+      setTimeout(() => {
+        if (pendingAcceptRef.current.length > 0 && soundOnRef.current) startAlarm('New delivery')
+      }, 400)
+    }
+    document.addEventListener('pointerdown', unlockOnFirstTap, { once: true })
+    return () => document.removeEventListener('pointerdown', unlockOnFirstTap)
+  }, [pendingAccept.length])
+
+  function startLocationSharing() {
+    if (watchIdRef.current !== null) return // already sharing
+    if (!navigator.geolocation) { setLocationError('Geolocation not supported on this device'); return }
+    setLocationError('')
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now()
+        if (now - lastSentRef.current < 4000) return // throttle writes to ~1 per 4s
+        lastSentRef.current = now
+        const id = partnerIdRef.current
+        if (!id) return
+        supabase.from('delivery_partners').update({
+          current_latitude: pos.coords.latitude,
+          current_longitude: pos.coords.longitude,
+          last_location_at: new Date().toISOString(),
+        }).eq('id', id).then()
+      },
+      (err) => setLocationError(err.message || 'Could not access location'),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    )
+    setSharingLocation(true)
+  }
+
+  function acceptOrder(orderId: string) {
+    setPendingAccept((prev) => {
+      const next = prev.filter((o) => o.id !== orderId)
+      announcedRef.current.delete(orderId)
+      if (next.length === 0) stopAlarm()
+      return next
+    })
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, accepted_at: new Date().toISOString() } : o))
+    supabase.from('orders').update({ accepted_at: new Date().toISOString() }).eq('id', orderId).then()
+  }
+
+  // Only the orders that actually hand over cash also settle the payment
+  // and stamp the cash-collection time — no photo involved anywhere here.
+  async function completeDelivery(orderId: string) {
+    setDeliveringBusy(true)
+    setDeliverError('')
+    try {
+      const now = new Date().toISOString()
+      const order = orders.find((o) => o.id === orderId)
+      const collectsCash = order ? amountToCollect(order) > 0 : false
+      // If the online leg was never confirmed by Cashfree (payment_status still
+      // pending/failed), the rider just collected the ENTIRE total in cash —
+      // amountToCollect() already accounts for that. Reclassify online_amount
+      // into cod_amount so the admin dashboard reports it as cash, not as a
+      // UPI payment that never actually went through Cashfree.
+      const onlineWasConfirmed = order ? ['partially_paid', 'paid'].includes(order.payment_status ?? '') : false
+
+      const { error } = await supabase.from('orders').update({
+        status: 'delivered',
+        delivered_at: now,
+        ...(collectsCash ? {
+          payment_status: 'paid',
+          cash_collected_at: now,
+          ...(order && !onlineWasConfirmed ? { online_amount: 0, cod_amount: order.total } : {}),
+        } : {}),
+      }).eq('id', orderId)
+      if (error) throw error
+
+      if (partner) {
+        await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
+        setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
+      }
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'delivered' } : o))
+      setDeliveringBusy(false)
+      setTimeout(() => setConfirmingDelivery(null), 700)
+    } catch (err: unknown) {
+      setDeliveringBusy(false)
+      setDeliverError(err instanceof Error ? err.message : 'Could not mark delivered. Please try again.')
+      setSlideAttempt((n) => n + 1)
+    }
+  }
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-[#7C3AED] animate-spin" />
+    </div>
+  )
+
+  if (!partner) return (
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <p className="text-[15px] text-[#374151]">Delivery partner not found</p>
+    </div>
+  )
+
+  const activeOrders = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
+  // Not yet picked up: still with the kitchen, or assigned but not accepted.
+  const pendingOrders = activeOrders.filter((o) => !o.accepted_at || ['pending', 'confirmed', 'preparing'].includes(o.status))
+  const deliveredOrders = orders.filter((o) => o.status === 'delivered')
+
+  const q = search.trim().toLowerCase()
+  const matches = (o: Order) => !q || [
+    o.id.slice(0, 8), o.customer_name ?? '', o.customer_phone ?? '', o.address ?? '', restName(o) ?? '',
+  ].some((f) => f.toLowerCase().includes(q))
+
+  // Delivered orders group by when they were delivered; active/pending ones
+  // by when they were placed — a still-open order keeps no delivered_at yet.
+  const dateOf = (o: Order) => tab === 'delivered' ? (o.delivered_at ?? o.placed_at) : o.placed_at
+  const matchesDate = (o: Order) => !dateFilter || toLocalDateInput(dateOf(o)) === dateFilter
+
+  const shown = (tab === 'active' ? activeOrders : tab === 'pending' ? pendingOrders : deliveredOrders)
+    .filter(matches)
+    .filter(matchesDate)
+
+  const dayGroups = groupByDay(shown, dateOf)
+
+  // The at-a-glance card tracks whatever day is selected above (today by
+  // default), so it's a real per-day record the rider can look back on via
+  // the calendar — not just a number that resets and is lost at midnight.
+  // Clearing the filter rolls it up to an all-time total instead.
+  const deliveredForStats = orders.filter((o) => o.status === 'delivered'
+    && (!dateFilter || toLocalDateInput(o.delivered_at ?? o.placed_at) === dateFilter))
+  const collectedForStats = deliveredForStats.reduce((sum, o) => sum + Number(o.cod_amount ?? 0), 0)
+  const statsLabel = dateFilter ? dayLabel(dateFilter).toLowerCase() : 'all time'
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* Header */}
+      <div className="bg-white border-b border-[#E5E7EB] sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-[#F5F3FF] rounded-xl flex items-center justify-center">
+                <Bike className="w-5 h-5 text-[#7C3AED]" />
+              </div>
+              <div>
+                <h1 className="text-[15px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>{partner.name}</h1>
+                <p className="text-[11.5px] text-[#9CA3AF] capitalize">{partner.vehicle_type ?? 'Rider'} · {partner.total_deliveries ?? 0} delivered</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={`/delivery/${slug}/analytics`}
+                title="Analytics"
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#E5E7EB] text-[#9CA3AF] hover:text-[#7C3AED] hover:border-[#DDD6FE] transition-all">
+                <BarChart3 className="w-4 h-4" />
+              </Link>
+              <button
+                onClick={startLocationSharing}
+                title={sharingLocation ? 'Sharing your live location with customers' : locationError || 'Tap to allow location sharing'}
+                className={cn('w-9 h-9 flex items-center justify-center rounded-xl border transition-all',
+                  sharingLocation ? 'bg-[#F5F3FF] border-[#DDD6FE] text-[#7C3AED]' : locationError ? 'bg-[#FEF2F2] border-[#FECACA] text-[#DC2626]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
+                <Navigation className={cn('w-4 h-4', sharingLocation && 'animate-pulse')} />
+              </button>
+              <button
+                onClick={() => { unlockAudio(); if (soundOn) stopAlarm(); setSoundOn(!soundOn) }}
+                className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-[600] border transition-all',
+                  soundOn ? 'bg-[#F0FDF4] border-[#BBF7D0] text-[#15803D]' : 'bg-[#F3F4F6] border-[#E5E7EB] text-[#9CA3AF]')}>
+                {soundOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              <a href="/" className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#E5E7EB] text-[#9CA3AF] hover:text-[#DC2626] hover:border-[#FECACA] transition-all">
+                <LogOut className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+          {locationError && <p className="text-[11.5px] text-[#DC2626] mb-3">{locationError} — tap the location icon to retry</p>}
+
+          {newOrderFlash && (
+            <div className="mb-3 flex items-center gap-2 px-4 py-2.5 bg-[#7C3AED] rounded-xl animate-pulse">
+              <BellRing className="w-4 h-4 text-white" />
+              <span className="text-[13px] font-[700] text-white">New delivery assigned!</span>
+            </div>
+          )}
+
+          {/* A per-day record, not a live-only snapshot — it tracks whichever
+              day is selected below (today by default), so switching the date
+              re-opens that day's own totals instead of losing them at midnight. */}
+          <div className="grid grid-cols-3 gap-2 mb-2.5">
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#15803D] leading-none">{deliveredForStats.length}</p>
+              <p className="text-[10.5px] text-[#15803D]/70 mt-1">delivered {statsLabel}</p>
+            </div>
+            <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
+              <p className="text-[10.5px] text-[#6D28D9]/70 mt-1">still to deliver</p>
+            </div>
+            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2">
+              <p className="text-[17px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
+              <p className="text-[10.5px] text-[#B45309]/70 mt-1">cash collected {statsLabel}</p>
+            </div>
+          </div>
+
+          <div className="relative mb-2.5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search order, name, phone or address"
+              className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex gap-1.5">
+            <button onClick={() => setTab('active')}
+              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+                tab === 'active' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
+              Active ({activeOrders.length})
+            </button>
+            <button onClick={() => setTab('pending')}
+              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+                tab === 'pending' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
+              Pending ({pendingOrders.length})
+            </button>
+            <button onClick={() => setTab('delivered')}
+              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+                tab === 'delivered' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
+              Delivered ({deliveredOrders.length})
+            </button>
+          </div>
+
+          {/* Defaults to today; the calendar is how the rider reaches older
+              orders instead of scrolling a list spanning every day they've
+              ever ridden. Clearing it goes back to every day, grouped. */}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <div className="relative flex-1">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
+              />
+              {dateFilter && (
+                <button onClick={() => setDateFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {dateFilter !== toLocalDateInput(new Date().toISOString()) && (
+              <button onClick={() => setDateFilter(toLocalDateInput(new Date().toISOString()))}
+                className="px-3 py-2 rounded-xl text-[12.5px] font-[600] border border-[#E5E7EB] text-[#374151] hover:border-[#D1D5DB] transition-all whitespace-nowrap">
+                Today
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Orders */}
+      <div className="max-w-2xl mx-auto p-4 space-y-3">
+        {shown.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-24 text-[#9CA3AF]">
+            <Truck className="w-12 h-12" strokeWidth={1} />
+            <p className="text-[15px] font-semibold text-[#374151]">
+              {search
+                ? 'Nothing matches that search'
+                : dateFilter
+                  ? `No ${tab} orders on ${dayLabel(dateFilter).toLowerCase()}`
+                  : tab === 'active' ? 'No deliveries right now' : tab === 'pending' ? 'Nothing waiting to be picked up' : 'No deliveries yet'}
+            </p>
+            {tab === 'active' && !dateFilter && <p className="text-[13px]">New assignments from admin will show up here instantly.</p>}
+            {dateFilter && <p className="text-[13px]">Pick another date above, or clear it to see every day.</p>}
+          </div>
+        ) : (
+          dayGroups.map(([dateKey, dayOrders]) => (
+            <div key={dateKey} className="space-y-3">
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11.5px] font-[700] text-[#6B7280] uppercase tracking-wide">{dayLabel(dateKey)}</span>
+                <span className="text-[11px] text-[#9CA3AF]">({dayOrders.length})</span>
+                <div className="flex-1 h-px bg-[#E5E7EB]" />
+              </div>
+              {dayOrders.map((o) => {
+                const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.confirmed
+                const Icon = cfg.icon
+                const isReady = o.status === 'out_for_delivery'
+                return (
+              <div key={o.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', isReady ? 'border-[#7C3AED]' : 'border-[#E5E7EB]')}>
+                {isReady && (
+                  <div className="bg-[#F5F3FF] px-4 py-2 flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-[#7C3AED]" />
+                    <span className="text-[11.5px] font-semibold text-[#5B21B6]">Ready for pickup</span>
+                  </div>
+                )}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <span className="text-[13px] font-mono font-bold text-[#374151]">{o.id.slice(0,8).toUpperCase()}</span>
+                      <p className="text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</p>
+                    </div>
+                    <span className="text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: cfg.bg, color: cfg.color }}>
+                      <Icon className="w-3 h-3" /> {cfg.label}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div className="flex items-start gap-2 text-[12.5px]">
+                      <MapPin className="w-3.5 h-3.5 text-[#7C3AED] mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-[600] text-[#111827]">Pickup: {restName(o)}</p>
+                          {restPhone(o) && (
+                            <a href={`tel:${restPhone(o)}`} className="text-[11px] font-[600] text-[#7C3AED] hover:underline shrink-0">Call restaurant</a>
+                          )}
+                        </div>
+                        {restAddress(o) && <p className="text-[#6B7280]">{restAddress(o)}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 text-[12.5px]">
+                      <MapPin className="w-3.5 h-3.5 text-[#16A34A] mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-[600] text-[#111827]">Drop: {o.customer_name ?? 'Customer'}</p>
+                        {o.address && <p className="text-[#6B7280]">{o.address}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {o.order_items?.length > 0 && (
+                    <div className="mb-3 space-y-1">
+                      <p className="flex items-center gap-1.5 text-[10.5px] font-[600] text-[#9CA3AF] uppercase tracking-wide"><Package className="w-3 h-3" /> Items</p>
+                      {o.order_items.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-[12px] text-[#374151]">
+                          <span>{item.name} × {item.quantity}</span>
+                          <span className="font-[600]">₹{item.price * item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* The rider has to know what has already been received, or they
+                      will collect the cash half of a split order whose online half
+                      never went through. */}
+                  {!['delivered', 'cancelled'].includes(o.status) && (
+                    <div className={cn('flex items-center gap-2 rounded-xl px-3 py-2 mb-3 text-[12px] font-[600]',
+                      amountToCollect(o) > 0 ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#DCFCE7] text-[#15803D]')}>
+                      <span>
+                        {amountToCollect(o) > 0
+                          ? <>Collect <strong>₹{amountToCollect(o)}</strong> from the customer</>
+                          : <>Fully paid — collect nothing</>}
+                      </span>
+                      <span className="ml-auto text-[11px] font-[500] opacity-80">
+                        {onlineSettled(o)
+                          ? `₹${o.online_amount} received online`
+                          : (o.online_amount ?? 0) > 0
+                            ? 'online payment not received'
+                            : 'cash on delivery'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-[14px] font-[800] text-[#111827]">₹{o.total}</span>
+                      {o.customer_phone && (
+                        <a href={`tel:${o.customer_phone}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                          <Phone className="w-3.5 h-3.5" /> Call
+                        </a>
+                      )}
+                      {o.delivery_latitude && o.delivery_longitude && (
+                        <>
+                          <button onClick={() => setMapOrder(o)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                            <Map className="w-3.5 h-3.5" /> Map
+                          </button>
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                            <Navigation className="w-3.5 h-3.5" /> Go to
+                          </a>
+                        </>
+                      )}
+                    </div>
+                    {isReady && (
+                      <button onClick={() => { setConfirmingDelivery(o); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
+                        title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then mark delivered` : 'Mark this order delivered'}
+                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)]">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        {amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}
+                      </button>
+                    )}
+                    {!isReady && o.status !== 'delivered' && (
+                      <span className="text-[11.5px] text-[#9CA3AF]">Waiting on restaurant</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+                )
+              })}
+            </div>
+          ))
+        )}
+      </div>
+
+      {pendingAccept[0] && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center">
+            <div className="w-16 h-16 bg-[#F5F3FF] rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+              <BellRing className="w-8 h-8 text-[#7C3AED]" />
+            </div>
+            <h2 className="text-[19px] font-[800] text-[#111827] mb-1">New Delivery!</h2>
+            <p className="text-[13px] text-[#6B7280] mb-4">{restName(pendingAccept[0])} · pickup for {pendingAccept[0].customer_name ?? 'a customer'}</p>
+            <div className="bg-[#F8FAFC] rounded-2xl p-4 mb-5 text-left space-y-1.5">
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Order ID</span>
+                <span className="font-mono font-[700] text-[#111827]">{pendingAccept[0].id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Total</span>
+                <span className="font-[800] text-[#111827]">₹{pendingAccept[0].total}</span>
+              </div>
+              <div className="flex justify-between text-[13px]">
+                <span className="text-[#6B7280]">Items</span>
+                <span className="text-[#111827]">{pendingAccept[0].order_items?.length ?? 0}</span>
+              </div>
+              {pendingAccept[0].address && (
+                <div className="flex justify-between text-[13px] gap-3">
+                  <span className="text-[#6B7280] shrink-0">Drop address</span>
+                  <span className="text-[#111827] text-right line-clamp-2">{pendingAccept[0].address}</span>
+                </div>
+              )}
+            </div>
+            <button onClick={() => acceptOrder(pendingAccept[0].id)}
+              className="w-full py-3.5 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(22,163,74,0.35)]">
+              Accept Delivery
+            </button>
+            <p className="text-[11px] text-[#9CA3AF] mt-3">
+              {pendingAccept.length > 1 ? `The alarm will keep ringing — 1 of ${pendingAccept.length} new deliveries` : 'The alarm will keep ringing until you accept'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {mapOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMapOrder(null)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#F3F4F6]">
+              <h2 className="text-[15px] font-[800] text-[#111827]">Drop Location</h2>
+              <button onClick={() => setMapOrder(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
+                <X className="w-4 h-4 text-[#6B7280]" />
+              </button>
+            </div>
+            <LiveTrackingMap
+              riderLocation={null}
+              showRiderStatus={false}
+              dropLocation={mapOrder.delivery_latitude != null && mapOrder.delivery_longitude != null
+                ? { lat: mapOrder.delivery_latitude, lng: mapOrder.delivery_longitude }
+                : null}
+              className="h-64"
+            />
+            {mapOrder.address && <p className="text-[12.5px] text-[#374151] p-4">{mapOrder.address}</p>}
+          </div>
+        </div>
+      )}
+
+      {confirmingDelivery && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!deliveringBusy) setConfirmingDelivery(null) }} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center">
+            <div className="w-16 h-16 bg-[#F0FDF4] rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-[#16A34A]" />
+            </div>
+            <h2 className="text-[18px] font-[800] text-[#111827] mb-1">Are you sure delivery is complete?</h2>
+            <p className="text-[13px] text-[#6B7280] mb-5">
+              {confirmingDelivery.customer_name ?? 'Customer'} · {confirmingDelivery.id.slice(0, 8).toUpperCase()}
+              {amountToCollect(confirmingDelivery) > 0 && <> · collect ₹{amountToCollect(confirmingDelivery)}</>}
+            </p>
+            <SlideToDeliver key={slideAttempt} busy={deliveringBusy} onComplete={() => completeDelivery(confirmingDelivery.id)} />
+            {deliverError && <p className="text-[12px] text-[#DC2626] mt-3">{deliverError}</p>}
+            <button onClick={() => setConfirmingDelivery(null)} disabled={deliveringBusy}
+              className="mt-4 text-[12.5px] font-[600] text-[#9CA3AF] hover:text-[#374151] disabled:opacity-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
