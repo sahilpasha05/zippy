@@ -17,12 +17,7 @@ export function removePriceMarkup(markedUpPrice: number): number {
 }
 
 // Flat delivery charge applied to every order, regardless of cart size.
-// During the free delivery promo, fee is waived for orders ≥ FREE_DELIVERY_MIN_ORDER.
-export const DELIVERY_FEE_ORIGINAL: number = 29
-export const FREE_DELIVERY_ACTIVE: boolean = true
-export const FREE_DELIVERY_MIN_ORDER: number = 100
-
-export const DELIVERY_FEE: number = 0
+export const DELIVERY_FEE: number = 29
 
 // Platform fee, banded by cart subtotal (before discount and delivery).
 // Bands are inclusive of their lower bound: up to ₹100 → ₹2, ₹100 up to

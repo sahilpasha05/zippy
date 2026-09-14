@@ -7,15 +7,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE, DELIVERY_FEE_ORIGINAL, FREE_DELIVERY_ACTIVE, FREE_DELIVERY_MIN_ORDER } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
   const cartTotal = getCartBaseTotal(items)
   const platformFee = getPlatformFee(cartTotal)
-  const freeDeliveryUnlocked = FREE_DELIVERY_ACTIVE && cartTotal >= FREE_DELIVERY_MIN_ORDER
-  const effectiveDeliveryFee = freeDeliveryUnlocked ? 0 : DELIVERY_FEE_ORIGINAL
-  const grandTotal = cartTotal + effectiveDeliveryFee + platformFee
+  const grandTotal = cartTotal + DELIVERY_FEE + platformFee
   const deliveryEta = useDeliveryEta()
 
   useEffect(() => {
@@ -121,27 +119,6 @@ export default function CartSidebar() {
         {/* Footer */}
         {items.length > 0 && (
           <div className="px-6 py-5 border-t border-[#E5E7EB] bg-white space-y-4">
-            {/* Free delivery status banner */}
-            {FREE_DELIVERY_ACTIVE && (
-              freeDeliveryUnlocked ? (
-                <div className="relative overflow-hidden flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#16A34A] to-[#15803D] rounded-xl shadow-[0_2px_12px_rgba(22,163,74,0.4)]">
-                  <span className="pointer-events-none absolute inset-0 -translate-x-full animate-[shimmer_2.2s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                  <span className="text-base animate-[bounce_1s_ease-in-out_3]">🎉</span>
-                  <p className="text-[12.5px] font-semibold text-white leading-snug">
-                    <strong>FREE delivery unlocked!</strong>
-                    <span className="ml-1 font-normal opacity-90">₹{DELIVERY_FEE_ORIGINAL} waived off</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-3 bg-[#FEF9C3] border border-[#FDE047] rounded-xl">
-                  <span className="text-sm">🛵</span>
-                  <p className="text-[12px] text-[#713F12] leading-snug">
-                    Add <strong>₹{Math.ceil(FREE_DELIVERY_MIN_ORDER - cartTotal)}</strong> more to unlock <strong>FREE delivery</strong> today!
-                  </p>
-                </div>
-              )
-            )}
-
             {/* Delivery estimate */}
             <div className="flex items-center gap-2 px-4 py-3 bg-[#DCFCE7] rounded-xl">
               <Zap className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
@@ -156,14 +133,7 @@ export default function CartSidebar() {
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
                 <span>Delivery fee</span>
-                {freeDeliveryUnlocked ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="line-through text-[#9CA3AF]">₹{DELIVERY_FEE_ORIGINAL}</span>
-                    <span className="text-[#16A34A] font-semibold">FREE</span>
-                  </span>
-                ) : (
-                  <span>₹{effectiveDeliveryFee}</span>
-                )}
+                <span>₹{DELIVERY_FEE}</span>
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
                 <span>Platform fee</span>

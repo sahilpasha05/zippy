@@ -17,7 +17,6 @@ import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { createClient } from '@/lib/supabase/client'
 import LocationPicker from '@/components/LocationPicker'
-import { FREE_DELIVERY_ACTIVE } from '@/lib/cartPricing'
 
 const navLinks = [
   { label: 'Essentials', href: '/essentials', icon: Package },
@@ -76,7 +75,7 @@ export default function Navbar() {
     <>
       <header
         className={cn(
-          `fixed ${FREE_DELIVERY_ACTIVE ? 'top-9' : 'top-0'} left-0 right-0 z-50 transition-all duration-300`,
+          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
           scrolled
             ? 'bg-white/95 backdrop-blur-md shadow-[0_1px_20px_rgba(0,0,0,0.08)] border-b border-[#E5E7EB]'
             : 'bg-white border-b border-[#E5E7EB]'

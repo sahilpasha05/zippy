@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE_ORIGINAL, FREE_DELIVERY_ACTIVE, FREE_DELIVERY_MIN_ORDER } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import Navbar from '@/components/layout/Navbar'
@@ -85,7 +85,7 @@ export default function CheckoutPage() {
   // only a confirmed out-of-area one is refused.
   const addressBlocked = addressOutOfZone
 
-  const deliveryFee = FREE_DELIVERY_ACTIVE && cartTotal >= FREE_DELIVERY_MIN_ORDER ? 0 : DELIVERY_FEE_ORIGINAL
+  const deliveryFee = DELIVERY_FEE
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
@@ -492,14 +492,7 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-[13px] text-[#6B7280]"><span>Subtotal</span><span>₹{cartTotal.toFixed(0)}</span></div>
                   <div className="flex justify-between text-[13px] text-[#6B7280]">
                     <span>Delivery fee</span>
-                    {deliveryFee === 0 ? (
-                      <span className="flex items-center gap-1.5">
-                        <span className="line-through text-[#9CA3AF]">₹{DELIVERY_FEE_ORIGINAL}</span>
-                        <span className="text-[#16A34A] font-semibold">FREE</span>
-                      </span>
-                    ) : (
-                      <span>₹{deliveryFee}</span>
-                    )}
+                    <span>₹{deliveryFee}</span>
                   </div>
                   <div className="flex justify-between text-[13px] text-[#6B7280]">
                     <span>Platform fee</span>
