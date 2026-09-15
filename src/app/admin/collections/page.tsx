@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Wallet, Clock, CheckCircle2, X, Phone, Bike, Loader2 } from 'lucide-react'
+import { Wallet, Clock, CheckCircle2, X, Phone, Bike, Loader2, XCircle, Truck, Store } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 
@@ -13,38 +13,55 @@ type Order = {
   id: string; placed_at: string; customer_name: string | null; customer_phone: string | null
   status: string; total: number; cod_amount: number | null; cash_collected_at: string | null
   delivery_partner_id: string | null
+  restaurant_id: string | null
+  restaurants: { name: string } | null
 }
 
 export default function AdminCollectionsPage() {
   const [partners, setPartners] = useState<Partner[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [cancelledOrders, setCancelledOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRange>(presetRange(30))
   const [drillPartnerId, setDrillPartnerId] = useState<string | null>(null)
+  const [dispatchingId, setDispatchingId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       setLoading(true)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const [{ data: parts }, { data: ords }] = await Promise.all([
+      const [{ data: parts }, { data: ords }, { data: cancelled }] = await Promise.all([
         supabase.from('delivery_partners').select('id, name, phone').order('name'),
         supabase.from('orders')
-          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, delivery_partner_id')
+          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, delivery_partner_id, restaurant_id, restaurants(name)')
           .not('delivery_partner_id', 'is', null)
           .gt('cod_amount', 0)
+          .neq('status', 'cancelled')
+          .gte('placed_at', fromISO).lte('placed_at', toISO)
+          .order('placed_at', { ascending: false }),
+        supabase.from('orders')
+          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, delivery_partner_id, restaurant_id, restaurants(name)')
+          .not('delivery_partner_id', 'is', null)
+          .eq('status', 'cancelled')
           .gte('placed_at', fromISO).lte('placed_at', toISO)
           .order('placed_at', { ascending: false }),
       ])
       setPartners((parts as Partner[]) ?? [])
-      setOrders((ords as Order[]) ?? [])
+      setOrders((ords as unknown as Order[]) ?? [])
+      setCancelledOrders((cancelled as unknown as Order[]) ?? [])
       setLoading(false)
     }
     load()
   }, [range])
 
-  // One row per rider — what they've collected in cash vs. what's still
-  // outstanding from cash-on-delivery orders assigned to them in this range.
+  async function sendForDelivery(orderId: string) {
+    setDispatchingId(orderId)
+    await supabase.from('orders').update({ status: 'out_for_delivery' }).eq('id', orderId)
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'out_for_delivery' } : o))
+    setDispatchingId(null)
+  }
+
   const rows = partners
     .map((p) => {
       const theirOrders = orders.filter((o) => o.delivery_partner_id === p.id)
@@ -85,6 +102,7 @@ export default function AdminCollectionsPage() {
             </div>
           ) : (
             <>
+              {/* Summary Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { label: 'Cash Collected',  value: totalCollected, icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7' },
@@ -102,6 +120,7 @@ export default function AdminCollectionsPage() {
                 ))}
               </div>
 
+              {/* By Rider */}
               <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-sm">
                 <div className="px-5 py-4 border-b border-[#F3F4F6]">
                   <h2 className="text-[15px] font-[700] text-[#111827]" style={{ fontWeight: 700 }}>By Rider</h2>
@@ -138,11 +157,59 @@ export default function AdminCollectionsPage() {
                   </div>
                 )}
               </div>
+
+              {/* Cancelled Orders Section */}
+              {cancelledOrders.length > 0 && (
+                <div className="bg-white rounded-2xl border border-[#FECACA] shadow-zippy-sm">
+                  <div className="px-5 py-4 border-b border-[#FEE2E2] flex items-center gap-2">
+                    <XCircle className="w-4.5 h-4.5 text-[#DC2626]" />
+                    <div>
+                      <h2 className="text-[15px] font-[700] text-[#DC2626]" style={{ fontWeight: 700 }}>Cancelled Orders</h2>
+                      <p className="text-[12px] text-[#9CA3AF] mt-0.5">{cancelledOrders.length} order{cancelledOrders.length !== 1 ? 's' : ''} cancelled after rider assignment</p>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-[#F3F4F6]">
+                    {cancelledOrders.map((o) => {
+                      const rider = partners.find((p) => p.id === o.delivery_partner_id)
+                      return (
+                        <div key={o.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[12px] font-mono font-[700] text-[#374151]">{o.id.slice(0, 8).toUpperCase()}</span>
+                              <span className="flex items-center gap-1 text-[11px] text-[#9CA3AF]">
+                                <Clock className="w-3 h-3" />
+                                {new Date(o.placed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                              {o.restaurants?.name && (
+                                <span className="flex items-center gap-1 text-[11px] bg-[#F3F4F6] text-[#6B7280] px-2 py-0.5 rounded-full">
+                                  <Store className="w-3 h-3" />{o.restaurants.name}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[12.5px] font-[600] text-[#111827] mt-0.5 truncate">
+                              {o.customer_name ?? 'Customer'}
+                              {o.customer_phone && <span className="text-[#9CA3AF] font-normal"> · {o.customer_phone}</span>}
+                            </p>
+                            {rider && (
+                              <p className="text-[11px] text-[#9CA3AF]">Rider: {rider.name}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[13px] font-[800] text-[#111827]">₹{Number(o.cod_amount).toLocaleString()}</p>
+                            <span className="text-[10.5px] font-[600] text-[#DC2626]">Cancelled</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       </main>
 
+      {/* Drill-down Modal */}
       {drillRow && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrillPartnerId(null)} />
@@ -175,31 +242,53 @@ export default function AdminCollectionsPage() {
             </div>
 
             <div className="overflow-y-auto flex-1 divide-y divide-[#F3F4F6]">
-              {drillRow.orders.map((o) => (
-                <div key={o.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-mono font-[700] text-[#374151]">{o.id.slice(0, 8).toUpperCase()}</span>
-                      <span className="flex items-center gap-1 text-[11px] text-[#9CA3AF]">
-                        <Clock className="w-3 h-3" />
-                        {new Date(o.placed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
-                      </span>
+              {drillRow.orders.map((o) => {
+                const isPending = o.status !== 'delivered' && o.status !== 'out_for_delivery'
+                const isDispatching = dispatchingId === o.id
+                return (
+                  <div key={o.id} className="px-5 py-3.5 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] font-mono font-[700] text-[#374151]">{o.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="flex items-center gap-1 text-[11px] text-[#9CA3AF]">
+                          <Clock className="w-3 h-3" />
+                          {new Date(o.placed_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-[12.5px] font-[600] text-[#111827] mt-0.5 truncate">
+                        {o.customer_name ?? 'Customer'}
+                        {o.customer_phone && <span className="text-[#9CA3AF] font-normal"> · {o.customer_phone}</span>}
+                      </p>
+                      {o.restaurants?.name && (
+                        <p className="flex items-center gap-1 text-[11px] text-[#6B7280] mt-0.5">
+                          <Store className="w-3 h-3" />{o.restaurants.name}
+                        </p>
+                      )}
+                      {/* Send for Delivery button for pending orders */}
+                      {isPending && (
+                        <button
+                          onClick={() => sendForDelivery(o.id)}
+                          disabled={isDispatching}
+                          className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-[#7C3AED] text-white text-[11px] font-[700] rounded-lg hover:bg-[#6D28D9] transition-all disabled:opacity-60"
+                        >
+                          {isDispatching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Truck className="w-3 h-3" />}
+                          {isDispatching ? 'Sending...' : `Send for Delivery${o.restaurants?.name ? ` · ${o.restaurants.name}` : ''}`}
+                        </button>
+                      )}
                     </div>
-                    <p className="text-[12.5px] font-[600] text-[#111827] mt-0.5 truncate">
-                      {o.customer_name ?? 'Customer'}
-                      {o.customer_phone && <span className="text-[#9CA3AF] font-normal"> · {o.customer_phone}</span>}
-                    </p>
+                    <div className="text-right shrink-0">
+                      <p className="text-[13px] font-[800] text-[#111827]">₹{Number(o.cod_amount).toLocaleString()}</p>
+                      {o.cash_collected_at ? (
+                        <span className="text-[10.5px] font-[600] text-[#16A34A]">✓ Collected</span>
+                      ) : o.status === 'out_for_delivery' ? (
+                        <span className="text-[10.5px] font-[600] text-[#7C3AED]">On the way</span>
+                      ) : (
+                        <span className="text-[10.5px] font-[600] text-[#D97706]">Pending</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[13px] font-[800] text-[#111827]">₹{Number(o.cod_amount).toLocaleString()}</p>
-                    {o.cash_collected_at ? (
-                      <span className="text-[10.5px] font-[600] text-[#16A34A]">✓ Collected</span>
-                    ) : (
-                      <span className="text-[10.5px] font-[600] text-[#D97706]">Pending</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
