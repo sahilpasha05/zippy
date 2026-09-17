@@ -245,6 +245,7 @@ export default function SlugOrdersPage() {
   }
 
   async function advance(orderId: string, nextStatus: string) {
+    if (nextStatus === 'cancelled' && !confirm('Are you sure you want to cancel this order? This cannot be undone.')) return
     setAdvancing(orderId)
     await supabase.from('orders').update({ status: nextStatus }).eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: nextStatus } : o))

@@ -75,8 +75,12 @@ export default function RestaurantDashboard() {
   async function toggleOpen() {
     if (!restaurant) return
     setTogglingOpen(true)
-    await supabase.from('restaurants').update({ is_open: !isOpen }).eq('id', restaurant.id)
-    setIsOpen(!isOpen)
+    const desired = !isOpen
+    const { error } = await supabase.from('restaurants').update({ is_open: desired }).eq('id', restaurant.id)
+    if (error) { alert(`Could not update: ${error.message}`); setTogglingOpen(false); return }
+    // Re-read to confirm the write stuck (RLS can silently no-op an update).
+    const { data } = await supabase.from('restaurants').select('is_open').eq('id', restaurant.id).single()
+    setIsOpen(data?.is_open ?? desired)
     setTogglingOpen(false)
   }
 
