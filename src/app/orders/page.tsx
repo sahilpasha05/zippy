@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star } from 'lucide-react'
+import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star, Phone, Bike } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import ReviewModal from '@/components/ReviewModal'
@@ -35,6 +35,7 @@ type Rel<T> = T | T[] | null
 type OrderRow = {
   id: string
   restaurant_id: string | null
+  delivery_partner_id: string | null
   reviews: { id: string }[] | null
   order_type: string
   status: string
@@ -42,6 +43,7 @@ type OrderRow = {
   address: string | null
   created_at: string
   restaurants: Rel<{ name: string }>
+  delivery_partners: Rel<{ name: string; phone: string | null }> | null
   order_items: { name: string; quantity: number }[] | null
 }
 
@@ -50,10 +52,16 @@ function restName(o: OrderRow): string | null {
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.name ?? null : o.restaurants.name
 }
 
+function riderInfo(o: OrderRow): { name: string; phone: string | null } | null {
+  if (!o.delivery_partners) return null
+  return Array.isArray(o.delivery_partners) ? o.delivery_partners[0] ?? null : o.delivery_partners
+}
+
 function OrderCard({ order, eta, onReview }: { order: OrderRow; eta: number; onReview: (o: OrderRow) => void }) {
   const config = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
   const isActive = !CLOSED.includes(order.status)
   const currentStep = STEPS.indexOf(order.status)
+  const rider = riderInfo(order)
 
   const items = order.order_items ?? []
   const totalUnits = items.reduce((sum, i) => sum + i.quantity, 0)
@@ -138,6 +146,24 @@ function OrderCard({ order, eta, onReview }: { order: OrderRow; eta: number; onR
           </div>
         )}
 
+        {order.delivery_partner_id && rider && (
+          <div className="flex items-center gap-3 mb-3 px-3.5 py-2.5 bg-[#F5F3FF] rounded-xl">
+            <div className="w-8 h-8 bg-[#EDE9FE] rounded-xl flex items-center justify-center shrink-0">
+              <Bike className="w-4 h-4 text-[#7C3AED]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12.5px] font-[700] text-[#4C1D95] truncate">{rider.name}</p>
+              <p className="text-[11px] text-[#7C3AED]">Delivery partner assigned</p>
+            </div>
+            {rider.phone && (
+              <a href={`tel:${rider.phone}`}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#7C3AED] text-white text-[12px] font-[600] rounded-xl hover:bg-[#6D28D9] transition-all shrink-0">
+                <Phone className="w-3 h-3" /> Call
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#F3F4F6]">
           <span className="flex items-center gap-1.5 text-[12.5px] text-[#6B7280] min-w-0">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
@@ -183,7 +209,7 @@ export default function OrdersPage() {
       // query honest about its intent rather than relying on the policy alone.
       const { data } = await supabase
         .from('orders')
-        .select('id, order_type, status, total, address, created_at, restaurant_id, restaurants(name), order_items(name, quantity), reviews(id)')
+        .select('id, order_type, status, total, address, created_at, restaurant_id, delivery_partner_id, restaurants(name), delivery_partners(name, phone), order_items(name, quantity), reviews(id)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
