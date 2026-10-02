@@ -287,7 +287,7 @@ export default function RestaurantDetailClient() {
 
         {/* Category filter bar — mobile/tablet, where the sidebar below is hidden */}
         {menu.length > 0 && (
-          <div className="lg:hidden sticky top-[64px] z-10 bg-white border-b border-[#E5E7EB] px-4 py-3">
+          <div className="lg:hidden sticky top-[224px] z-10 bg-white border-b border-[#E5E7EB] px-4 py-3">
             <div className="flex gap-2 overflow-x-auto">
               {menu.map((section) => (
                 <button key={section.category} onClick={() => scrollToCategory(section.category)}
@@ -306,7 +306,7 @@ export default function RestaurantDetailClient() {
           <div className="flex gap-8">
             {/* Category sidebar */}
             <aside className="hidden lg:block w-52 shrink-0">
-              <div className="sticky top-24 bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
+              <div className="sticky top-[152px] bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-zippy-sm">
                 <div className="p-3">
                   {menu.map((section) => (
                     <button key={section.category} onClick={() => scrollToCategory(section.category)}
@@ -335,7 +335,7 @@ export default function RestaurantDetailClient() {
                 </div>
               ) : (
                 filteredMenu.map((section) => (
-                  <div key={section.category} id={`category-${section.category}`} className="mb-8 scroll-mt-40">
+                  <div key={section.category} id={`category-${section.category}`} className="mb-8 scroll-mt-[216px]">
                     <h2 className="text-[18px] font-[800] text-[#111827] mb-1">{section.category}</h2>
                     <p className="text-[12.5px] text-[#9CA3AF] mb-4">{section.items.length} items</p>
                     <div className="bg-white rounded-2xl border border-[#E5E7EB] px-6">

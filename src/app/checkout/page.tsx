@@ -464,7 +464,7 @@ export default function CheckoutPage() {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 sticky top-24">
+              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 sticky top-[152px]">
                 <h3 className="text-[16px] font-[700] text-[#111827] mb-5" style={{ fontWeight: 700 }}>Order Summary</h3>
 
                 {!mounted ? (

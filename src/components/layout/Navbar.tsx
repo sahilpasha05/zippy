@@ -9,6 +9,7 @@ import {
   Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History
 } from 'lucide-react'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
+import AnnouncementTicker from '@/components/layout/AnnouncementTicker'
 import GrocerySearchBox from '@/components/layout/GrocerySearchBox'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
@@ -73,9 +74,13 @@ export default function Navbar() {
 
   return (
     <>
+      {/* Fixed wrapper owns the top-0 positioning so the ticker strips and
+          header stack as one unit. */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <AnnouncementTicker />
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+          'transition-all duration-300',
           scrolled
             ? 'bg-white/95 backdrop-blur-md shadow-[0_1px_20px_rgba(0,0,0,0.08)] border-b border-[#E5E7EB]'
             : 'bg-white border-b border-[#E5E7EB]'
@@ -250,14 +255,15 @@ export default function Navbar() {
           </div>
         )}
       </header>
+      </div>
 
-      {/* Spacer */}
-      <div className="h-[168px] lg:h-16" />
+      {/* Spacer — matches the fixed strips + header stack's combined height */}
+      <div className="h-[224px] lg:h-[120px]" />
 
       {profileMenuOpen && user && (
         <>
           <div className="fixed inset-0 z-[90]" onClick={closeProfileMenu} />
-          <div className="fixed top-[172px] lg:top-16 right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
+          <div className="fixed top-[228px] lg:top-[120px] right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
             <div className="px-3 py-2.5 border-b border-[#F3F4F6] mb-1">
               <p className="text-[12px] text-[#9CA3AF]">Signed in as</p>
               <p className="text-[13.5px] font-[700] text-[#111827] truncate">{user.phone ?? user.email}</p>
