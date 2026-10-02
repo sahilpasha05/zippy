@@ -275,7 +275,6 @@ export default function RestaurantDetailClient() {
               <span className={cn('px-2.5 py-1 rounded-full text-[11px] font-semibold', restaurant.is_open ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#F3F4F6] text-[#6B7280]')}>
                 {restaurant.is_open ? '● Open now' : '○ Closed'}
               </span>
-              <span className="text-[#16A34A] font-medium">{restaurant.delivery_fee === 0 ? 'Free delivery' : `₹${restaurant.delivery_fee} delivery`}</span>
               <span>Min ₹{restaurant.min_order}</span>
             </div>
             {!restaurant.is_open && (
