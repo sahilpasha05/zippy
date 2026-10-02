@@ -16,8 +16,8 @@ export function removePriceMarkup(markedUpPrice: number): number {
   return Math.round((markedUpPrice / PRICE_MARKUP) * 100) / 100
 }
 
-// Flat delivery charge applied to every order, regardless of cart size.
-export const DELIVERY_FEE: number = 29
+// Free delivery on all orders.
+export const DELIVERY_FEE: number = 0
 
 // Platform fee, banded by cart subtotal (before discount and delivery).
 // Bands are inclusive of their lower bound: up to ₹100 → ₹2, ₹100 up to

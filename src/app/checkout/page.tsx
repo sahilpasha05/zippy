@@ -92,9 +92,16 @@ export default function CheckoutPage() {
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
+  const MIN_ORDER = 100
+
   const handlePlace = async () => {
     if (submittingRef.current) return
     if (items.length === 0 || !selectedAddress) return
+
+    if (cartTotal < MIN_ORDER) {
+      setPlaceError(`Minimum order value is ₹${MIN_ORDER}. Add more items to proceed.`)
+      return
+    }
 
     if (!signedIn) { setShowAuth(true); return }
 
