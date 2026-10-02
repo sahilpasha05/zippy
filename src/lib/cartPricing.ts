@@ -16,8 +16,10 @@ export function removePriceMarkup(markedUpPrice: number): number {
   return Math.round((markedUpPrice / PRICE_MARKUP) * 100) / 100
 }
 
-// Free delivery on all orders.
+// Delivery is free, and ₹100 is both the minimum order value and the point at
+// which the cart shows "free delivery unlocked".
 export const DELIVERY_FEE: number = 0
+export const FREE_DELIVERY_THRESHOLD = 100
 
 // Platform fee, banded by cart subtotal (before discount and delivery).
 // Bands are inclusive of their lower bound: up to ₹100 → ₹2, ₹100 up to

@@ -9,11 +9,12 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
+import FreeDeliveryProgress from '@/components/layout/FreeDeliveryProgress'
 import SiteFooter from '@/components/layout/SiteFooter'
 import LocationPicker from '@/components/LocationPicker'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
@@ -92,7 +93,7 @@ export default function CheckoutPage() {
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
-  const MIN_ORDER = 100
+  const MIN_ORDER = FREE_DELIVERY_THRESHOLD
 
   const handlePlace = async () => {
     if (submittingRef.current) return
@@ -495,6 +496,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
+                <FreeDeliveryProgress subtotal={cartTotal} className="mb-3" />
                 <div className="border-t border-[#E5E7EB] pt-4 space-y-2.5">
                   <div className="flex justify-between text-[13px] text-[#6B7280]"><span>Subtotal</span><span>₹{cartTotal.toFixed(0)}</span></div>
                   <div className="flex justify-between text-[13px] text-[#6B7280]">

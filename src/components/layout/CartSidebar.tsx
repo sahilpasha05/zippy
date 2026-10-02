@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCartStore } from '@/lib/store/cart'
 import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE, FREE_DELIVERY_THRESHOLD } from '@/lib/cartPricing'
+import FreeDeliveryProgress from '@/components/layout/FreeDeliveryProgress'
+import FreeDeliveryPopup from '@/components/layout/FreeDeliveryPopup'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
@@ -16,12 +18,29 @@ export default function CartSidebar() {
   const grandTotal = cartTotal + DELIVERY_FEE + platformFee
   const deliveryEta = useDeliveryEta()
 
+  // Celebrate the moment the cart crosses the free-delivery threshold. The
+  // previous total is only recorded once the persisted cart has loaded, so a
+  // page load with an already-qualifying cart doesn't pop the celebration.
+  const prevTotal = useRef<number | null>(null)
+  const [showUnlocked, setShowUnlocked] = useState(false)
+
   useEffect(() => {
-    useCartStore.persist.rehydrate()
+    Promise.resolve(useCartStore.persist.rehydrate()).then(() => {
+      prevTotal.current = getCartBaseTotal(useCartStore.getState().items)
+    })
   }, [])
+
+  useEffect(() => {
+    const prev = prevTotal.current
+    if (prev === null) return
+    prevTotal.current = cartTotal
+    if (prev < FREE_DELIVERY_THRESHOLD && cartTotal >= FREE_DELIVERY_THRESHOLD) setShowUnlocked(true)
+  }, [cartTotal])
 
   return (
     <>
+      {showUnlocked && <FreeDeliveryPopup onClose={() => setShowUnlocked(false)} />}
+
       {/* Overlay */}
       {isOpen && (
         <div
@@ -124,6 +143,8 @@ export default function CartSidebar() {
               <Zap className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
               <p className="text-[12.5px] font-medium text-[#14532D]">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
             </div>
+
+            <FreeDeliveryProgress subtotal={cartTotal} />
 
             {/* Bill Summary */}
             <div className="space-y-2">
