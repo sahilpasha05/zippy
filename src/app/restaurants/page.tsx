@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import Navbar from '@/components/layout/Navbar'
+import { sortRestaurantsForDisplay } from '@/lib/restaurantOrder'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
 import { createBrowserClient } from '@supabase/ssr'
@@ -15,16 +16,6 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 const CUISINES = ['All', 'Biryani', 'Pizza', 'South Indian', 'Chinese', 'North Indian', 'Desserts']
-
-// Hand-picked running order for the launch lineup, by slug:
-// Golden cafe → Smiley cafe → Jai hind restaurant → Hotel Mayur & Residency → Neelgiri Cake's.
-// Anything not listed sorts in after these, still highest-rated first.
-const DISPLAY_ORDER = ['g', 's', 'j', 'h', 'n']
-
-function displayRank(slug: string) {
-  const i = DISPLAY_ORDER.indexOf(slug)
-  return i === -1 ? DISPLAY_ORDER.length : i
-}
 
 type Restaurant = {
   id: string
@@ -134,8 +125,7 @@ export default function RestaurantsPage() {
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .then(({ data }) => {
-        // Sort is stable, so unlisted restaurants keep the rating order above.
-        if (data) setRestaurants([...(data as Restaurant[])].sort((a, b) => displayRank(a.slug) - displayRank(b.slug)))
+        if (data) setRestaurants(sortRestaurantsForDisplay(data as Restaurant[]))
         setLoading(false)
       })
   }, [])

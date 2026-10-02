@@ -1,5 +1,6 @@
 'use client'
 
+import { sortRestaurantsForDisplay } from '@/lib/restaurantOrder'
 import { useEffect, useState } from 'react'
 import { Star, Clock, MapPin, ChevronRight } from 'lucide-react'
 import Image from 'next/image'
@@ -110,9 +111,8 @@ export default function FeaturedRestaurants() {
       .select('id, name, slug, cuisine, rating, rating_count, distance, delivery_time, is_open, cover_url, logo_url, min_order')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
-      .limit(4)
       .then(({ data }) => {
-        if (data) setRestaurants(data as Restaurant[])
+        if (data) setRestaurants(sortRestaurantsForDisplay(data as Restaurant[]).slice(0, 4))
         setLoading(false)
       })
   }, [])
