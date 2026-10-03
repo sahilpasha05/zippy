@@ -174,12 +174,18 @@ export default function RestaurantDetailClient() {
           rating: Number(p.rating ?? 4),
         })
 
+        // Items within each category go cheapest first. The Weekend Offer
+        // section is left in its own order.
+        const byPrice = (x: MenuItem, y: MenuItem) => x.price - y.price
         const sections: MenuSection[] = (cats ?? [])
-          .map((c) => ({ category: c.name, items: (prods ?? []).filter((p) => p.category_id === c.id).map(toMenuItem) }))
+          .map((c) => {
+            const items = (prods ?? []).filter((p) => p.category_id === c.id).map(toMenuItem)
+            return { category: c.name, items: c.name === 'Weekend Offer' ? items : items.sort(byPrice) }
+          })
           .filter((s) => s.items.length > 0)
 
         const uncategorized = (prods ?? []).filter((p) => !p.category_id).map(toMenuItem)
-        if (uncategorized.length > 0) sections.push({ category: 'Other', items: uncategorized })
+        if (uncategorized.length > 0) sections.push({ category: 'Other', items: uncategorized.sort(byPrice) })
 
         setMenu(sections)
         setActiveCategory(sections[0]?.category ?? '')
