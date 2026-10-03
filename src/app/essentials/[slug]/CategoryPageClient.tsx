@@ -186,7 +186,7 @@ export default function CategoryPageClient() {
               {/* Subcategory sidebar — Blinkit style, sticky, own scroll */}
               {hasSubcategories && (
                 <aside className="w-[76px] sm:w-[92px] shrink-0">
-                  <div className="sticky top-[186px] lg:top-[152px] flex flex-col gap-1 max-h-[calc(100vh-160px)] overflow-y-auto pr-1">
+                  <div className="sticky top-[130px] lg:top-24 flex flex-col gap-1 max-h-[calc(100vh-160px)] overflow-y-auto pr-1">
                     {groups.map(({ sub, items }) => (
                       <button
                         key={sub.id}
@@ -216,7 +216,7 @@ export default function CategoryPageClient() {
               {/* Product sections */}
               <div className="flex-1 min-w-0 space-y-8">
                 {groups.map(({ sub, items }) => (
-                  <div key={sub.id} ref={(el) => { sectionRefs.current[sub.id] = el }} className="scroll-mt-[206px] lg:scroll-mt-[168px]">
+                  <div key={sub.id} ref={(el) => { sectionRefs.current[sub.id] = el }} className="scroll-mt-[150px] lg:scroll-mt-28">
                     {hasSubcategories && (
                       <h2 className="text-[15px] lg:text-[17px] font-[800] text-[#111827] mb-3" style={{ fontWeight: 800 }}>{sub.name}</h2>
                     )}
