@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { TrendingUp, ShoppingBag, Store, Users, X, ChevronLeft, ChevronRight, Package, Clock } from 'lucide-react'
@@ -91,13 +92,13 @@ export default function AdminAnalyticsPage() {
       setTodayLoading(true)
       const start = new Date(range.from + 'T00:00:00')
       const end = new Date(range.to + 'T23:59:59.999')
-      const { data } = await supabase
+      const data = await fetchAllRows<TodayOrder>((from, to) => supabase
         .from('orders')
         .select('id, status, total, placed_at, restaurant_id, customer_name, customer_phone, restaurants(name), order_items(name, quantity, price)')
         .gte('placed_at', start.toISOString()).lte('placed_at', end.toISOString())
-        .order('placed_at', { ascending: false })
-        .limit(5000)
-      setTodayOrders((data as unknown as TodayOrder[]) ?? [])
+        .order('placed_at', { ascending: false }).order('id')
+        .range(from, to))
+      setTodayOrders(data)
       setTodayLoading(false)
       setLastRefreshed(new Date())
     }
@@ -114,13 +115,14 @@ export default function AdminAnalyticsPage() {
       setLoading(true)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const [{ data: ords }, { count }] = await Promise.all([
-        supabase.from('orders').select('id, status, total, placed_at, restaurant_id')
+      const [ords, { count }] = await Promise.all([
+        fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, placed_at, restaurant_id')
           .gte('placed_at', fromISO).lte('placed_at', toISO)
-          .order('placed_at', { ascending: false }).limit(5000),
+          .order('placed_at', { ascending: false }).order('id')
+          .range(from, to)),
         supabase.from('restaurants').select('*', { count: 'exact', head: true }).eq('is_active', true),
       ])
-      setOrders((ords as Order[]) ?? [])
+      setOrders(ords)
       setRestaurantCount(count ?? 0)
       setLoading(false)
     }

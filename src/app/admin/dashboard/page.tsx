@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Store, ShoppingBag, Users, TrendingUp, ArrowUpRight, Clock, CheckCircle, ChefHat, Truck, XCircle, AlertCircle, Plus, Eye } from 'lucide-react'
@@ -35,11 +36,11 @@ export default function AdminDashboardPage() {
       // order — capping it at 10 made "Total Revenue" the sum of the last ten
       // orders and "Total Orders" always read 10. The table further down slices
       // the first few for display.
-      const [{ data: ords }, { data: rests }] = await Promise.all([
-        supabase.from('orders').select('id, status, total, customer_name, placed_at, restaurants(name)').order('placed_at', { ascending: false }).limit(5000),
+      const [ords, { data: rests }] = await Promise.all([
+        fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, customer_name, placed_at, restaurants(name)').order('placed_at', { ascending: false }).order('id').range(from, to)),
         supabase.from('restaurants').select('id, name, is_active, rating, owner_id').eq('is_active', true).order('created_at', { ascending: false }),
       ])
-      setOrders((ords as unknown as Order[]) ?? [])
+      setOrders(ords)
       setRestaurants((rests as Restaurant[]) ?? [])
       setLoading(false)
     }

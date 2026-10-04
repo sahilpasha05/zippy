@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Smartphone, Banknote, Clock, ShoppingBag, Loader2 } from 'lucide-react'
@@ -34,13 +35,13 @@ export default function AdminLedgerPage() {
       setLoading(true)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const { data } = await supabase
+      const data = await fetchAllRows<Order>((from, to) => supabase
         .from('orders')
         .select('id, placed_at, customer_name, payment_method, payment_status, total, online_amount, cod_amount, cash_collected_at, cash_proof_image_url')
         .gte('placed_at', fromISO).lte('placed_at', toISO)
-        .order('placed_at', { ascending: false })
-        .limit(2000)
-      setOrders((data as Order[]) ?? [])
+        .order('placed_at', { ascending: false }).order('id')
+        .range(from, to))
+      setOrders(data)
       setLoading(false)
     }
     load()

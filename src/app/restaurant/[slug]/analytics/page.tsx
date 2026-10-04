@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -52,11 +53,12 @@ export default function SlugAnalyticsPage() {
       setRestaurant(rest as Restaurant)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const { data: ords } = await supabase.from('orders').select('id, status, total, placed_at, customer_name, customer_phone, order_items(name, quantity, price)')
+      const ords = await fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, placed_at, customer_name, customer_phone, order_items(name, quantity, price)')
         .eq('restaurant_id', rest.id)
         .gte('placed_at', fromISO).lte('placed_at', toISO)
-        .order('placed_at', { ascending: false }).limit(2000)
-      setOrders((ords as unknown as Order[]) ?? [])
+        .order('placed_at', { ascending: false }).order('id')
+        .range(from, to))
+      setOrders(ords)
       setLoading(false)
     }
     load()

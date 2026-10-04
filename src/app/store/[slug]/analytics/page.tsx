@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
@@ -32,11 +33,12 @@ export default function StoreSlugAnalyticsPage() {
       setPartner(part as Partner)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const { data: ords } = await supabase.from('orders').select('id, status, total, placed_at')
+      const ords = await fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, placed_at')
         .eq('store_partner_id', part.id)
         .gte('placed_at', fromISO).lte('placed_at', toISO)
-        .order('placed_at', { ascending: false }).limit(2000)
-      setOrders((ords as Order[]) ?? [])
+        .order('placed_at', { ascending: false }).order('id')
+        .range(from, to))
+      setOrders(ords)
       setLoading(false)
     }
     load()
