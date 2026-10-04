@@ -43,7 +43,9 @@ export default function SlugAnalyticsPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<DateRange>(presetRange(30))
-  const [drillOpen, setDrillOpen] = useState(false)
+  // 'revenue' opens the delivered orders behind Total Revenue; any other value
+  // is an order status (e.g. 'cancelled') whose orders are listed instead.
+  const [drill, setDrill] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -68,11 +70,22 @@ export default function SlugAnalyticsPage() {
   const totalRevenue = delivered.reduce((s, o) => s + menuTotal(o), 0)
   const avgOrderValue = delivered.length ? totalRevenue / delivered.length : 0
 
-  // Delivered orders behind the Total Revenue figure, grouped by day for
-  // the drill-down — most recent day first.
+  const STATUS_TILES = [
+    { status: 'confirmed',        label: 'Confirmed',  color: '#0891B2', bg: '#ECFEFF' },
+    { status: 'preparing',        label: 'Preparing',  color: '#D97706', bg: '#FFFBEB' },
+    { status: 'out_for_delivery', label: 'On the way', color: '#7C3AED', bg: '#F5F3FF' },
+    { status: 'delivered',        label: 'Delivered',  color: '#16A34A', bg: '#DCFCE7' },
+    { status: 'cancelled',        label: 'Cancelled',  color: '#DC2626', bg: '#FEF2F2' },
+    { status: 'pending',          label: 'Pending',    color: '#6B7280', bg: '#F3F4F6' },
+  ]
+  const drillTile = STATUS_TILES.find((t) => t.status === drill)
+  const drillOrders = drill === 'revenue' ? delivered : orders.filter((o) => o.status === drill)
+
+  // Orders behind whichever figure was tapped (revenue → delivered, or a
+  // status tile), grouped by day for the drill-down — most recent day first.
   const revenueByDay = (() => {
     const map = new Map<string, { day: string; orders: Order[]; amount: number }>()
-    for (const o of delivered) {
+    for (const o of drillOrders) {
       const key = dayKey(o.placed_at)
       if (!map.has(key)) map.set(key, { day: key, orders: [], amount: 0 })
       const entry = map.get(key)!
@@ -122,7 +135,7 @@ export default function SlugAnalyticsPage() {
                   const clickable = label === 'Total Revenue'
                   const Tag = clickable ? 'button' : 'div'
                   return (
-                    <Tag key={label} onClick={clickable ? () => setDrillOpen(true) : undefined}
+                    <Tag key={label} onClick={clickable ? () => setDrill('revenue') : undefined}
                       className={`bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm text-left w-full ${clickable ? 'hover:border-[#16A34A] transition-all active:scale-[0.98]' : ''}`}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: bg }}>
                         <Icon className="w-5 h-5" style={{ color }} />
@@ -155,20 +168,17 @@ export default function SlugAnalyticsPage() {
               <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
                 <h2 className="text-[15px] font-[700] text-[#111827] mb-5">Order Status Breakdown</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {[
-                    { status: 'confirmed',        label: 'Confirmed',  color: '#0891B2', bg: '#ECFEFF' },
-                    { status: 'preparing',        label: 'Preparing',  color: '#D97706', bg: '#FFFBEB' },
-                    { status: 'out_for_delivery', label: 'On the way', color: '#7C3AED', bg: '#F5F3FF' },
-                    { status: 'delivered',        label: 'Delivered',  color: '#16A34A', bg: '#DCFCE7' },
-                    { status: 'cancelled',        label: 'Cancelled',  color: '#DC2626', bg: '#FEF2F2' },
-                    { status: 'pending',          label: 'Pending',    color: '#6B7280', bg: '#F3F4F6' },
-                  ].map(({ status, label, color, bg }) => (
-                    <div key={status} className="rounded-xl p-4 text-center" style={{ background: bg }}>
-                      <div className="text-[26px] font-[800] mb-1" style={{ color, fontWeight: 800 }}>{statusCounts[status] ?? 0}</div>
-                      <div className="text-[12px] font-[600]" style={{ color }}>{label}</div>
-                    </div>
-                  ))}
-                </div>
+                  {STATUS_TILES.map(({ status, label, color, bg }) => {
+                    const count = statusCounts[status] ?? 0
+                    const Tag = count > 0 ? 'button' : 'div'
+                    return (
+                    <Tag key={status} onClick={count > 0 ? () => setDrill(status) : undefined}
+                      className={`rounded-xl p-4 text-center w-full ${count > 0 ? 'hover:ring-2 hover:ring-offset-1 transition-all active:scale-[0.98]' : ''}`} style={{ background: bg }}>
+                      <div className="text-[26px] font-[800] mb-1" style={{ color, fontWeight: 800 }}>{count}</div>
+                      <div className="text-[12px] font-[600]" style={{ color }}>{label}{count > 0 ? ' · tap' : ''}</div>
+                    </Tag>
+                    )
+                  })}                </div>
               </div>
             </>
           )}
@@ -177,23 +187,27 @@ export default function SlugAnalyticsPage() {
 
       {/* Order-level detail behind Total Revenue: day by day, each order's
           items with name/qty/price, and a menu-only total per order. */}
-      {drillOpen && (
+      {drill && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrillOpen(false)} />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrill(null)} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col z-10">
             <div className="flex items-center gap-2 px-5 py-4 border-b border-[#F3F4F6] shrink-0">
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-[600] uppercase tracking-wide text-[#16A34A]">Total Revenue · menu items only</p>
-                <h2 className="text-[15px] font-[800] text-[#111827] truncate" style={{ fontWeight: 800 }}>₹{totalRevenue.toLocaleString()}</h2>
+                <p className="text-[11px] font-[600] uppercase tracking-wide" style={{ color: drillTile?.color ?? '#16A34A' }}>
+                  {drill === 'revenue' ? 'Total Revenue · menu items only' : `${drillTile?.label ?? drill} orders · menu items only`}
+                </p>
+                <h2 className="text-[15px] font-[800] text-[#111827] truncate" style={{ fontWeight: 800 }}>
+                  {drill === 'revenue' ? `₹${totalRevenue.toLocaleString()}` : `${drillOrders.length} order${drillOrders.length !== 1 ? 's' : ''} · ₹${drillOrders.reduce((sum, o) => sum + menuTotal(o), 0).toLocaleString()}`}
+                </h2>
               </div>
-              <button onClick={() => setDrillOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6] shrink-0">
+              <button onClick={() => setDrill(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6] shrink-0">
                 <X className="w-4 h-4 text-[#6B7280]" />
               </button>
             </div>
 
             <div className="overflow-y-auto flex-1">
               {revenueByDay.length === 0 ? (
-                <p className="text-[13px] text-[#9CA3AF] text-center py-10">No delivered orders in this range.</p>
+                <p className="text-[13px] text-[#9CA3AF] text-center py-10">No {drill === 'revenue' ? 'delivered' : (drillTile?.label ?? '').toLowerCase()} orders in this range.</p>
               ) : (
                 revenueByDay.map(({ day, orders: dayOrders, amount }) => (
                   <div key={day}>
