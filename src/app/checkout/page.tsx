@@ -9,9 +9,9 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
+import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE } from '@/lib/deliveryZone'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
@@ -38,7 +38,7 @@ export default function CheckoutPage() {
   const deliveryEta = useDeliveryEta()
   const [mounted, setMounted] = useState(false)
   const cartTotal = getCartBaseTotal(items)
-  const [selectedPayment, setSelectedPayment] = useState('upi')
+  const [chosenPayment, setSelectedPayment] = useState('upi')
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(false)
   const [orderId, setOrderId] = useState<string | null>(null)
@@ -75,17 +75,20 @@ export default function CheckoutPage() {
 
   const selectedAddress = addresses.find((a) => a.id === selectedId) ?? null
 
-  // Last gate before payment. Addresses saved before the zone check existed have
-  // no coordinates, so they can't be confirmed as inside the area and are
-  // treated the same as out-of-area rather than waved through.
-  const addressUnverified = !!selectedAddress && (selectedAddress.lat == null || selectedAddress.lng == null)
-  const addressOutOfZone = !!selectedAddress && !addressUnverified
-    && !isWithinDeliveryZone(selectedAddress.lat as number, selectedAddress.lng as number)
-  // An address with no coordinates (location was denied) is allowed through;
-  // only a confirmed out-of-area one is refused.
-  const addressBlocked = addressOutOfZone
+  // Delivery area: inside the inner boundary is the standard fee, between the
+  // two boundaries a higher fee, and outside the outer one the order is still
+  // accepted but stays pending until an executive calls to confirm. An address
+  // with no coordinates (location was denied) is treated as the standard area.
+  const tier = selectedAddress && selectedAddress.lat != null && selectedAddress.lng != null
+    ? getDeliveryTier(selectedAddress.lat, selectedAddress.lng)
+    : 'core'
+  const needsConfirmation = tier === 'outside'
 
-  const deliveryFee = DELIVERY_FEE
+  // Nothing is charged online until the executive has confirmed delivery is
+  // possible, so these orders are cash on delivery only.
+  const selectedPayment = needsConfirmation ? 'cod' : chosenPayment
+
+  const deliveryFee = getDeliveryFee(selectedAddress?.lat, selectedAddress?.lng)
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
@@ -97,13 +100,6 @@ export default function CheckoutPage() {
     if (items.length === 0 || !selectedAddress) return
 
     if (!signedIn) { setShowAuth(true); return }
-
-    if (addressBlocked) {
-      setPlaceError(addressOutOfZone
-        ? OUT_OF_ZONE_MESSAGE
-        : 'We can’t confirm this address is inside our delivery area. Please remove it and add it again using “Use current location”.')
-      return
-    }
 
     if (selectedPayment !== 'cod') {
       const normalizedPhone = (selectedAddress.contactPhone ?? '').replace(/^\+91/, '').slice(-10)
@@ -144,7 +140,8 @@ export default function CheckoutPage() {
           user_id: user?.id ?? null,
           restaurant_id: restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',
-          status: selectedPayment === 'cod' ? 'confirmed' : 'pending',
+          status: selectedPayment === 'cod' && !needsConfirmation ? 'confirmed' : 'pending',
+          notes: needsConfirmation ? 'OUTSIDE DELIVERY AREA - executive must call the customer and confirm a delivery partner is available before this order is confirmed.' : null,
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount: 0,
@@ -279,10 +276,16 @@ export default function CheckoutPage() {
                 <Check className="w-10 h-10 text-[#16A34A]" strokeWidth={2.5} />
               </div>
               <h2 className="text-[22px] font-[800] text-[#111827] mb-2" style={{ fontWeight: 800 }}>Order Placed!</h2>
+              {needsConfirmation ? (
+                <p className="text-[13.5px] text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-4 py-3 mb-2 leading-relaxed">
+                  {NEEDS_CONFIRMATION_MESSAGE}
+                </p>
+              ) : (<>
               <p className="text-[13.5px] text-[#6B7280] mb-2">Your order has been confirmed and will arrive in</p>
               <div className="flex items-center justify-center gap-2 text-[26px] font-[900] text-[#16A34A] mb-2" style={{ fontWeight: 900 }}>
                 <Zap className="w-6 h-6 fill-[#16A34A]" /> {deliveryEta} minutes
               </div>
+              </>)}
               {orderId && (
                 <p className="text-[11.5px] text-[#9CA3AF] font-mono">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
               )}
@@ -355,11 +358,9 @@ export default function CheckoutPage() {
 
           {/* The place-order button is disabled in this state, so the reason has
               to be visible here or it would look broken for no apparent reason. */}
-          {addressBlocked && (
+          {needsConfirmation && (
             <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
-              {addressOutOfZone
-                ? OUT_OF_ZONE_MESSAGE
-                : 'We can’t confirm this address is inside our delivery area. Please remove it and add it again using “Use current location”.'}
+              {NEEDS_CONFIRMATION_MESSAGE} This address is outside our regular delivery area, so payment is cash on delivery only.
             </div>
           )}
 
@@ -432,7 +433,8 @@ export default function CheckoutPage() {
                     <button
                       key={id}
                       onClick={() => setSelectedPayment(id)}
-                      className={cn('w-full text-left flex items-center gap-4 p-4 rounded-xl border-2 transition-all', selectedPayment === id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]')}
+                      disabled={needsConfirmation && id !== 'cod'}
+                      className={cn('w-full text-left flex items-center gap-4 p-4 rounded-xl border-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed', selectedPayment === id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]')}
                     >
                       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', selectedPayment === id ? 'bg-[#DCFCE7]' : 'bg-[#F3F4F6]')}>
                         <Icon className={cn('w-5 h-5', selectedPayment === id ? 'text-[#16A34A]' : 'text-[#6B7280]')} strokeWidth={1.75} />
@@ -517,7 +519,7 @@ export default function CheckoutPage() {
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
                   onClick={handlePlace}
-                  disabled={placing || !mounted || items.length === 0 || !selectedAddress || addressBlocked}
+                  disabled={placing || !mounted || items.length === 0 || !selectedAddress}
                   className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
                 >
@@ -539,7 +541,7 @@ export default function CheckoutPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <button
           onClick={handlePlace}
-          disabled={placing || !mounted || items.length === 0 || !selectedAddress || addressBlocked}
+          disabled={placing || !mounted || items.length === 0 || !selectedAddress}
           className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
         >
           {placing ? (
@@ -548,8 +550,6 @@ export default function CheckoutPage() {
             <>Sign in to place order</>
           ) : !selectedAddress ? (
             <>Select a delivery address</>
-          ) : addressBlocked ? (
-            <>Outside our delivery area</>
           ) : (
             <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}

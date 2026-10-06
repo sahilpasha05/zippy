@@ -2,10 +2,15 @@ import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 import { point } from '@turf/helpers'
 import type { Feature, Polygon } from 'geojson'
 
-// Traced from a hand-drawn delivery boundary over Tarikere, Karnataka.
-// Approximate accuracy — visually traced against Google Maps imagery, not
-// survey-grade. Re-trace in Mapbox Studio / geojson.io if you need tighter
-// tolerance on any specific edge.
+// Two hand-drawn boundaries over Tarikere, Karnataka, traced from a Google
+// Maps screenshot (pixel positions converted using the map's centre and scale
+// bar). Approximate — a few hundred metres of tolerance on any edge. Re-trace
+// in Mapbox Studio / geojson.io if you need tighter edges.
+//
+//   inside DELIVERY_ZONE (black line)         → standard delivery fee
+//   between the two lines (inside OUTER_ZONE) → higher delivery fee
+//   outside OUTER_ZONE (red line)             → order is accepted but must be
+//                                               confirmed by an executive call
 export const DELIVERY_ZONE: Feature<Polygon> = {
   type: 'Feature',
   properties: { name: 'Zippy Delivery Zone' },
@@ -13,111 +18,116 @@ export const DELIVERY_ZONE: Feature<Polygon> = {
     type: 'Polygon',
     coordinates: [
       [
-        [75.787942, 13.723376],
-        [75.789501, 13.723983],
-        [75.791374, 13.72459],
-        [75.793246, 13.725074],
-        [75.795429, 13.725316],
-        [75.797614, 13.725316],
-        [75.799798, 13.725074],
-        [75.801671, 13.72459],
-        [75.803231, 13.724104],
-        [75.804791, 13.723861],
-        [75.806663, 13.723983],
-        [75.808536, 13.724286],
-        [75.810408, 13.724468],
-        [75.812281, 13.72459],
-        [75.814153, 13.724711],
-        [75.816025, 13.72459],
-        [75.817585, 13.723983],
-        [75.819145, 13.722892],
-        [75.820393, 13.721556],
-        [75.82133, 13.720041],
-        [75.822267, 13.718222],
-        [75.822891, 13.716403],
-        [75.823328, 13.714585],
-        [75.823703, 13.712766],
-        [75.823953, 13.710947],
-        [75.824453, 13.709734],
-        [75.826321, 13.709128],
-        [75.828817, 13.708522],
-        [75.831626, 13.707916],
-        [75.834434, 13.70731],
-        [75.837243, 13.706703],
-        [75.840052, 13.705916],
-        [75.84286, 13.705066],
-        [75.845669, 13.704097],
-        [75.848477, 13.703066],
-        [75.851286, 13.701854],
-        [75.854094, 13.700641],
-        [75.856903, 13.699125],
-        [75.859399, 13.69761],
-        [75.861583, 13.696095],
-        [75.863456, 13.694579],
-        [75.865016, 13.693062],
-        [75.865952, 13.691547],
-        [75.865952, 13.689729],
-        [75.865016, 13.68791],
-        [75.863768, 13.686091],
-        [75.862207, 13.684274],
-        [75.860334, 13.682452],
-        [75.858461, 13.680634],
-        [75.856588, 13.678816],
-        [75.854716, 13.676996],
-        [75.852844, 13.675178],
-        [75.850659, 13.673541],
-        [75.848165, 13.672148],
-        [75.845357, 13.670935],
-        [75.842235, 13.669903],
-        [75.8388, 13.668933],
-        [75.835057, 13.668084],
-        [75.831, 13.667297],
-        [75.826945, 13.66669],
-        [75.823824, 13.666993],
-        [75.821953, 13.668206],
-        [75.82083, 13.670024],
-        [75.820268, 13.672148],
-        [75.820081, 13.674572],
-        [75.820206, 13.676996],
-        [75.82058, 13.67942],
-        [75.820081, 13.681846],
-        [75.818521, 13.683666],
-        [75.816025, 13.684878],
-        [75.813215, 13.685668],
-        [75.810408, 13.686273],
-        [75.807912, 13.687],
-        [75.806039, 13.688212],
-        [75.804479, 13.690032],
-        [75.803356, 13.692154],
-        [75.802482, 13.694396],
-        [75.801983, 13.696822],
-        [75.801858, 13.699246],
-        [75.802108, 13.701672],
-        [75.802482, 13.704097],
-        [75.802919, 13.706522],
-        [75.803106, 13.708946],
-        [75.802919, 13.711372],
-        [75.802295, 13.713676],
-        [75.801234, 13.715797],
-        [75.799798, 13.717737],
-        [75.798114, 13.719434],
-        [75.796242, 13.720949],
-        [75.79437, 13.72204],
-        [75.79231, 13.722891],
-        [75.790125, 13.723376],
-        [75.787942, 13.723376],
+        [75.793493, 13.716512],
+        [75.793876, 13.71571],
+        [75.794424, 13.714104],
+        [75.795244, 13.712231],
+        [75.796065, 13.711001],
+        [75.79705, 13.710626],
+        [75.79787, 13.710358],
+        [75.79798, 13.709021],
+        [75.799348, 13.708218],
+        [75.802357, 13.707415],
+        [75.804272, 13.705275],
+        [75.805913, 13.703402],
+        [75.807554, 13.700726],
+        [75.809743, 13.69805],
+        [75.812478, 13.696177],
+        [75.81494, 13.695214],
+        [75.816855, 13.695107],
+        [75.817676, 13.694304],
+        [75.819591, 13.692699],
+        [75.821506, 13.691254],
+        [75.825062, 13.690666],
+        [75.827251, 13.691629],
+        [75.828454, 13.693502],
+        [75.828782, 13.69591],
+        [75.828892, 13.699121],
+        [75.827251, 13.701261],
+        [75.827032, 13.703937],
+        [75.826703, 13.706077],
+        [75.82643, 13.708485],
+        [75.824241, 13.708753],
+        [75.820685, 13.709984],
+        [75.816308, 13.711429],
+        [75.813573, 13.711964],
+        [75.811384, 13.713034],
+        [75.808649, 13.714372],
+        [75.805366, 13.71571],
+        [75.802083, 13.717048],
+        [75.799348, 13.71785],
+        [75.797159, 13.718064],
+        [75.795518, 13.717583],
+        [75.793876, 13.71678],
+        [75.793493, 13.716512]
       ],
     ],
   },
 }
 
-// Turf/GeoJSON is [lng, lat] — this helper takes the more natural (lat, lng)
-// argument order used throughout the rest of the app (geolocation, reverse-geocode, etc).
-export function isWithinDeliveryZone(lat: number, lng: number): boolean {
-  return booleanPointInPolygon(point([lng, lat]), DELIVERY_ZONE)
+export const OUTER_ZONE: Feature<Polygon> = {
+  type: 'Feature',
+  properties: { name: 'Zippy Outer Zone' },
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [75.791141, 13.727697],
+        [75.780417, 13.720847],
+        [75.780417, 13.713569],
+        [75.780417, 13.706077],
+        [75.78184, 13.699121],
+        [75.788952, 13.69591],
+        [75.793876, 13.695375],
+        [75.799895, 13.693769],
+        [75.802083, 13.689488],
+        [75.80646, 13.685207],
+        [75.813025, 13.681996],
+        [75.818497, 13.679535],
+        [75.825062, 13.676324],
+        [75.832175, 13.67322],
+        [75.836552, 13.673434],
+        [75.841476, 13.675575],
+        [75.845852, 13.678786],
+        [75.849135, 13.681996],
+        [75.852965, 13.686813],
+        [75.856248, 13.693234],
+        [75.858764, 13.699656],
+        [75.860625, 13.703937],
+        [75.862047, 13.708218],
+        [75.862813, 13.713569],
+        [75.862266, 13.71892],
+        [75.860625, 13.722131],
+        [75.854606, 13.725128],
+        [75.850229, 13.726947],
+        [75.846947, 13.728553],
+        [75.841476, 13.729195],
+        [75.83491, 13.729837],
+        [75.827251, 13.729944],
+        [75.817402, 13.730051],
+        [75.813573, 13.730693],
+        [75.811931, 13.730479],
+        [75.809743, 13.72973],
+        [75.804272, 13.729409],
+        [75.797706, 13.728981],
+        [75.792782, 13.728339],
+        [75.791141, 13.727697]
+      ],
+    ],
+  },
 }
 
-// One wording for every place an out-of-area customer gets turned away, so the
-// address picker and checkout can't drift apart.
-export const OUT_OF_ZONE_MESSAGE =
-  'We’re not delivering to your area yet — Zippy currently serves Tarikere only. Contact us at zippytarikere@gmail.com or on WhatsApp at 8277802605 for more details.'
+export type DeliveryTier = 'core' | 'extended' | 'outside'
+
+// Turf/GeoJSON is [lng, lat] — this helper takes the more natural (lat, lng)
+// argument order used throughout the rest of the app (geolocation, reverse-geocode, etc).
+export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
+  const p = point([lng, lat])
+  if (booleanPointInPolygon(p, DELIVERY_ZONE)) return 'core'
+  if (booleanPointInPolygon(p, OUTER_ZONE)) return 'extended'
+  return 'outside'
+}
+
+// Shown wherever an address outside the outer boundary is used for an order.
+export const NEEDS_CONFIRMATION_MESSAGE =
+  'Your order needs to be confirmed. Our executive will call you and check whether a delivery partner is available in your area.'

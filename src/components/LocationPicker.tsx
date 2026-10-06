@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
-import { isWithinDeliveryZone, OUT_OF_ZONE_MESSAGE } from '@/lib/deliveryZone'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 
 const LABELS = [
@@ -63,11 +62,6 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     try {
       const pos = await getCurrentPosition()
       const { latitude, longitude } = pos.coords
-      if (!isWithinDeliveryZone(latitude, longitude)) {
-        setError(OUT_OF_ZONE_MESSAGE)
-        setLocating(false)
-        return
-      }
       const address = await reverseGeocode(latitude, longitude)
       setDraftCoords({ lat: latitude, lng: longitude })
       setDetectedArea(address ?? `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
@@ -107,7 +101,6 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     // coordinates; without them the address saves and the shop confirms the
     // area from the typed address when they call.
     const coords = draftCoords
-    if (coords && !isWithinDeliveryZone(coords.lat, coords.lng)) { setError(OUT_OF_ZONE_MESSAGE); return }
 
     try {
       const saved = await addAddress({

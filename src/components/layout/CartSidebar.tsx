@@ -7,13 +7,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { useAddressStore } from '@/lib/store/address'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
   const cartTotal = getCartBaseTotal(items)
   const platformFee = getPlatformFee(cartTotal)
-  const grandTotal = cartTotal + DELIVERY_FEE + platformFee
+  const selectedAddress = useAddressStore((s) => s.addresses.find((a) => a.id === s.selectedId) ?? null)
+  const deliveryFee = getDeliveryFee(selectedAddress?.lat, selectedAddress?.lng)
+  const grandTotal = cartTotal + deliveryFee + platformFee
   const deliveryEta = useDeliveryEta()
 
   useEffect(() => {
@@ -132,8 +135,8 @@ export default function CartSidebar() {
                 <span>₹{cartTotal.toFixed(0)}</span>
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
-                <span>Delivery fee</span>
-                <span>₹{DELIVERY_FEE}</span>
+                <span>Delivery fee{deliveryFee > DELIVERY_FEE ? ' (outside core area)' : ''}</span>
+                <span>₹{deliveryFee}</span>
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
                 <span>Platform fee</span>
