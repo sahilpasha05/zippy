@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE } from '@/lib/deliveryZone'
 import { useLiveLocation } from '@/lib/store/liveLocation'
@@ -98,6 +98,8 @@ export default function CheckoutPage() {
   const selectedPayment = needsConfirmation ? 'cod' : chosenPayment
 
   const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
+  const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
+  const belowMinOrder = minOrder > 0 && cartTotal < minOrder
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
@@ -107,6 +109,11 @@ export default function CheckoutPage() {
   const handlePlace = async () => {
     if (submittingRef.current) return
     if (items.length === 0 || !selectedAddress) return
+
+    if (belowMinOrder) {
+      setPlaceError(`The minimum order for your area is ₹${minOrder}. Add ₹${Math.ceil(minOrder - cartTotal)} more to continue.`)
+      return
+    }
 
     if (!locationReady) {
       setPlaceError('We need your live location to place the order. Allow location access and try again.')
@@ -386,7 +393,8 @@ export default function CheckoutPage() {
 
           {needsConfirmation && (
             <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
-              {NEEDS_CONFIRMATION_MESSAGE} This address is outside our regular delivery area, so payment is cash on delivery only.
+              {NEEDS_CONFIRMATION_MESSAGE} This address is outside our regular delivery area, so payment is cash on delivery only, delivery is ₹{deliveryFee}, and the minimum order is ₹{minOrder}.
+              {belowMinOrder && <strong className="block mt-1">Add ₹{Math.ceil(minOrder - cartTotal)} more to place this order.</strong>}
             </div>
           )}
 
@@ -545,7 +553,7 @@ export default function CheckoutPage() {
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
                   onClick={handlePlace}
-                  disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady}
+                  disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady || belowMinOrder}
                   className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
                 >
@@ -555,6 +563,8 @@ export default function CheckoutPage() {
                     <>Select a delivery address</>
                   ) : !locationReady ? (
                     <>Allow live location to continue</>
+                  ) : belowMinOrder ? (
+                    <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
                   ) : (
                     <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
                   )}
@@ -569,7 +579,7 @@ export default function CheckoutPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <button
           onClick={handlePlace}
-          disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady}
+          disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady || belowMinOrder}
           className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
         >
           {placing ? (
@@ -580,6 +590,8 @@ export default function CheckoutPage() {
             <>Select a delivery address</>
           ) : !locationReady ? (
             <>Allow live location to continue</>
+          ) : belowMinOrder ? (
+            <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
           ) : (
             <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}

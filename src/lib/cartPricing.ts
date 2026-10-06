@@ -18,15 +18,24 @@ export function removePriceMarkup(markedUpPrice: number): number {
 }
 
 // Delivery charge by area (see deliveryZone.ts): ₹29 inside the inner zone,
-// ₹59 between the inner and outer boundaries, and ₹59 outside the outer one
-// too (those orders also need an executive's confirmation). An address with no
-// coordinates can't be placed, so it gets the standard fee.
+// ₹59 between the inner and outer boundaries, and ₹80 outside the outer one —
+// those orders also need ₹600 of food and an executive's confirmation. An
+// address with no coordinates can't be placed, so it gets the standard fee.
 export const DELIVERY_FEE: number = 29
 export const OUTER_DELIVERY_FEE: number = 59
+export const OUTSIDE_DELIVERY_FEE: number = 80
+export const OUTSIDE_MIN_ORDER: number = 600
 
 export function getDeliveryFee(lat: number | null | undefined, lng: number | null | undefined): number {
   if (lat == null || lng == null) return DELIVERY_FEE
-  return getDeliveryTier(lat, lng) === 'core' ? DELIVERY_FEE : OUTER_DELIVERY_FEE
+  const tier = getDeliveryTier(lat, lng)
+  return tier === 'core' ? DELIVERY_FEE : tier === 'extended' ? OUTER_DELIVERY_FEE : OUTSIDE_DELIVERY_FEE
+}
+
+// Minimum cart value (items, before fees) — only outside the outer boundary.
+export function getMinOrderValue(lat: number | null | undefined, lng: number | null | undefined): number {
+  if (lat == null || lng == null) return 0
+  return getDeliveryTier(lat, lng) === 'outside' ? OUTSIDE_MIN_ORDER : 0
 }
 
 // Platform fee, banded by cart subtotal (before discount and delivery).

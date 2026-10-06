@@ -7,7 +7,7 @@ import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-re
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useLiveLocation } from '@/lib/store/liveLocation'
 
 export default function CartSidebar() {
@@ -21,6 +21,8 @@ export default function CartSidebar() {
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
+  const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
+  const belowMinOrder = minOrder > 0 && cartTotal < minOrder
 
   async function handleProceed() {
     setLocationError('')
@@ -29,6 +31,12 @@ export default function CartSidebar() {
     setLocating(false)
     if (!ok) {
       setLocationError((useLiveLocation.getState().error || 'We could not get your location.') + ' Live location is required to continue.')
+      return
+    }
+    const coords = useLiveLocation.getState().coords
+    const needed = getMinOrderValue(coords?.lat, coords?.lng)
+    if (needed > 0 && cartTotal < needed) {
+      setLocationError(`Your location is outside our regular delivery area. The minimum order there is ₹${needed} — add ₹${Math.ceil(needed - cartTotal)} more to continue.`)
       return
     }
     closeCart()
@@ -167,6 +175,9 @@ export default function CartSidebar() {
             </div>
 
             {/* Checkout CTA */}
+            {belowMinOrder && !locationError && (
+              <p className="text-[12.5px] text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2 leading-relaxed">Minimum order for your area is ₹{minOrder}. Add ₹{Math.ceil(minOrder - cartTotal)} more to continue.</p>
+            )}
             {locationError && (
               <p className="text-[12.5px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-xl px-3 py-2 leading-relaxed">{locationError}</p>
             )}
