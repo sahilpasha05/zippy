@@ -1,21 +1,39 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/lib/store/cart'
 import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, DELIVERY_FEE } from '@/lib/cartPricing'
-import { useAddressStore } from '@/lib/store/address'
+import { useLiveLocation } from '@/lib/store/liveLocation'
 
 export default function CartSidebar() {
   const { items, isOpen, closeCart, updateQuantity, removeItem } = useCartStore()
   const cartTotal = getCartBaseTotal(items)
   const platformFee = getPlatformFee(cartTotal)
-  const selectedAddress = useAddressStore((s) => s.addresses.find((a) => a.id === s.selectedId) ?? null)
-  const deliveryFee = getDeliveryFee(selectedAddress?.lat, selectedAddress?.lng)
+  // Live location is compulsory to continue. It's asked for here, when the
+  // customer taps Proceed, and the delivery fee reflects where they actually are.
+  const router = useRouter()
+  const liveCoords = useLiveLocation((s) => s.coords)
+  const [locating, setLocating] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
+
+  async function handleProceed() {
+    setLocationError('')
+    setLocating(true)
+    const ok = await useLiveLocation.getState().request()
+    setLocating(false)
+    if (!ok) {
+      setLocationError((useLiveLocation.getState().error || 'We could not get your location.') + ' Live location is required to continue.')
+      return
+    }
+    closeCart()
+    router.push('/checkout')
+  }
   const grandTotal = cartTotal + deliveryFee + platformFee
   const deliveryEta = useDeliveryEta()
 
@@ -149,12 +167,13 @@ export default function CartSidebar() {
             </div>
 
             {/* Checkout CTA */}
-            <Link href="/checkout" onClick={closeCart}>
-              <button className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#16A34A] text-white text-[15px] font-700 rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all shadow-[0_4px_16px_rgba(22,163,74,0.35)] hover:shadow-[0_6px_20px_rgba(22,163,74,0.45)]" style={{ fontWeight: 700 }}>
-                Proceed to Checkout
-                <ArrowRight className="w-4.5 h-4.5" />
-              </button>
-            </Link>
+            {locationError && (
+              <p className="text-[12.5px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-xl px-3 py-2 leading-relaxed">{locationError}</p>
+            )}
+            <button onClick={handleProceed} disabled={locating}
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#16A34A] text-white text-[15px] font-700 rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-70 shadow-[0_4px_16px_rgba(22,163,74,0.35)] hover:shadow-[0_6px_20px_rgba(22,163,74,0.45)]" style={{ fontWeight: 700 }}>
+              {locating ? 'Getting your live location…' : <>Proceed to Checkout<ArrowRight className="w-4.5 h-4.5" /></>}
+            </button>
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE } from '@/lib/deliveryZone'
+import { useLiveLocation } from '@/lib/store/liveLocation'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
@@ -79,16 +80,24 @@ export default function CheckoutPage() {
   // two boundaries a higher fee, and outside the outer one the order is still
   // accepted but stays pending until an executive calls to confirm. An address
   // with no coordinates (location was denied) is treated as the standard area.
-  const tier = selectedAddress && selectedAddress.lat != null && selectedAddress.lng != null
-    ? getDeliveryTier(selectedAddress.lat, selectedAddress.lng)
-    : 'core'
+  // Live location is compulsory: the zone, the fee and the rider's drop point
+  // all come from the customer's actual GPS position, even when a saved
+  // address is selected. It's requested again here (the cart asks first) so a
+  // direct visit to checkout can't skip it.
+  const { coords: liveCoords, status: liveStatus, error: liveError, request: requestLocation } = useLiveLocation()
+  useEffect(() => {
+    if (useLiveLocation.getState().status === 'idle') void useLiveLocation.getState().request()
+  }, [])
+  const locationReady = liveStatus === 'granted' && !!liveCoords
+
+  const tier = liveCoords ? getDeliveryTier(liveCoords.lat, liveCoords.lng) : 'core'
   const needsConfirmation = tier === 'outside'
 
   // Nothing is charged online until the executive has confirmed delivery is
   // possible, so these orders are cash on delivery only.
   const selectedPayment = needsConfirmation ? 'cod' : chosenPayment
 
-  const deliveryFee = getDeliveryFee(selectedAddress?.lat, selectedAddress?.lng)
+  const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
   const platformFee = getPlatformFee(cartTotal)
   const grandTotal = cartTotal + deliveryFee + platformFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
@@ -98,6 +107,12 @@ export default function CheckoutPage() {
   const handlePlace = async () => {
     if (submittingRef.current) return
     if (items.length === 0 || !selectedAddress) return
+
+    if (!locationReady) {
+      setPlaceError('We need your live location to place the order. Allow location access and try again.')
+      void requestLocation()
+      return
+    }
 
     if (!signedIn) { setShowAuth(true); return }
 
@@ -148,8 +163,8 @@ export default function CheckoutPage() {
           online_amount: onlineAmount,
           cod_amount: codAmount,
           address: selectedAddress.address,
-          delivery_latitude: selectedAddress.lat,
-          delivery_longitude: selectedAddress.lng,
+          delivery_latitude: liveCoords?.lat ?? selectedAddress.lat,
+          delivery_longitude: liveCoords?.lng ?? selectedAddress.lng,
           coupon_code: null,
           payment_method: selectedPayment,
           payment_status: 'pending',
@@ -358,6 +373,17 @@ export default function CheckoutPage() {
 
           {/* The place-order button is disabled in this state, so the reason has
               to be visible here or it would look broken for no apparent reason. */}
+          {!locationReady && (
+            <div className="mb-6 px-4 py-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-[13px] text-[#B91C1C] leading-relaxed">
+              {liveStatus === 'loading' || liveStatus === 'idle'
+                ? 'Getting your live location… Please allow location access when your browser asks. It is required to place an order.'
+                : (<>
+                    {liveError || 'We could not get your live location.'} Live location is required to place an order.
+                    <button onClick={() => void requestLocation()} className="ml-2 font-[700] underline">Try again</button>
+                  </>)}
+            </div>
+          )}
+
           {needsConfirmation && (
             <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
               {NEEDS_CONFIRMATION_MESSAGE} This address is outside our regular delivery area, so payment is cash on delivery only.
@@ -519,7 +545,7 @@ export default function CheckoutPage() {
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
                   onClick={handlePlace}
-                  disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+                  disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady}
                   className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
                 >
@@ -527,6 +553,8 @@ export default function CheckoutPage() {
                     <><Loader2 className="w-5 h-5 animate-spin" />Placing order...</>
                   ) : !selectedAddress ? (
                     <>Select a delivery address</>
+                  ) : !locationReady ? (
+                    <>Allow live location to continue</>
                   ) : (
                     <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
                   )}
@@ -541,7 +569,7 @@ export default function CheckoutPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <button
           onClick={handlePlace}
-          disabled={placing || !mounted || items.length === 0 || !selectedAddress}
+          disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady}
           className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
         >
           {placing ? (
@@ -550,6 +578,8 @@ export default function CheckoutPage() {
             <>Sign in to place order</>
           ) : !selectedAddress ? (
             <>Select a delivery address</>
+          ) : !locationReady ? (
+            <>Allow live location to continue</>
           ) : (
             <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}

@@ -18,11 +18,11 @@ export function removePriceMarkup(markedUpPrice: number): number {
 }
 
 // Delivery charge by area (see deliveryZone.ts): ₹29 inside the inner zone,
-// ₹79 between the inner and outer boundaries, and ₹79 outside the outer one
+// ₹59 between the inner and outer boundaries, and ₹59 outside the outer one
 // too (those orders also need an executive's confirmation). An address with no
 // coordinates can't be placed, so it gets the standard fee.
 export const DELIVERY_FEE: number = 29
-export const OUTER_DELIVERY_FEE: number = 79
+export const OUTER_DELIVERY_FEE: number = 59
 
 export function getDeliveryFee(lat: number | null | undefined, lng: number | null | undefined): number {
   if (lat == null || lng == null) return DELIVERY_FEE

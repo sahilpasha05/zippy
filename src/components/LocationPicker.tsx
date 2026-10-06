@@ -75,13 +75,22 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     }
   }
 
-  // Manual entry is a deliberately separate, unverified path: no GPS, no zone
-  // gate, the customer can type any address they like (a friend's place, an
-  // office across town, whatever). It saves without coordinates, and the shop
-  // confirms the area from the typed text when they call — unlike "Use current
-  // location", which is locked to what GPS actually detected.
-  function openManual() {
-    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftCoords(null); setDraftLabel('Home'); setError('')
+  // Manual entry lets the customer type any address (a friend's place, an
+  // office across town), but live location is compulsory: it's fetched as soon
+  // as they choose to add an address, and the address can't be saved without
+  // it. The typed text is kept as the delivery address.
+  async function openManual() {
+    setLocating(true); setError('')
+    try {
+      const pos = await getCurrentPosition()
+      setDraftCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : 'Could not get your location') + ' Live location is required to add an address.')
+      setLocating(false)
+      return
+    }
+    setLocating(false)
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftLabel('Home')
     setStep('manual')
   }
 
@@ -101,10 +110,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     // coordinates; without them the address saves and the shop confirms the
     // area from the typed address when they call.
     const coords = draftCoords
+    if (!coords) { setError('Live location is required to save an address. Go back and allow location access.'); return }
 
     try {
       const saved = await addAddress({
-        label: draftLabel, address: fullAddress, lat: coords?.lat ?? null, lng: coords?.lng ?? null,
+        label: draftLabel, address: fullAddress, lat: coords.lat, lng: coords.lng,
         contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
       })
       await selectAddress(saved.id)
@@ -167,9 +177,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <button onClick={openManual}
-              className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[#D1D5DB] rounded-xl text-[13.5px] font-medium text-[#16A34A] hover:border-[#16A34A] hover:bg-[#F0FDF4] transition-all">
-              <Plus className="w-4 h-4" /> Add new address
+            <button onClick={openManual} disabled={locating}
+              className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-[#D1D5DB] rounded-xl text-[13.5px] font-medium text-[#16A34A] hover:border-[#16A34A] hover:bg-[#F0FDF4] transition-all disabled:opacity-60">
+              {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {locating ? 'Getting your location...' : 'Add new address'}
             </button>
           </div>
         )}
@@ -178,12 +188,12 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
           <div className="p-4 space-y-4">
             {error && <p className="text-[12.5px] text-[#DC2626]">{error}</p>}
 
-            {step === 'confirm' && draftCoords && (
+            {draftCoords && (
               <>
                 <LiveTrackingMap riderLocation={null} dropLocation={draftCoords} className="h-40" showRiderStatus={false} />
                 <div className="flex items-start gap-2 px-3 py-2.5 bg-[#F0FDF4] border border-[#DCFCE7] rounded-xl">
                   <MapPin className="w-3.5 h-3.5 text-[#16A34A] mt-0.5 shrink-0" />
-                  <p className="text-[12px] text-[#15803D]">Detected: {detectedArea}</p>
+                  <p className="text-[12px] text-[#15803D]">{detectedArea ? `Live location detected: ${detectedArea}` : 'Live location captured'}. Please also type your full address below.</p>
                 </div>
               </>
             )}
@@ -196,11 +206,9 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">
                 Apartment / Road / Area *
-                {step === 'confirm' && <span className="text-[#9CA3AF] font-normal"> — locked to your current location</span>}
               </label>
               <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. Main Road, Tarikere"
-                readOnly={step === 'confirm'}
-                className={cn(INPUT, step === 'confirm' && 'bg-[#F8FAFC] text-[#6B7280] cursor-not-allowed')} />
+                className={INPUT} />
             </div>
             <div>
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Landmark <span className="text-[#9CA3AF] font-normal">(optional)</span></label>
