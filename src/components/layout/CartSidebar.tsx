@@ -20,17 +20,19 @@ export default function CartSidebar() {
   const liveCoords = useLiveLocation((s) => s.coords)
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
+  const [offerManual, setOfferManual] = useState(false)
   const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
   const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
   const belowMinOrder = minOrder > 0 && cartTotal < minOrder
 
   async function handleProceed() {
-    setLocationError('')
+    setLocationError(''); setOfferManual(false)
     setLocating(true)
     const ok = await useLiveLocation.getState().request()
     setLocating(false)
     if (!ok) {
-      setLocationError((useLiveLocation.getState().error || 'We could not get your location.') + ' Live location is required to continue.')
+      setLocationError((useLiveLocation.getState().error || 'We could not get your location.') + ' You can try again, or continue with a manually typed address.')
+      setOfferManual(true)
       return
     }
     const coords = useLiveLocation.getState().coords
@@ -39,6 +41,14 @@ export default function CartSidebar() {
       setLocationError(`Your location is outside our regular delivery area. The minimum order there is ₹${needed} — add ₹${Math.ceil(needed - cartTotal)} more to continue.`)
       return
     }
+    closeCart()
+    router.push('/checkout')
+  }
+
+  // Location blocked: carry on with the address typed at checkout instead.
+  function handleManual() {
+    useLiveLocation.getState().continueManually()
+    setLocationError(''); setOfferManual(false)
     closeCart()
     router.push('/checkout')
   }
@@ -180,6 +190,11 @@ export default function CartSidebar() {
             )}
             {locationError && (
               <p className="text-[12.5px] text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-xl px-3 py-2 leading-relaxed">{locationError}</p>
+            )}
+            {offerManual && (
+              <button onClick={handleManual} className="w-full py-3 border-2 border-[#16A34A] text-[#15803D] text-[14px] font-[700] rounded-2xl hover:bg-[#F0FDF4] transition-all" style={{ fontWeight: 700 }}>
+                Continue with manual address
+              </button>
             )}
             <button onClick={handleProceed} disabled={locating}
               className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#16A34A] text-white text-[15px] font-700 rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-70 shadow-[0_4px_16px_rgba(22,163,74,0.35)] hover:shadow-[0_6px_20px_rgba(22,163,74,0.45)]" style={{ fontWeight: 700 }}>

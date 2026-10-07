@@ -35,6 +35,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   const [accountPhone, setAccountPhone] = useState('')
   const [draftLabel, setDraftLabel] = useState('Home')
   const [draftCoords, setDraftCoords] = useState<{ lat: number; lng: number } | null>(null)
+  // Set when location is blocked/unavailable and the customer chooses to type
+  // the address manually instead; it then saves without coordinates and the
+  // order is confirmed by an executive call.
+  const [locationFailed, setLocationFailed] = useState(false)
+  const [manualFallback, setManualFallback] = useState(false)
 
 
 
@@ -80,16 +85,24 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
   // as they choose to add an address, and the address can't be saved without
   // it. The typed text is kept as the delivery address.
   async function openManual() {
-    setLocating(true); setError('')
+    setLocating(true); setError(''); setLocationFailed(false); setManualFallback(false)
     try {
       const pos = await getCurrentPosition()
       setDraftCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude })
     } catch (err: unknown) {
-      setError((err instanceof Error ? err.message : 'Could not get your location') + ' Live location is required to add an address.')
+      setError((err instanceof Error ? err.message : 'Could not get your location') + ' You can try again, or continue with a manually typed address.')
+      setLocationFailed(true)
       setLocating(false)
       return
     }
     setLocating(false)
+    setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftLabel('Home')
+    setStep('manual')
+  }
+
+  // Location is blocked: open the form with no coordinates.
+  function continueManually() {
+    setError(''); setLocationFailed(false); setManualFallback(true); setDraftCoords(null)
     setDetectedArea(''); setHouseNo(''); setAreaLine(''); setLandmark(''); setContactName(''); setContactPhone(accountPhone); setContactPhone2(accountPhone); setDraftLabel('Home')
     setStep('manual')
   }
@@ -110,11 +123,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
     // coordinates; without them the address saves and the shop confirms the
     // area from the typed address when they call.
     const coords = draftCoords
-    if (!coords) { setError('Live location is required to save an address. Go back and allow location access.'); return }
+    if (!coords && !manualFallback) { setError('Live location is required to save an address. Go back and allow location access, or continue manually.'); return }
 
     try {
       const saved = await addAddress({
-        label: draftLabel, address: fullAddress, lat: coords.lat, lng: coords.lng,
+        label: draftLabel, address: fullAddress, lat: coords?.lat ?? null, lng: coords?.lng ?? null,
         contactName: contactName.trim(), contactPhone: `+91${contactPhone.trim()}`,
       })
       await selectAddress(saved.id)
@@ -140,6 +153,11 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
         {step === 'list' && (
           <div className="p-4">
             {error && <p className="text-[12.5px] text-[#DC2626] mb-3">{error}</p>}
+            {locationFailed && (
+              <button onClick={continueManually} className="w-full mb-3 py-2.5 border-2 border-[#16A34A] text-[#15803D] text-[13.5px] font-[700] rounded-xl hover:bg-[#F0FDF4] transition-all" style={{ fontWeight: 700 }}>
+                Continue with manual address
+              </button>
+            )}
             <button onClick={handleUseCurrentLocation} disabled={locating}
               className="w-full flex items-center gap-3 p-3.5 border-2 border-[#DCFCE7] bg-[#F0FDF4] rounded-xl mb-4 hover:border-[#16A34A] transition-all disabled:opacity-70">
               <div className="w-9 h-9 bg-[#16A34A] rounded-xl flex items-center justify-center shrink-0">

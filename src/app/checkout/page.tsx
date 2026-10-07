@@ -84,14 +84,18 @@ export default function CheckoutPage() {
   // all come from the customer's actual GPS position, even when a saved
   // address is selected. It's requested again here (the cart asks first) so a
   // direct visit to checkout can't skip it.
-  const { coords: liveCoords, status: liveStatus, error: liveError, request: requestLocation } = useLiveLocation()
+  const { coords: liveCoords, status: liveStatus, error: liveError, manualMode, request: requestLocation, continueManually } = useLiveLocation()
   useEffect(() => {
     if (useLiveLocation.getState().status === 'idle') void useLiveLocation.getState().request()
   }, [])
-  const locationReady = liveStatus === 'granted' && !!liveCoords
+  // If location is blocked the customer can carry on with the address they typed.
+  const noLiveLocation = manualMode && !liveCoords
+  const locationReady = (liveStatus === 'granted' && !!liveCoords) || noLiveLocation
 
   const tier = liveCoords ? getDeliveryTier(liveCoords.lat, liveCoords.lng) : 'core'
-  const needsConfirmation = tier === 'outside'
+  // The area can't be checked without a location, so those orders are
+  // confirmed by an executive call too.
+  const needsConfirmation = tier === 'outside' || noLiveLocation
 
   // Nothing is charged online until the executive has confirmed delivery is
   // possible, so these orders are cash on delivery only.
@@ -163,7 +167,11 @@ export default function CheckoutPage() {
           restaurant_id: restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',
           status: selectedPayment === 'cod' && !needsConfirmation ? 'confirmed' : 'pending',
-          notes: needsConfirmation ? 'OUTSIDE DELIVERY AREA - executive must call the customer and confirm a delivery partner is available before this order is confirmed.' : null,
+          notes: noLiveLocation
+            ? 'NO LIVE LOCATION - customer location was blocked and they used a typed address. Executive must call the customer, confirm the area and delivery availability before this order is confirmed.'
+            : needsConfirmation
+              ? 'OUTSIDE DELIVERY AREA - executive must call the customer and confirm a delivery partner is available before this order is confirmed.'
+              : null,
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount: 0,
@@ -385,15 +393,21 @@ export default function CheckoutPage() {
               {liveStatus === 'loading' || liveStatus === 'idle'
                 ? 'Getting your live location… Please allow location access when your browser asks. It is required to place an order.'
                 : (<>
-                    {liveError || 'We could not get your live location.'} Live location is required to place an order.
-                    <button onClick={() => void requestLocation()} className="ml-2 font-[700] underline">Try again</button>
+                    {liveError || 'We could not get your live location.'} You can try again, or continue with the address you typed.
+                    <span className="flex flex-wrap gap-3 mt-2">
+                      <button onClick={() => void requestLocation()} className="font-[700] underline">Try again</button>
+                      <button onClick={continueManually} className="font-[700] underline">Continue with manual address</button>
+                    </span>
                   </>)}
             </div>
           )}
 
           {needsConfirmation && (
             <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
-              {NEEDS_CONFIRMATION_MESSAGE} This address is outside our regular delivery area, so payment is cash on delivery only, delivery is ₹{deliveryFee}, and the minimum order is ₹{minOrder}.
+              {NEEDS_CONFIRMATION_MESSAGE}{' '}
+              {noLiveLocation
+                ? 'Your live location is off, so we will confirm your area when we call. Payment is cash on delivery only.'
+                : `This address is outside our regular delivery area, so payment is cash on delivery only, delivery is ₹${deliveryFee}, and the minimum order is ₹${minOrder}.`}
               {belowMinOrder && <strong className="block mt-1">Add ₹{Math.ceil(minOrder - cartTotal)} more to place this order.</strong>}
             </div>
           )}
