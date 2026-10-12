@@ -18,7 +18,18 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
   cancelled:        { label: 'Cancelled',   color: '#DC2626', bg: '#FEF2F2', icon: XCircle },
 }
 
-const TABS = ['All', 'Active', 'Unassigned', 'Preparing', 'Delivered', 'Cancelled']
+const TABS = ['All', 'Active', 'On hold', 'Unassigned', 'Preparing', 'Delivered', 'Cancelled']
+
+// Orders from outside the outer delivery boundary are saved with no restaurant
+// and a note starting "ON HOLD …" that carries the restaurant the customer
+// ordered from as "[rid:<restaurant id>]". They stay invisible to the
+// restaurant, and out of auto-assign, until the admin sends them on.
+function isHeld(notes: string | null | undefined): boolean {
+  return !!notes && notes.startsWith('ON HOLD')
+}
+function heldRestaurantId(notes: string | null | undefined): string | null {
+  return notes?.match(/\[rid:([0-9a-fA-F-]{36})\]/)?.[1] ?? null
+}
 
 type OrderItem = { name: string; quantity: number; price: number; image_url: string | null }
 type Order = {
@@ -132,8 +143,8 @@ export default function AdminOrdersPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
         const partnerId = autoAssignPartnerRef.current
         if (!partnerId) return
-        const newOrder = payload.new as { id: string; delivery_partner_id: string | null }
-        if (newOrder.delivery_partner_id) return
+        const newOrder = payload.new as { id: string; delivery_partner_id: string | null; notes: string | null }
+        if (newOrder.delivery_partner_id || isHeld(newOrder.notes)) return
         await supabase.from('orders').update({ delivery_partner_id: partnerId, accepted_at: null, updated_at: new Date().toISOString() }).eq('id', newOrder.id)
       })
       .subscribe()
@@ -148,8 +159,8 @@ export default function AdminOrdersPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
         const list = rrPartnersRef.current
         if (!list.length) return
-        const newOrder = payload.new as { id: string; delivery_partner_id: string | null }
-        if (newOrder.delivery_partner_id) return
+        const newOrder = payload.new as { id: string; delivery_partner_id: string | null; notes: string | null }
+        if (newOrder.delivery_partner_id || isHeld(newOrder.notes)) return
         const partnerId = list[rrIndexRef.current % list.length]
         rrIndexRef.current += 1
         await supabase.from('orders').update({ delivery_partner_id: partnerId, accepted_at: null, updated_at: new Date().toISOString() }).eq('id', newOrder.id)
@@ -161,9 +172,13 @@ export default function AdminOrdersPage() {
   // Lets an admin move an order to a different kitchen, or clear it when the
   // restaurant can't take it — the order itself stays on file either way.
   async function assignRestaurant(orderId: string, restaurantId: string) {
-    await supabase.from('orders').update({ restaurant_id: restaurantId || null }).eq('id', orderId)
+    // Giving a held order a restaurant is what "sends" it: the hold marker in
+    // the note is replaced so it stops being skipped by auto-assign.
+    const held = isHeld(orders.find((o) => o.id === orderId)?.notes)
+    const sentNote = held && restaurantId ? `SENT TO RESTAURANT by admin (was on hold, outside delivery area) at ${new Date().toLocaleString('en-IN')}` : null
+    await supabase.from('orders').update(sentNote ? { restaurant_id: restaurantId, notes: sentNote } : { restaurant_id: restaurantId || null }).eq('id', orderId)
     setOrders((prev) => prev.map((o) => o.id === orderId
-      ? { ...o, restaurant_id: restaurantId || null, restaurants: restaurantId ? { name: restaurantList.find((r) => r.id === restaurantId)?.name ?? '' } : null }
+      ? { ...o, restaurant_id: restaurantId || null, ...(sentNote ? { notes: sentNote } : {}), restaurants: restaurantId ? { name: restaurantList.find((r) => r.id === restaurantId)?.name ?? '' } : null }
       : o))
   }
 
@@ -241,7 +256,7 @@ export default function AdminOrdersPage() {
     if (!autoAssignPartner) return
     setAutoAssigning(true)
     const unassignedIds = orders
-      .filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status))
+      .filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status) && !isHeld(o.notes))
       .map((o) => o.id)
     if (unassignedIds.length === 0) { setAutoAssigning(false); setAutoAssignMsg('No unassigned orders'); setTimeout(() => setAutoAssignMsg(''), 2000); return }
     await supabase.from('orders')
@@ -257,6 +272,7 @@ export default function AdminOrdersPage() {
     const matchTab =
       tab === 'All'        ? true :
       tab === 'Active'     ? !['delivered','cancelled'].includes(o.status) :
+      tab === 'On hold'    ? isHeld(o.notes) && !['delivered','cancelled'].includes(o.status) :
       tab === 'Unassigned' ? !o.delivery_partner_id && !['delivered','cancelled'].includes(o.status) :
       tab === 'Preparing'  ? o.status === 'preparing' :
       tab === 'Delivered'  ? o.status === 'delivered' :
@@ -436,6 +452,21 @@ export default function AdminOrdersPage() {
                               {restaurantList.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
                           )}
+                          {!isFinal && isHeld(o.notes) && (() => {
+                            const rid = heldRestaurantId(o.notes)
+                            const heldName = rid ? restaurantList.find((r) => r.id === rid)?.name ?? 'the restaurant' : null
+                            return (
+                              <div className="mt-1.5 max-w-[170px]">
+                                <p className="text-[10.5px] font-[700] text-[#7C3AED] leading-tight">ON HOLD · outside area<br />Ordered from: {heldName ?? 'not a restaurant order'}</p>
+                                {rid && (
+                                  <button onClick={() => assignRestaurant(o.id, rid)}
+                                    className="mt-1 px-2 py-1 bg-[#7C3AED] text-white text-[10.5px] font-[700] rounded-md hover:bg-[#6D28D9]">
+                                    Send to {heldName}
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="px-5 py-3.5">
                           <span className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1 rounded-full w-fit" style={{ background: cfg.bg, color: cfg.color }}>

@@ -12,28 +12,20 @@ interface LiveLocationStore {
   coords: { lat: number; lng: number } | null
   status: Status
   error: string
-  // Set when location is blocked/unavailable and the customer chooses to carry
-  // on with a manually typed address instead. Those orders are confirmed by an
-  // executive call, since the area can't be checked.
-  manualMode: boolean
   request: () => Promise<boolean>
-  continueManually: () => void
 }
 
 export const useLiveLocation = create<LiveLocationStore>()((set, get) => ({
   coords: null,
   status: 'idle',
   error: '',
-  manualMode: false,
-
-  continueManually: () => set({ manualMode: true }),
 
   request: async () => {
     if (get().status === 'loading') return false
     set({ status: 'loading', error: '' })
     try {
       const pos = await getCurrentPosition()
-      set({ coords: { lat: pos.coords.latitude, lng: pos.coords.longitude }, status: 'granted', error: '', manualMode: false })
+      set({ coords: { lat: pos.coords.latitude, lng: pos.coords.longitude }, status: 'granted', error: '' })
       return true
     } catch (err) {
       set({ coords: null, status: 'denied', error: err instanceof Error ? err.message : 'Could not get your location' })

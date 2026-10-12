@@ -130,4 +130,9 @@ export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
 
 // Shown wherever an address outside the outer boundary is used for an order.
 export const NEEDS_CONFIRMATION_MESSAGE =
-  'Your order needs to be confirmed. Our executive will call you and check whether a delivery partner is available in your area.'
+  'Your order is not confirmed until our executive calls you. We will check whether a delivery partner is available in your area.'
+
+// One wording wherever location is blocked, so the cart, checkout and the
+// address form tell the customer the same thing.
+export const ALLOW_LOCATION_MESSAGE =
+  'Please allow location access so that we can calculate your exact price and delivery charge.'
