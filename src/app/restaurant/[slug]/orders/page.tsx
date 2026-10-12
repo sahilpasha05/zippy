@@ -113,7 +113,10 @@ export default function SlugOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
+  // No date selected by default, so the list runs on continuously: Today,
+  // Yesterday, then each earlier day. (Defaulting to today hid every other
+  // day's delivered/cancelled orders while still showing old unresolved ones.)
+  const [dateFilter, setDateFilter] = useState('')
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
@@ -378,17 +381,17 @@ export default function SlugOrdersPage() {
                     )}
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-3 mb-3">
-                        <div>
-                          <div className="flex items-center gap-2 mb-0.5">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">
                             <span className="text-[13px] font-mono font-bold text-[#374151]">{o.id.slice(0,8).toUpperCase()}</span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1" style={{ background: cfg.bg, color: cfg.color }}>
                               <Icon className="w-3 h-3" /> {cfg.label}
                             </span>
                           </div>
-                          <p className="text-[12px] text-[#9CA3AF]">{o.customer_name ?? 'Customer'} · {timeAgo(o.placed_at)}</p>
+                          <p className="text-[12px] text-[#9CA3AF] break-words">{o.customer_name ?? 'Customer'} · {timeAgo(o.placed_at)}</p>
                           <p className="text-[11px] text-[#9CA3AF]">{formatDateTime(o.placed_at)}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <div className="text-[15px] font-[800] text-[#111827]">₹{o.total}</div>
                           <div className="text-[11px] text-[#9CA3AF]">{items.length} item{items.length !== 1 ? 's' : ''}</div>
                         </div>
@@ -397,16 +400,16 @@ export default function SlugOrdersPage() {
                       {items.length > 0 && (
                         <div className="bg-[#F8FAFC] rounded-xl p-3 mb-3 space-y-2">
                           {items.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between gap-2 text-[12.5px]">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div key={idx} className="flex items-start justify-between gap-2 text-[12.5px]">
+                              <div className="flex items-start gap-2 min-w-0">
                                 <div className="w-7 h-7 rounded-md overflow-hidden bg-white border border-[#E5E7EB] shrink-0">
                                   {item.image_url && (
                                     <Image src={item.image_url} alt={item.name} width={28} height={28} unoptimized className="w-full h-full object-cover" />
                                   )}
                                 </div>
-                                <span className="text-[#374151] truncate">{item.name} <span className="text-[#9CA3AF]">× {item.quantity}</span></span>
+                                <span className="text-[#374151] break-words min-w-0">{item.name} <span className="text-[#9CA3AF] whitespace-nowrap">× {item.quantity}</span></span>
                               </div>
-                              <span className="text-[#111827] font-medium shrink-0">₹{item.price * item.quantity}</span>
+                              <span className="text-[#111827] font-medium shrink-0 whitespace-nowrap">₹{item.price * item.quantity}</span>
                             </div>
                           ))}
                         </div>
@@ -417,7 +420,7 @@ export default function SlugOrdersPage() {
                           {o.address && (
                             <div className="flex items-start gap-2">
                               <MapPin className="w-3.5 h-3.5 text-[#9CA3AF] mt-0.5 shrink-0" />
-                              <p className="text-[12px] text-[#374151] flex-1 line-clamp-2">{o.address}</p>
+                              <p className="text-[12px] text-[#374151] flex-1 min-w-0 break-words">{o.address}</p>
                               {o.delivery_latitude != null && o.delivery_longitude != null && (
                                 <button onClick={() => setMapOrder(o)} className="text-[11px] font-[600] text-[#16A34A] hover:underline shrink-0">Map</button>
                               )}
@@ -439,7 +442,7 @@ export default function SlugOrdersPage() {
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           {o.customer_phone && (
                             <a href={`tel:${o.customer_phone}`}
@@ -460,7 +463,7 @@ export default function SlugOrdersPage() {
                             value={o.status}
                             disabled={advancing === o.id}
                             onChange={(e) => advance(o.id, e.target.value)}
-                            className="px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-[600] text-[#374151] bg-white outline-none focus:border-[#16A34A] disabled:opacity-60"
+                            className="max-w-full px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-[600] text-[#374151] bg-white outline-none focus:border-[#16A34A] disabled:opacity-60"
                           >
                             {SHOP_STAGES.map((st) => (
                               <option key={st.value} value={st.value}>{st.label}</option>

@@ -87,7 +87,10 @@ export default function RestaurantOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState(() => toLocalDateInput(new Date().toISOString()))
+  // No date selected by default, so the list runs on continuously: Today,
+  // Yesterday, then each earlier day. (Defaulting to today hid every other
+  // day's delivered/cancelled orders while still showing old unresolved ones.)
+  const [dateFilter, setDateFilter] = useState('')
   const [advancing, setAdvancing] = useState<string | null>(null)
   const [soundOn, setSoundOn] = useState(true)
   const [newOrderFlash, setNewOrderFlash] = useState(false)
