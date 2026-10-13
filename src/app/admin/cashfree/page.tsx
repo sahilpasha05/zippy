@@ -17,6 +17,7 @@ type Overview = {
   totals: { collected: number; paidOrders: number; settled: number; settlements: number; fees: number; failed: number; failedAmount: number }
   inProgress: { count: number; amount: number }
   unsettled: { amount: number; orders: number; since: string | null }
+  upcoming: { cutoff: string; expectedOn: string; orders: number; amount: number; cutoffPassed: boolean; overdue: boolean }[]
   lastSettlement: { amount: number; on: string | null; utr: string | null; paymentTill: string | null } | null
   typicalLagDays: number | null
   days: { date: string; orders: number; collected: number; settled: number }[]
@@ -101,7 +102,8 @@ export default function AdminCashfreePage() {
                 {[
                   { label: 'Collected online', value: inr(data.totals.collected), sub: `${data.totals.paidOrders} paid order${data.totals.paidOrders !== 1 ? 's' : ''} in range`, icon: IndianRupee, color: '#16A34A', bg: '#DCFCE7' },
                   { label: 'Settled to bank', value: inr(data.totals.settled), sub: `${data.totals.settlements} payout${data.totals.settlements !== 1 ? 's' : ''}${data.totals.fees ? ` · fees ${inr(data.totals.fees)}` : ''}`, icon: Landmark, color: '#0891B2', bg: '#ECFEFF' },
-                  { label: 'Awaiting settlement', value: inr(data.unsettled.amount), sub: data.unsettled.since ? `${data.unsettled.orders} order${data.unsettled.orders !== 1 ? 's' : ''} since ${dateTime(data.unsettled.since)} (estimate, before fees)` : 'No settlement history found yet', icon: Clock, color: '#D97706', bg: '#FFFBEB' },
+                  { label: 'Awaiting settlement', value: inr(data.unsettled.amount), sub: data.unsettled.since ? `${data.unsettled.orders} order${data.unsettled.orders !== 1 ? 's' : ''} collected since ${dateTime(data.unsettled.since)} (estimate, before fees)` : 'No settlement history found yet', icon: Clock, color: '#D97706', bg: '#FFFBEB' },
+                  { label: 'Next settlement', value: data.upcoming[0] ? inr(data.upcoming[0].amount) : '—', sub: data.upcoming[0] ? `${data.upcoming[0].overdue ? 'was due' : 'expected'} ~${dateTime(data.upcoming[0].expectedOn)} · ${data.upcoming[0].cutoffPassed ? 'cut-off passed' : `still collecting until ${dateTime(data.upcoming[0].cutoff)}`}` : 'Nothing queued yet', icon: CalendarClock, color: '#7C3AED', bg: '#F5F3FF' },
                   { label: 'Settlement in progress', value: inr(data.inProgress.amount), sub: data.inProgress.count ? `${data.inProgress.count} payout${data.inProgress.count !== 1 ? 's' : ''} being processed` : 'None right now', icon: CalendarClock, color: '#7C3AED', bg: '#F5F3FF' },
                   { label: 'Last settlement', value: data.lastSettlement ? inr(data.lastSettlement.amount) : '—', sub: data.lastSettlement ? `${dateTime(data.lastSettlement.on)}${data.lastSettlement.utr ? ` · UTR ${data.lastSettlement.utr}` : ''}` : 'No payouts yet', icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7' },
                   { label: 'Failed settlements', value: String(data.totals.failed), sub: data.totals.failed ? `${inr(data.totals.failedAmount)} to be re-attempted in range` : 'None in this range', icon: AlertTriangle, color: data.totals.failed ? '#DC2626' : '#6B7280', bg: data.totals.failed ? '#FEF2F2' : '#F3F4F6' },
@@ -121,6 +123,44 @@ export default function AdminCashfreePage() {
                 <p className="text-[12px] text-[#6B7280] leading-relaxed">
                   {lagText} “Awaiting settlement” is what customers paid online after the last paid-out cut-off. Cashfree deducts its fees before paying out, so the bank amount will be a little lower.
                 </p>
+              )}
+
+              {data.upcoming.length > 0 && (
+                <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-sm overflow-hidden">
+                  <div className="px-5 py-3.5 border-b border-[#F3F4F6] flex flex-wrap items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-[#7C3AED]" />
+                    <h2 className="text-[14px] font-[700] text-[#111827]">Upcoming settlements</h2>
+                    <span className="text-[11.5px] text-[#9CA3AF]">estimated from your usual payout schedule — bank holidays and weekends can delay a payout</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px]">
+                      <thead>
+                        <tr className="bg-[#F8FAFC] text-left text-[11px] uppercase tracking-wide text-[#9CA3AF]">
+                          <th className="px-5 py-2.5 font-[600]">Expected payout</th>
+                          <th className="px-5 py-2.5 font-[600]">Payments up to</th>
+                          <th className="px-5 py-2.5 font-[600] text-right">Orders</th>
+                          <th className="px-5 py-2.5 font-[600] text-right">Amount (before fees)</th>
+                          <th className="px-5 py-2.5 font-[600]">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#F3F4F6]">
+                        {data.upcoming.map((c) => (
+                          <tr key={c.cutoff} className="hover:bg-[#FAFAFA]">
+                            <td className="px-5 py-3 text-[13px] font-[700] text-[#111827] whitespace-nowrap">{dateTime(c.expectedOn)}</td>
+                            <td className="px-5 py-3 text-[12px] text-[#6B7280] whitespace-nowrap">{dateTime(c.cutoff)}</td>
+                            <td className="px-5 py-3 text-[12.5px] text-[#374151] text-right">{c.orders}</td>
+                            <td className="px-5 py-3 text-[13px] font-[700] text-[#16A34A] text-right whitespace-nowrap">{inr(c.amount)}</td>
+                            <td className="px-5 py-3">
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-[700]" style={c.overdue ? { background: '#FFFBEB', color: '#D97706' } : c.cutoffPassed ? { background: '#ECFEFF', color: '#0891B2' } : { background: '#F3F4F6', color: '#6B7280' }}>
+                                {c.overdue ? 'Due — processing' : c.cutoffPassed ? 'Cut-off passed' : 'Still collecting'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
 
               {data.inProgressList.length > 0 && (

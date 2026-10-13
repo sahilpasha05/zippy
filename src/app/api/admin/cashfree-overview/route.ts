@@ -82,11 +82,35 @@ export async function GET(req: NextRequest) {
     for (const o of orders) { const d = ensure(istDay(o.placed_at)); d.orders += 1; d.collected += Number(o.online_amount) }
     for (const s of inRange.filter(isPaid)) { const t = when(s); if (t) ensure(istDay(t)).settled += s.amountSettled }
 
-    // Collected after the last settled cut-off and not yet paid out (estimate).
+    // Collected after the last settled cut-off and not yet paid out (estimate),
+    // split into the daily settlement cycles Cashfree will pay them out in.
+    // Cut-offs fall every 24h after the last paid cut-off; each payout then
+    // lands about the usual lag after its cut-off.
     let unsettled = { amount: 0, orders: 0, since: lastPaid?.paymentTill ?? null }
+    type Cycle = { cutoff: string; expectedOn: string; orders: number; amount: number; cutoffPassed: boolean; overdue: boolean }
+    let upcoming: Cycle[] = []
     if (lastPaid?.paymentTill) {
-      const after = await paidOrders(new Date(lastPaid.paymentTill).toISOString(), now.toISOString())
+      const lastCut = new Date(lastPaid.paymentTill).getTime()
+      const after = await paidOrders(new Date(lastCut).toISOString(), now.toISOString())
       unsettled = { amount: round2(after.reduce((a, o) => a + Number(o.online_amount), 0)), orders: after.length, since: lastPaid.paymentTill }
+
+      const lagMs = (typicalLagDays ?? 1) * DAY_MS
+      const lastK = Math.max(1, Math.floor((now.getTime() - lastCut) / DAY_MS) + 1)
+      for (let k = 1; k <= Math.min(lastK, 6); k++) {
+        const cutoff = lastCut + k * DAY_MS
+        const lo = lastCut + (k - 1) * DAY_MS
+        const inCycle = after.filter((o) => { const t = new Date(o.placed_at).getTime(); return t > lo && t <= cutoff })
+        const expectedOn = cutoff + lagMs
+        upcoming.push({
+          cutoff: new Date(cutoff).toISOString(),
+          expectedOn: new Date(expectedOn).toISOString(),
+          orders: inCycle.length,
+          amount: round2(inCycle.reduce((a, o) => a + Number(o.online_amount), 0)),
+          cutoffPassed: cutoff <= now.getTime(),
+          overdue: expectedOn < now.getTime(),
+        })
+      }
+      upcoming = upcoming.filter((c) => c.orders > 0 || !c.cutoffPassed)
     }
 
     const sum = (list: CashfreeSettlement[], k: 'amountSettled' | 'paymentAmount' | 'charges') => round2(list.reduce((a, s) => a + s[k], 0))
@@ -107,6 +131,7 @@ export async function GET(req: NextRequest) {
       },
       inProgress: { count: inProgress.length, amount: sum(inProgress, 'paymentAmount') },
       unsettled,
+      upcoming,
       lastSettlement: lastPaid && { amount: lastPaid.amountSettled, on: lastPaid.settledOn, utr: lastPaid.utr, paymentTill: lastPaid.paymentTill },
       typicalLagDays,
       days: [...days.values()].sort((a, b) => b.date.localeCompare(a.date)).map((d) => ({ ...d, collected: round2(d.collected), settled: round2(d.settled) })),

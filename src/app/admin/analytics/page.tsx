@@ -1,5 +1,6 @@
 'use client'
 
+import RefundsPanel from '@/components/admin/RefundsPanel'
 import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -223,6 +224,8 @@ export default function AdminAnalyticsPage() {
         </div>
 
         <div className="p-6 space-y-6">
+          <RefundsPanel />
+
           {/* Today at a glance — click a card to see it broken down by
               restaurant, then click a restaurant to see its actual orders. */}
           <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
