@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils'
 type Settlement = {
   id: string; utr: string | null; status: string; amountSettled: number; paymentAmount: number
   paymentFrom: string | null; paymentTill: string | null; on: string | null
-  charges: number; adjustment: number; type: string | null
+  charges: number; adjustment: number; type: string | null; recoveredOn?: string | null
 }
 type Overview = {
   environment: 'production' | 'sandbox'
   generatedAt: string
-  totals: { collected: number; paidOrders: number; settled: number; settlements: number; fees: number; failed: number; failedAmount: number }
+  totals: { collected: number; paidOrders: number; settled: number; settlements: number; fees: number; failed: number; failedAmount: number; recovered: number; recoveredAmount: number; recoveredOn: string | null }
   inProgress: { count: number; amount: number }
   unsettled: { amount: number; orders: number; since: string | null }
   upcoming: { cutoff: string; expectedOn: string; orders: number; amount: number; cutoffPassed: boolean; overdue: boolean }[]
@@ -106,7 +106,7 @@ export default function AdminCashfreePage() {
                   { label: 'Next settlement', value: data.upcoming[0] ? inr(data.upcoming[0].amount) : '—', sub: data.upcoming[0] ? `${data.upcoming[0].overdue ? 'was due' : 'expected'} ~${dateTime(data.upcoming[0].expectedOn)} · ${data.upcoming[0].cutoffPassed ? 'cut-off passed' : `still collecting until ${dateTime(data.upcoming[0].cutoff)}`}` : 'Nothing queued yet', icon: CalendarClock, color: '#7C3AED', bg: '#F5F3FF' },
                   { label: 'Settlement in progress', value: inr(data.inProgress.amount), sub: data.inProgress.count ? `${data.inProgress.count} payout${data.inProgress.count !== 1 ? 's' : ''} being processed` : 'None right now', icon: CalendarClock, color: '#7C3AED', bg: '#F5F3FF' },
                   { label: 'Last settlement', value: data.lastSettlement ? inr(data.lastSettlement.amount) : '—', sub: data.lastSettlement ? `${dateTime(data.lastSettlement.on)}${data.lastSettlement.utr ? ` · UTR ${data.lastSettlement.utr}` : ''}` : 'No payouts yet', icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7' },
-                  { label: 'Failed settlements', value: String(data.totals.failed), sub: data.totals.failed ? `${inr(data.totals.failedAmount)} to be re-attempted in range` : 'None in this range', icon: AlertTriangle, color: data.totals.failed ? '#DC2626' : '#6B7280', bg: data.totals.failed ? '#FEF2F2' : '#F3F4F6' },
+                  { label: 'Failed settlements', value: String(data.totals.failed), sub: data.totals.failed ? `${inr(data.totals.failedAmount)} not yet re-paid — check Cashfree` : data.totals.recovered ? `${data.totals.recovered} failed (${inr(data.totals.recoveredAmount)}) — already re-paid in the ${dateTime(data.totals.recoveredOn)} payout` : 'None in this range', icon: AlertTriangle, color: data.totals.failed ? '#DC2626' : '#6B7280', bg: data.totals.failed ? '#FEF2F2' : '#F3F4F6' },
                 ].map(({ label, value, sub, icon: Icon, color, bg }) => (
                   <div key={label} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: bg }}>
@@ -244,7 +244,9 @@ function SettlementTable({ rows, empty }: { rows: Settlement[]; empty?: string }
             <tr><td colSpan={7} className="px-5 py-8 text-center text-[13px] text-[#9CA3AF]">{empty ?? 'Nothing here.'}</td></tr>
           )}
           {rows.map((s) => {
-            const st = statusStyle(s.status)
+            const st = s.status === 'FAILED' && s.recoveredOn
+              ? { label: 'Failed — re-paid later', color: '#B45309', bg: '#FFFBEB' }
+              : statusStyle(s.status)
             return (
               <tr key={s.id + (s.utr ?? '')} className="hover:bg-[#FAFAFA]">
                 <td className="px-5 py-3 text-[12.5px] text-[#111827] whitespace-nowrap">{dateTime(s.on)}</td>

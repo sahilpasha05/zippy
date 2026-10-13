@@ -114,7 +114,15 @@ export async function GET(req: NextRequest) {
     }
 
     const sum = (list: CashfreeSettlement[], k: 'amountSettled' | 'paymentAmount' | 'charges') => round2(list.reduce((a, s) => a + s[k], 0))
-    const failedInRange = inRange.filter((s) => s.status === 'FAILED')
+    // A failed payout is not lost: Cashfree folds its payments into the next
+    // successful settlement. It counts as recovered when a later PAID
+    // settlement's payment window starts no later and ends no earlier.
+    const recoveredBy = (f: CashfreeSettlement) => paid.find((p) =>
+      p.paymentFrom && p.paymentTill && f.paymentFrom && f.paymentTill &&
+      new Date(p.paymentFrom) <= new Date(f.paymentFrom) && new Date(p.paymentTill) >= new Date(f.paymentTill))
+    const failedAll = inRange.filter((s) => s.status === 'FAILED').map((s) => ({ s, rec: recoveredBy(s) }))
+    const failedInRange = failedAll.filter((x) => !x.rec).map((x) => x.s)
+    const recoveredInRange = failedAll.filter((x) => x.rec)
 
     return NextResponse.json({
       environment: cashfreeEnvironment(),
@@ -128,6 +136,9 @@ export async function GET(req: NextRequest) {
         fees: sum(inRange.filter(isPaid), 'charges'),
         failed: failedInRange.length,
         failedAmount: sum(failedInRange, 'paymentAmount'),
+        recovered: recoveredInRange.length,
+        recoveredAmount: sum(recoveredInRange.map((x) => x.s), 'paymentAmount'),
+        recoveredOn: recoveredInRange[0]?.rec?.settledOn ?? null,
       },
       inProgress: { count: inProgress.length, amount: sum(inProgress, 'paymentAmount') },
       unsettled,
@@ -137,7 +148,7 @@ export async function GET(req: NextRequest) {
       days: [...days.values()].sort((a, b) => b.date.localeCompare(a.date)).map((d) => ({ ...d, collected: round2(d.collected), settled: round2(d.settled) })),
       settlements: inRange
         .sort((a, b) => (when(b) ?? '').localeCompare(when(a) ?? ''))
-        .map((s) => ({ ...s, on: when(s) })),
+        .map((s) => ({ ...s, on: when(s), recoveredOn: s.status === 'FAILED' ? recoveredBy(s)?.settledOn ?? null : null })),
       inProgressList: inProgress.map((s) => ({ ...s, on: when(s) })),
     })
   } catch (err) {
