@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { RotateCcw, CheckCircle2, Loader2, Phone } from 'lucide-react'
+import { RotateCcw, Loader2, Phone } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchAllRows } from '@/lib/fetchAllRows'
-import { cn } from '@/lib/utils'
 
 const supabase = createClient()
 
@@ -26,22 +25,26 @@ const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'nume
 export default function RefundsPanel() {
   const [rows, setRows] = useState<RefundOrder[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'pending' | 'done'>('pending')
+  const [doneCount, setDoneCount] = useState(0)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Only orders that were cancelled AFTER the customer paid online.
       const data = await fetchAllRows<RefundOrder>((from, to) => supabase
         .from('orders')
         .select('id, placed_at, payment_status, online_amount, cod_amount, total, customer_name, customer_phone, notes, restaurants(name)')
         .eq('status', 'cancelled')
         .gt('online_amount', 0)
-        .in('payment_status', ['paid', 'partially_paid', 'refunded'])
+        .in('payment_status', ['paid', 'partially_paid'])
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
       setRows(data)
+      const { count } = await supabase.from('orders').select('id', { count: 'exact', head: true })
+        .eq('status', 'cancelled').eq('payment_status', 'refunded')
+      setDoneCount(count ?? 0)
     } finally {
       setLoading(false)
     }
@@ -60,13 +63,14 @@ export default function RefundsPanel() {
       .eq('status', 'cancelled')
     setBusy(null)
     if (err) { setError('Could not update this order. Please try again.'); return }
-    setRows((prev) => prev.map((r) => r.id === o.id ? { ...r, payment_status: 'refunded', notes: o.notes ? `${o.notes}\n${stamp}` : stamp } : r))
+    // Leaves the pending list as soon as it is marked.
+    setRows((prev) => prev.filter((r) => r.id !== o.id))
+    setDoneCount((n) => n + 1)
   }
 
-  const pending = rows.filter((r) => r.payment_status !== 'refunded')
-  const done = rows.filter((r) => r.payment_status === 'refunded')
+  const pending = rows
   const pendingTotal = pending.reduce((s, r) => s + Number(r.online_amount), 0)
-  const list = tab === 'pending' ? pending : done
+  const list = pending
 
   return (
     <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-sm overflow-hidden">
@@ -84,23 +88,13 @@ export default function RefundsPanel() {
         </div>
       </div>
 
-      <div className="px-5 pt-3 flex gap-1.5">
-        {([['pending', `Pending (${pending.length})`], ['done', `Completed (${done.length})`]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={cn('px-3.5 py-1.5 rounded-xl text-[12.5px] font-medium transition-all',
-              tab === k ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]')}>
-            {label}
-          </button>
-        ))}
-      </div>
-
       {error && <p className="mx-5 mt-3 text-[12.5px] text-[#DC2626]">{error}</p>}
 
       {loading ? (
         <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 text-[#7C3AED] animate-spin" /></div>
       ) : list.length === 0 ? (
         <p className="text-[13px] text-[#9CA3AF] text-center py-10">
-          {tab === 'pending' ? 'No refunds pending. Every cancelled paid order has been refunded.' : 'No refunds marked as completed yet.'}
+          No refunds pending. Every cancelled order that was paid online has been refunded.
         </p>
       ) : (
         <div className="overflow-x-auto mt-3">
@@ -111,7 +105,7 @@ export default function RefundsPanel() {
                 <th className="px-5 py-2.5 font-[600]">Customer</th>
                 <th className="px-5 py-2.5 font-[600]">Restaurant</th>
                 <th className="px-5 py-2.5 font-[600] text-right">Paid online</th>
-                <th className="px-5 py-2.5 font-[600] text-right">{tab === 'pending' ? 'Action' : 'Status'}</th>
+                <th className="px-5 py-2.5 font-[600] text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F3F4F6]">
@@ -133,20 +127,19 @@ export default function RefundsPanel() {
                     <div className="text-[11px] text-[#9CA3AF]">of {inr(Number(o.total))}{(o.cod_amount ?? 0) > 0 ? ' · rest was cash' : ''}</div>
                   </td>
                   <td className="px-5 py-3 text-right whitespace-nowrap">
-                    {tab === 'pending' ? (
-                      <button onClick={() => void markRefunded(o)} disabled={busy === o.id}
-                        className="px-3 py-1.5 bg-[#16A34A] text-white text-[12px] font-[700] rounded-lg hover:bg-[#15803D] disabled:opacity-60 transition-all">
-                        {busy === o.id ? 'Saving…' : 'Mark refund completed'}
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[12px] font-[700] text-[#16A34A]"><CheckCircle2 className="w-3.5 h-3.5" /> Refunded</span>
-                    )}
+                    <button onClick={() => void markRefunded(o)} disabled={busy === o.id}
+                      className="px-3 py-1.5 bg-[#16A34A] text-white text-[12px] font-[700] rounded-lg hover:bg-[#15803D] disabled:opacity-60 transition-all">
+                      {busy === o.id ? 'Saving…' : 'Mark refund completed'}
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {!loading && doneCount > 0 && (
+        <p className="px-5 py-3 text-[11.5px] text-[#9CA3AF] border-t border-[#F3F4F6]">{doneCount} refund{doneCount !== 1 ? 's' : ''} already marked completed.</p>
       )}
     </div>
   )
