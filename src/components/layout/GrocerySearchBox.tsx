@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { Search, Package, Loader2, MessageCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn, matchesSearchQuery, whatsappSupportUrl } from '@/lib/utils'
+import { fetchAllRows } from '@/lib/fetchAllRows'
+import { sortRestaurantsForDisplay } from '@/lib/restaurantOrder'
 
 type SearchProduct = {
   id: string
@@ -17,7 +19,21 @@ type SearchProduct = {
   weight: string | null
 }
 
+type Dish = {
+  id: string
+  name: string
+  price: number
+  image_url: string | null
+  slug: string
+  restaurant: string
+  is_open: boolean
+}
+
 const MAX_RESULTS = 8
+// Restaurant dishes: every restaurant that has a match is listed, in the
+// site's restaurant order (open first), a few dishes each.
+const MAX_DISHES_PER_RESTAURANT = 4
+const MAX_DISH_RESULTS = 24
 
 // The whole active grocery catalog is small enough to fetch once and filter
 // client-side (same matchesSearchQuery logic as the Essentials pages), rather
@@ -28,7 +44,11 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [catalog, setCatalog] = useState<SearchProduct[] | null>(null)
+  const [dishes, setDishes] = useState<Dish[] | null>(null)
   const [loadingCatalog, setLoadingCatalog] = useState(false)
+  const pathname = usePathname()
+  // On the Restaurants side of the app, dishes come before groceries.
+  const restaurantsFirst = pathname.startsWith('/restaurant')
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -41,7 +61,23 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
   function ensureCatalogLoaded() {
     if (catalog !== null || loadingCatalog) return
     setLoadingCatalog(true)
-    createClient()
+    const supabase = createClient()
+    type DishRow = { id: string; name: string; price: number; image_url: string | null; restaurants: { name: string; slug: string; is_open: boolean; is_active: boolean } | null }
+    void fetchAllRows<DishRow>((from, to) => supabase
+      .from('restaurant_products')
+      .select('id, name, price, image_url, restaurants(name, slug, is_open, is_active)')
+      .eq('is_available', true)
+      .order('id')
+      .range(from, to)
+    ).then((rows) => {
+      setDishes(rows
+        .filter((r) => r.restaurants && r.restaurants.is_active)
+        .map((r) => ({
+          id: r.id, name: r.name, price: r.price, image_url: r.image_url,
+          slug: r.restaurants!.slug, restaurant: r.restaurants!.name, is_open: r.restaurants!.is_open,
+        })))
+    })
+    supabase
       .from('grocery_products')
       .select('id, name, price, image_url, brand, weight, grocery_categories(slug)')
       .eq('is_active', true)
@@ -74,12 +110,34 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
     setOpen(false)
   }
 
+  function goToDish(d: Dish) {
+    router.push(`/restaurants/${d.slug}?q=${encodeURIComponent(d.name)}`)
+    setOpen(false)
+  }
+
   const trimmedQuery = query.trim()
   const results = (trimmedQuery && catalog
     ? catalog.filter((p) => matchesSearchQuery(trimmedQuery, p.name, p.brand, p.weight))
     : []
   ).slice(0, MAX_RESULTS)
   const showDropdown = open && trimmedQuery.length > 0
+
+  // Matching dishes grouped by restaurant, restaurants in the site's display
+  // order (Golden cafe, My Bite, … with closed ones last), cheapest dish first.
+  const dishGroups = (() => {
+    if (!trimmedQuery || !dishes) return [] as { slug: string; name: string; is_open: boolean; items: Dish[] }[]
+    const byRest = new Map<string, { slug: string; name: string; is_open: boolean; items: Dish[] }>()
+    for (const d of dishes) {
+      if (!matchesSearchQuery(trimmedQuery, d.name)) continue
+      if (!byRest.has(d.slug)) byRest.set(d.slug, { slug: d.slug, name: d.restaurant, is_open: d.is_open, items: [] })
+      byRest.get(d.slug)!.items.push(d)
+    }
+    let remaining = MAX_DISH_RESULTS
+    return sortRestaurantsForDisplay([...byRest.values()])
+      .map((g) => ({ ...g, items: g.items.sort((a, b) => a.price - b.price).slice(0, MAX_DISHES_PER_RESTAURANT) }))
+      .filter((g) => { if (remaining <= 0) return false; remaining -= g.items.length; return true })
+  })()
+  const dishesLoaded = dishes !== null
 
   return (
     <div ref={containerRef} className={cn('relative', variant === 'desktop' ? 'flex-1 max-w-2xl' : 'w-full')}>
@@ -94,7 +152,7 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
         </button>
         <input
           type="text"
-          placeholder={variant === 'mobile' ? 'Search "chocolate"' : 'Search groceries...'}
+          placeholder={variant === 'mobile' ? 'Search "chocolate" or "biryani"' : 'Search groceries and dishes...'}
           value={query}
           onChange={(e) => { setQuery(e.target.value); ensureCatalogLoaded() }}
           onFocus={() => { setOpen(true); ensureCatalogLoaded() }}
@@ -108,39 +166,78 @@ export default function GrocerySearchBox({ variant }: { variant: 'mobile' | 'des
 
       {showDropdown && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-[#E5E7EB] rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] z-[60] overflow-hidden">
-          {loadingCatalog ? (
+          {(loadingCatalog || !dishesLoaded) && results.length === 0 && dishGroups.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-[#9CA3AF]">
               <Loader2 className="w-4 h-4 animate-spin" /> Searching...
             </div>
-          ) : results.length > 0 ? (
+          ) : results.length > 0 || dishGroups.length > 0 ? (
             <>
-              <div className="max-h-80 overflow-y-auto py-1">
-                {results.map((p) => (
-                  <button key={p.id} onClick={() => goToProduct(p)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left">
-                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0 relative">
-                      {p.image_url ? (
-                        <Image src={p.image_url} alt={p.name} fill unoptimized className="object-contain" sizes="36px" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-4 h-4" /></div>
-                      )}
+              <div className="max-h-96 overflow-y-auto py-1">
+                {(restaurantsFirst ? ['dishes', 'groceries'] : ['groceries', 'dishes']).map((section) => section === 'dishes' ? (
+                  dishGroups.length > 0 && (
+                    <div key="dishes">
+                      <p className="px-4 pt-2 pb-1 text-[10.5px] font-[700] uppercase tracking-wide text-[#EA580C]">Restaurants</p>
+                      {dishGroups.map((g) => (
+                        <div key={g.slug}>
+                          <div className="flex items-center gap-2 px-4 pt-2 pb-0.5">
+                            <span className="text-[12px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>{g.name}</span>
+                            <span className={cn('text-[10px] font-[700] px-1.5 py-0.5 rounded-full', g.is_open ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#F3F4F6] text-[#6B7280]')}>
+                              {g.is_open ? 'Open' : 'Closed'}
+                            </span>
+                          </div>
+                          {g.items.map((d) => (
+                            <button key={d.id} onClick={() => goToDish(d)}
+                              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-[#FFF7ED] transition-colors text-left">
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0 relative">
+                                {d.image_url ? (
+                                  <Image src={d.image_url} alt={d.name} fill unoptimized className="object-cover" sizes="36px" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-4 h-4" /></div>
+                                )}
+                              </div>
+                              <span className="flex-1 text-[13px] text-[#111827] break-words min-w-0">{d.name}</span>
+                              <span className="text-[12.5px] font-[700] text-[#111827] shrink-0">₹{d.price}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
                     </div>
-                    <span className="flex-1 text-[13px] text-[#111827] truncate">{p.name}</span>
-                    <span className="text-[12.5px] font-[700] text-[#111827] shrink-0">₹{p.price}</span>
-                  </button>
+                  )
+                ) : (
+                  results.length > 0 && (
+                    <div key="groceries">
+                      <p className="px-4 pt-2 pb-1 text-[10.5px] font-[700] uppercase tracking-wide text-[#16A34A]">Groceries</p>
+                      {results.map((p) => (
+                        <button key={p.id} onClick={() => goToProduct(p)}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors text-left">
+                          <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F8FAFC] border border-[#E5E7EB] shrink-0 relative">
+                            {p.image_url ? (
+                              <Image src={p.image_url} alt={p.name} fill unoptimized className="object-contain" sizes="36px" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[#D1D5DB]"><Package className="w-4 h-4" /></div>
+                            )}
+                          </div>
+                          <span className="flex-1 text-[13px] text-[#111827] break-words min-w-0">{p.name}</span>
+                          <span className="text-[12.5px] font-[700] text-[#111827] shrink-0">₹{p.price}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )
                 ))}
               </div>
-              <button onClick={() => goToResults(query)}
-                className="w-full py-2.5 text-[12.5px] font-[600] text-[#16A34A] hover:bg-[#F0FDF4] border-t border-[#F3F4F6] transition-colors">
-                See all results for &quot;{trimmedQuery}&quot;
-              </button>
+              {results.length > 0 && (
+                <button onClick={() => goToResults(query)}
+                  className="w-full py-2.5 text-[12.5px] font-[600] text-[#16A34A] hover:bg-[#F0FDF4] border-t border-[#F3F4F6] transition-colors">
+                  See all grocery results for &quot;{trimmedQuery}&quot;
+                </button>
+              )}
             </>
           ) : (
             <div className="flex flex-col items-center gap-2 py-6 px-5 text-center">
-              <p className="text-[13px] font-[600] text-[#374151]">No products found for &quot;{trimmedQuery}&quot;</p>
+              <p className="text-[13px] font-[600] text-[#374151]">No products or dishes found for &quot;{trimmedQuery}&quot;</p>
               <p className="text-[11.5px] text-[#9CA3AF]">We couldn&apos;t find that — ask us directly instead.</p>
               <a
-                href={whatsappSupportUrl(`Hi, I need assistance with groceries. I couldn't find: "${trimmedQuery}"`)}
+                href={whatsappSupportUrl(`Hi, I need assistance. I couldn't find: "${trimmedQuery}"`)}
                 target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 mt-1 px-4 py-2 bg-[#25D366] text-white text-[12.5px] font-[700] rounded-xl hover:bg-[#1DA851] transition-all"
               >

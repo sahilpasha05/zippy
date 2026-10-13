@@ -145,7 +145,12 @@ export default function RestaurantDetailClient() {
   const [menu, setMenu] = useState<MenuSection[]>([])
   const [loading, setLoading] = useState(true)
   const [activeCategory, setActiveCategory] = useState('')
-  const [search, setSearch] = useState('')
+  // A dish picked from the site-wide search opens here as ?q=<dish>, so the
+  // menu search box starts filled in.
+  const [search, setSearch] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('q') ?? ''
+  })
   const [wishlist, setWishlist] = useState(false)
 
   useEffect(() => {
