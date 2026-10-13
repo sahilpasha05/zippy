@@ -119,7 +119,12 @@ export async function listCashfreeSettlements(startISO: string, endISO: string):
       cache: 'no-store',
     })
     const data: { data?: RawSettlement[]; cursor?: string | null; message?: string } = await res.json()
-    if (!res.ok) throw new Error(`Cashfree settlements failed: ${data.message ?? res.statusText}`)
+    if (!res.ok) {
+      const hint = res.status === 401 && ENV === 'sandbox'
+        ? ' (CASHFREE_ENV is "sandbox" here, but settlements exist only on a live key — set CASHFREE_ENV=production)'
+        : ''
+      throw new Error(`Cashfree settlements failed: ${data.message ?? res.statusText}${hint}`)
+    }
     for (const r of data.data ?? []) {
       out.push({
         id: String(r.cf_settlement_id ?? r.settlement_id ?? ''),
