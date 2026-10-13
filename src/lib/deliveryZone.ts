@@ -119,12 +119,28 @@ export const OUTER_ZONE: Feature<Polygon> = {
 
 export type DeliveryTier = 'core' | 'extended' | 'outside'
 
+// Small areas that are always treated as INSIDE the red line (the ₹59 area:
+// normal order, no executive call), even where the traced boundary would put
+// them just outside. Circles: centre plus radius in metres. The traced red
+// line is approximate, so known villages that are served are listed here.
+const ALWAYS_EXTENDED_AREAS: { name: string; lat: number; lng: number; radiusM: number }[] = [
+  { name: 'Byrapura', lat: 13.67184, lng: 75.82095, radiusM: 350 },
+]
+
+function metresBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const rad = (d: number) => (d * Math.PI) / 180
+  const a = Math.sin(rad(lat2 - lat1) / 2) ** 2
+    + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lng2 - lng1) / 2) ** 2
+  return 6371000 * 2 * Math.asin(Math.sqrt(a))
+}
+
 // Turf/GeoJSON is [lng, lat] — this helper takes the more natural (lat, lng)
 // argument order used throughout the rest of the app (geolocation, reverse-geocode, etc).
 export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
   const p = point([lng, lat])
   if (booleanPointInPolygon(p, DELIVERY_ZONE)) return 'core'
   if (booleanPointInPolygon(p, OUTER_ZONE)) return 'extended'
+  if (ALWAYS_EXTENDED_AREAS.some((a) => metresBetween(lat, lng, a.lat, a.lng) <= a.radiusM)) return 'extended'
   return 'outside'
 }
 
