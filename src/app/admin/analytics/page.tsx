@@ -224,7 +224,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         <div className="p-6 space-y-6">
-          <RefundsPanel />
+          <RefundsPanel range={range} />
 
           {/* Today at a glance — click a card to see it broken down by
               restaurant, then click a restaurant to see its actual orders. */}

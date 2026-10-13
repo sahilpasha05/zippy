@@ -22,7 +22,7 @@ const restName = (o: RefundOrder) => (Array.isArray(o.restaurants) ? o.restauran
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
 
-export default function RefundsPanel() {
+export default function RefundsPanel({ range }: { range: { from: string; to: string } }) {
   const [rows, setRows] = useState<RefundOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [doneCount, setDoneCount] = useState(0)
@@ -68,8 +68,14 @@ export default function RefundsPanel() {
     setDoneCount((n) => n + 1)
   }
 
-  const pending = rows
+  // Follows the page's date range (by the day the order was placed, India
+  // time). Refunds owed outside the range are never hidden: they're counted
+  // in the note under the list so the full amount is always visible.
+  const dayOf = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const pending = rows.filter((r) => { const d = dayOf(r.placed_at); return d >= range.from && d <= range.to })
+  const outside = rows.filter((r) => { const d = dayOf(r.placed_at); return d < range.from || d > range.to })
   const pendingTotal = pending.reduce((s, r) => s + Number(r.online_amount), 0)
+  const outsideTotal = outside.reduce((s, r) => s + Number(r.online_amount), 0)
   const list = pending
 
   return (
@@ -94,7 +100,7 @@ export default function RefundsPanel() {
         <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 text-[#7C3AED] animate-spin" /></div>
       ) : list.length === 0 ? (
         <p className="text-[13px] text-[#9CA3AF] text-center py-10">
-          No refunds pending. Every cancelled order that was paid online has been refunded.
+          {outside.length > 0 ? 'No refunds pending for orders in this date range.' : 'No refunds pending. Every cancelled order that was paid online has been refunded.'}
         </p>
       ) : (
         <div className="overflow-x-auto mt-3">
@@ -138,8 +144,15 @@ export default function RefundsPanel() {
           </table>
         </div>
       )}
-      {!loading && doneCount > 0 && (
-        <p className="px-5 py-3 text-[11.5px] text-[#9CA3AF] border-t border-[#F3F4F6]">{doneCount} refund{doneCount !== 1 ? 's' : ''} already marked completed.</p>
+      {!loading && (outside.length > 0 || doneCount > 0) && (
+        <p className="px-5 py-3 text-[11.5px] text-[#9CA3AF] border-t border-[#F3F4F6]">
+          {outside.length > 0 && (
+            <span className="font-[600] text-[#B45309]">
+              {outside.length} more refund{outside.length !== 1 ? 's' : ''} ({inr(outsideTotal)}) pending for orders outside this date range — widen the range (e.g. All time) to see them.{' '}
+            </span>
+          )}
+          {doneCount > 0 && <>{doneCount} refund{doneCount !== 1 ? 's' : ''} already marked completed.</>}
+        </p>
       )}
     </div>
   )
