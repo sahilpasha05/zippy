@@ -11,7 +11,7 @@ import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE, ALLOW_LOCATION_MESSAGE } from '@/lib/deliveryZone'
+import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE, ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 import { useLiveLocation } from '@/lib/store/liveLocation'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
@@ -84,11 +84,16 @@ export default function CheckoutPage() {
   // all come from the customer's actual GPS position, even when a saved
   // address is selected. It's requested again here (the cart asks first) so a
   // direct visit to checkout can't skip it.
-  const { coords: liveCoords, status: liveStatus, error: liveError, request: requestLocation } = useLiveLocation()
+  const { coords: liveCoords, status: liveStatus, error: liveError, manualMode, request: requestLocation, continueManually } = useLiveLocation()
   useEffect(() => {
     if (useLiveLocation.getState().status === 'idle') void useLiveLocation.getState().request()
   }, [])
-  const locationReady = liveStatus === 'granted' && !!liveCoords
+  // Location blocked: the customer may carry on with the address they typed,
+  // but only if they confirm it is inside Tarikere town. That is the inner
+  // zone, so the standard fee applies and the order is a normal one.
+  const noLiveLocation = manualMode && !liveCoords
+  const [insideTownConfirmed, setInsideTownConfirmed] = useState(false)
+  const locationReady = (liveStatus === 'granted' && !!liveCoords) || (noLiveLocation && insideTownConfirmed)
 
   const tier = liveCoords ? getDeliveryTier(liveCoords.lat, liveCoords.lng) : 'core'
   const needsConfirmation = tier === 'outside'
@@ -175,7 +180,9 @@ export default function CheckoutPage() {
           restaurant_id: needsConfirmation ? null : restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',
           status: selectedPayment === 'cod' && !needsConfirmation ? 'confirmed' : 'pending',
-          notes: heldNote,
+          notes: heldNote ?? (noLiveLocation
+            ? 'MANUAL ADDRESS - no live location (blocked on the customer\'s phone). Customer confirmed the address is inside Tarikere town. Check the address when calling or delivering.'
+            : null),
           total: grandTotal,
           delivery_fee: deliveryFee,
           discount: 0,
@@ -398,10 +405,24 @@ export default function CheckoutPage() {
                 ? 'Getting your live location… Please allow location access when your browser asks. It is required to place an order.'
                 : (<>
                     {ALLOW_LOCATION_MESSAGE} {liveError}
+                    <span className="block mt-1">{MANUAL_ADDRESS_NOTE}</span>
                     <span className="flex flex-wrap gap-3 mt-2">
                       <button onClick={() => void requestLocation()} className="font-[700] underline">Try again</button>
+                      <button onClick={continueManually} className="font-[700] underline">Continue with manual address</button>
                     </span>
                   </>)}
+            </div>
+          )}
+
+          {noLiveLocation && (
+            <div className="mb-6 px-4 py-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-[13px] text-[#14532D] leading-relaxed">
+              <p className="font-[700] mb-1.5">Ordering with a typed address</p>
+              <p className="mb-2">Your location is off, so we will use the address you entered. This is only for addresses inside Tarikere town.</p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={insideTownConfirmed} onChange={(e) => setInsideTownConfirmed(e.target.checked)} className="mt-0.5 accent-[#16A34A]" />
+                <span>My delivery address is inside Tarikere town.</span>
+              </label>
+              <button onClick={() => void requestLocation()} className="mt-2 text-[12px] font-[700] underline">I turned location on — try again</button>
             </div>
           )}
 
@@ -577,7 +598,7 @@ export default function CheckoutPage() {
                   ) : !selectedAddress ? (
                     <>Select a delivery address</>
                   ) : !locationReady ? (
-                    <>Allow live location to continue</>
+                    <>{noLiveLocation ? 'Confirm your address is in Tarikere town' : 'Allow live location to continue'}</>
                   ) : belowMinOrder ? (
                     <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
                   ) : (
@@ -604,7 +625,7 @@ export default function CheckoutPage() {
           ) : !selectedAddress ? (
             <>Select a delivery address</>
           ) : !locationReady ? (
-            <>Allow live location to continue</>
+            <>{noLiveLocation ? 'Confirm your address is in Tarikere town' : 'Allow live location to continue'}</>
           ) : belowMinOrder ? (
             <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
           ) : (

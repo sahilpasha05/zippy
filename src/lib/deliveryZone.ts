@@ -132,6 +132,12 @@ export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
 export const NEEDS_CONFIRMATION_MESSAGE =
   'Your order is not confirmed until our executive calls you. We will check whether a delivery partner is available in your area.'
 
+// Shown next to the "continue with manual address" option. That option is
+// only for addresses inside Tarikere town (the inner boundary), where the fee
+// is the standard one and no executive call is needed.
+export const MANUAL_ADDRESS_NOTE =
+  'Live inside Tarikere town? You can continue with the address you type instead.'
+
 // One wording wherever location is blocked, so the cart, checkout and the
 // address form tell the customer the same thing.
 export const ALLOW_LOCATION_MESSAGE =
