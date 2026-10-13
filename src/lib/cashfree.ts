@@ -79,3 +79,65 @@ export function verifyCashfreeWebhookSignature(
   if (receivedBuf.length !== expectedBuf.length) return false
   return crypto.timingSafeEqual(receivedBuf, expectedBuf)
 }
+
+export function cashfreeEnvironment(): 'production' | 'sandbox' {
+  return ENV
+}
+
+export type CashfreeSettlement = {
+  id: string
+  utr: string | null
+  status: string // PAID, FAILED, or an in-progress state such as INITIATED / PENDING
+  amountSettled: number
+  paymentAmount: number
+  paymentFrom: string | null // payments from … till … are what this settlement covers
+  paymentTill: string | null
+  initiatedOn: string | null
+  settledOn: string | null
+  charges: number // Cashfree service charge + tax + settlement charge
+  adjustment: number
+  type: string | null
+}
+
+type RawSettlement = Record<string, unknown>
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0)
+const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
+
+// Settlements Cashfree has created or paid out between two instants, newest
+// pages first as Cashfree returns them. Pages are followed via `cursor`.
+export async function listCashfreeSettlements(startISO: string, endISO: string): Promise<CashfreeSettlement[]> {
+  const out: CashfreeSettlement[] = []
+  let cursor: string | null = null
+  for (let page = 0; page < 20; page++) {
+    const res: Response = await fetch(`${BASE_URL}/settlements`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        pagination: { limit: 50, ...(cursor ? { cursor } : {}) },
+        filters: { start_date: startISO, end_date: endISO },
+      }),
+      cache: 'no-store',
+    })
+    const data: { data?: RawSettlement[]; cursor?: string | null; message?: string } = await res.json()
+    if (!res.ok) throw new Error(`Cashfree settlements failed: ${data.message ?? res.statusText}`)
+    for (const r of data.data ?? []) {
+      out.push({
+        id: String(r.cf_settlement_id ?? r.settlement_id ?? ''),
+        utr: str(r.settlement_utr),
+        status: String(r.status ?? 'UNKNOWN').toUpperCase(),
+        amountSettled: num(r.amount_settled),
+        paymentAmount: num(r.payment_amount),
+        paymentFrom: str(r.payment_from),
+        paymentTill: str(r.payment_till),
+        initiatedOn: str(r.settlement_initiated_on),
+        settledOn: str(r.settlement_date),
+        charges: num(r.service_charge) + num(r.service_tax) + num(r.settlement_charge) + num(r.settlement_tax),
+        adjustment: num(r.adjustment),
+        type: str(r.settlement_type),
+      })
+    }
+    cursor = typeof data.cursor === 'string' && data.cursor ? data.cursor : null
+    if (!cursor || (data.data ?? []).length === 0) break
+  }
+  return out
+}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Wallet, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk } from 'lucide-react'
+import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Wallet, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk, Landmark } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createClient()
@@ -18,6 +18,7 @@ const NAV = [
   { href: '/admin/quick-add',    label: 'Quick Add',    icon: PlusCircle },
   { href: '/admin/orders',       label: 'All Orders',   icon: ShoppingBag },
   { href: '/admin/ledger',       label: 'Ledger',       icon: Wallet },
+  { href: '/admin/cashfree',     label: 'Cashfree Payments', icon: Landmark },
   { href: '/admin/savings',      label: 'Savings & Expenses', icon: PiggyBank },
   { href: '/admin/delivery',     label: 'Delivery Partners', icon: Bike },
   { href: '/admin/collections',  label: 'Delivery Collections', icon: HandCoins },
