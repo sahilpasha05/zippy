@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -70,10 +70,33 @@ export default function Navbar() {
   const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
 
   const onRestaurantSide = pathname.startsWith('/restaurant')
+  // On a restaurant's own page the page has its "Search menu" box, so the
+  // site-wide product search is hidden to avoid two search bars.
+  const onRestaurantMenu = /^\/restaurants\/[^/]+/.test(pathname)
+
+  // The header's height changes when the search is hidden, so the spacer under
+  // it (and the sticky bars that sit below it) follow its measured height
+  // instead of a fixed number.
+  const headerRef = useRef<HTMLElement>(null)
+  const spacerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const apply = () => {
+      const h = el.offsetHeight
+      if (spacerRef.current) spacerRef.current.style.height = `${h}px`
+      document.documentElement.style.setProperty('--zippy-header-h', `${h}px`)
+    }
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   return (
     <>
       <header
+        ref={headerRef}
         className={cn(
           'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
           scrolled
@@ -128,7 +151,7 @@ export default function Navbar() {
             </div>
           </div>
           {/* Full-width search */}
-          <GrocerySearchBox variant="mobile" />
+          {!onRestaurantMenu && <GrocerySearchBox variant="mobile" />}
         </div>
 
         {/* Desktop header */}
@@ -165,7 +188,7 @@ export default function Navbar() {
             </button>
 
             {/* Search */}
-            <GrocerySearchBox variant="desktop" />
+            {onRestaurantMenu ? <div className="flex-1" /> : <GrocerySearchBox variant="desktop" />}
 
             {/* Nav Links - Desktop */}
             <nav className="hidden lg:flex items-center gap-1">
@@ -252,12 +275,12 @@ export default function Navbar() {
       </header>
 
       {/* Spacer */}
-      <div className="h-[168px] lg:h-16" />
+      <div ref={spacerRef} className="h-[168px] lg:h-16" />
 
       {profileMenuOpen && user && (
         <>
           <div className="fixed inset-0 z-[90]" onClick={closeProfileMenu} />
-          <div className="fixed top-[172px] lg:top-16 right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
+          <div style={{ top: 'calc(var(--zippy-header-h, 168px) + 4px)' }} className="fixed right-4 z-[100] w-56 bg-white rounded-2xl border border-[#E5E7EB] shadow-zippy-lg p-2">
             <div className="px-3 py-2.5 border-b border-[#F3F4F6] mb-1">
               <p className="text-[12px] text-[#9CA3AF]">Signed in as</p>
               <p className="text-[13.5px] font-[700] text-[#111827] truncate">{user.phone ?? user.email}</p>
