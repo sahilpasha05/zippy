@@ -3,63 +3,64 @@
   "scenes": {
     "s1": [
       0,
-      3
+      3.5
     ],
     "s2": [
-      3,
-      7
+      3.5,
+      8.5
     ],
     "s3": [
-      7,
-      9
+      8.5,
+      9.75
     ],
     "s4": [
-      9,
-      12
+      9.75,
+      12.25
     ],
     "s5": [
-      12,
-      14
+      12.25,
+      13.5
     ],
     "s6": [
-      14,
-      16.5
+      13.5,
+      16.0
     ],
     "s7": [
-      16.5,
+      16.0,
       18.5
     ],
     "s8": [
       18.5,
-      22.5
+      22.25
     ],
     "s9": [
-      22.5,
+      22.25,
       25
     ]
   },
   "cues": {
     "kadur": 1.0,
-    "ready": 2.0,
-    "food": 3.0,
-    "pizza": 4.0,
-    "burger": 5.0,
-    "fries": 6.0,
-    "groceries": 7.0,
-    "shelf": 8.0,
-    "logo": 9.0,
-    "comingTo": 10.0,
-    "kadurHit": 12.0,
-    "rider": 14.0,
-    "bag": 15.5,
-    "foodYouLove": 16.5,
-    "groceriesYouNeed": 17.5,
+    "ready": 2.25,
+    "food": 3.5,
+    "pizza": 4.75,
+    "burger": 6.0,
+    "fries": 7.25,
+    "groceries": 8.5,
+    "shelf": 9.125,
+    "logo": 9.75,
+    "comingTo": 10.625,
+    "kadurHit": 12.25,
+    "rider": 13.5,
+    "bag": 14.75,
+    "foodYouLove": 16.0,
+    "groceriesYouNeed": 17.25,
     "getReady": 18.5,
-    "comingSoon": 19.5,
-    "something": 20.95,
-    "end": 22.5,
-    "stayTuned": 22.9,
-    "url": 23.8,
-    "sting": 24.0
-  }
+    "comingSoon": 19.75,
+    "something": 21.0,
+    "end": 22.25,
+    "stayTuned": 22.875,
+    "url": 23.5,
+    "sting": 24.125
+  },
+  "note": "Cues sit on the track bar grid (96 BPM, bar 1.25s, anchor 9.75s = drop) using the track from 0:41."
 }

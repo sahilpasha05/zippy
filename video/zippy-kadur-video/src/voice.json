@@ -4,84 +4,84 @@
    "cue": "kadur",
    "text": "Kadur.",
    "start": 1.02,
-   "end": 1.876,
-   "speed": 0.9
+   "end": 1.949,
+   "speed": 0.85
   },
   {
    "cue": "ready",
    "text": "Are you ready?",
-   "start": 2.02,
-   "end": 2.934,
-   "speed": 1.05
+   "start": 2.27,
+   "end": 3.339,
+   "speed": 0.9
   },
   {
    "cue": "food",
    "text": "Your favourite food.",
-   "start": 3.02,
-   "end": 4.358,
+   "start": 3.52,
+   "end": 4.857,
    "speed": 0.95
   },
   {
    "cue": "groceries",
    "text": "Your daily groceries.",
-   "start": 7.02,
-   "end": 8.528,
-   "speed": 0.95
+   "start": 8.52,
+   "end": 9.703,
+   "speed": 1.3
   },
   {
    "cue": "comingTo",
    "text": "Zippy is coming to...",
-   "start": 10.02,
-   "end": 11.517,
-   "speed": 0.85
+   "start": 10.645,
+   "end": 11.865,
+   "speed": 1.1
   },
   {
    "cue": "kadurHit",
    "text": "Kadur!",
-   "start": 12.02,
-   "end": 13.224,
+   "start": 12.27,
+   "end": 13.446,
    "speed": 0.7
   },
   {
    "cue": "foodYouLove",
    "text": "Food you love.",
-   "start": 16.52,
-   "end": 17.484,
-   "speed": 1.2
+   "start": 16.02,
+   "end": 17.158,
+   "speed": 0.95
   },
   {
    "cue": "groceriesYouNeed",
    "text": "Groceries you need.",
-   "start": 17.52,
-   "end": 18.558,
-   "speed": 1.2
+   "start": 17.27,
+   "end": 18.426,
+   "speed": 1.1
   },
   {
    "cue": "getReady",
    "text": "Kadur, get ready!",
    "start": 18.52,
-   "end": 19.547,
-   "speed": 1.2
+   "end": 19.645,
+   "speed": 1.05
   },
   {
    "cue": "comingSoon",
    "text": "Zippy is coming soon!",
-   "start": 19.52,
-   "end": 20.881,
-   "speed": 1.05
+   "start": 19.77,
+   "end": 20.906,
+   "speed": 1.25
   },
   {
    "cue": "something",
    "text": "Something exciting is on its way.",
-   "start": 20.97,
-   "end": 22.6,
-   "speed": 1.1
+   "start": 21.02,
+   "end": 22.594,
+   "speed": 1.2
   },
   {
    "cue": "stayTuned",
    "text": "Stay tuned, Kadur!",
-   "start": 22.92,
-   "end": 24.449,
+   "start": 22.895,
+   "end": 24.427,
    "speed": 0.9
   }
  ]

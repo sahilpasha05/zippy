@@ -14,12 +14,12 @@ tts = sherpa_onnx.OfflineTts(cfg)
 SR = 44100; n = 25 * SR
 # (cue, text, latest end in seconds, speed range, gain)
 LINES = [
- ('kadur', 'Kadur.', 1.95, (0.85, 1.0), 1.0), ('ready', 'Are you ready?', 2.95, (0.9, 1.1), 1.0),
- ('food', 'Your favourite food.', 4.9, (0.95, 1.15), 1.0), ('groceries', 'Your daily groceries.', 8.9, (0.95, 1.15), 1.0),
- ('comingTo', 'Zippy is coming to...', 11.6, (0.85, 1.1), 1.0), ('kadurHit', 'Kadur!', 13.6, (0.7, 0.85), 1.25),
- ('foodYouLove', 'Food you love.', 17.45, (0.95, 1.2), 1.0), ('groceriesYouNeed', 'Groceries you need.', 18.45, (0.95, 1.2), 1.0),
- ('getReady', 'Kadur, get ready!', 19.45, (0.95, 1.2), 1.05), ('comingSoon', 'Zippy is coming soon!', 20.9, (0.95, 1.2), 1.05),
- ('something', 'Something exciting is on its way.', 22.6, (1.0, 1.3), 1.0), ('stayTuned', 'Stay tuned, Kadur!', 24.5, (0.9, 1.1), 1.05),
+ ('kadur', 'Kadur.', 2.2, (0.85, 1.0), 1.0), ('ready', 'Are you ready?', 3.4, (0.9, 1.1), 1.0),
+ ('food', 'Your favourite food.', 5.0, (0.95, 1.15), 1.0), ('groceries', 'Your daily groceries.', 9.7, (1.0, 1.3), 1.0),
+ ('comingTo', 'Zippy is coming to...', 11.9, (0.9, 1.2), 1.0), ('kadurHit', 'Kadur!', 13.5, (0.7, 0.85), 1.25),
+ ('foodYouLove', 'Food you love.', 17.2, (0.95, 1.2), 1.0), ('groceriesYouNeed', 'Groceries you need.', 18.45, (0.95, 1.25), 1.0),
+ ('getReady', 'Kadur, get ready!', 19.7, (0.95, 1.25), 1.05), ('comingSoon', 'Zippy is coming soon!', 20.95, (0.95, 1.25), 1.05),
+ ('something', 'Something exciting is on its way.', 22.6, (1.0, 1.3), 1.0), ('stayTuned', 'Stay tuned, Kadur!', 24.9, (0.9, 1.1), 1.05),
 ]
 def hp(x, f): return signal.sosfilt(signal.butter(2, f, 'high', fs=SR, output='sos'), x)
 bus = np.zeros(n); wet = np.zeros(n); windows = []

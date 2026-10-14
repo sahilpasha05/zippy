@@ -1,1 +1,4 @@
 node_modules
+public/track.wav
+public/music.wav
+out/*.mp4

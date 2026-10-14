@@ -26,10 +26,10 @@ const musicVolume = (f: number) => {
   }
   return 0.62 * duck;
 };
-export const Video: React.FC<{mode: Mode}> = ({mode}) => (
+export const Video: React.FC<{mode: Mode; voiceOn?: boolean}> = ({mode, voiceOn = true}) => (
   <ModeCtx.Provider value={mode}><AbsoluteFill style={{background: '#000'}}>
     {SC.map(([id, C]) => <Sequence key={id} {...sceneRange(id)}><C /></Sequence>)}
-    <Audio src={staticFile('music.wav')} volume={musicVolume} />
-    <Audio src={staticFile('voice.wav')} volume={0.95} />
+    <Audio src={staticFile('music.wav')} volume={voiceOn ? musicVolume : 0.85} />
+    {voiceOn && <Audio src={staticFile('voice.wav')} volume={0.95} />}
   </AbsoluteFill></ModeCtx.Provider>
 );
