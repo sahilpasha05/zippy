@@ -1,18 +1,9 @@
-// Brand values taken from the zippy app (green #16A34A, dark #111827, orange from the logo tagline).
-// Drop the original logo at public/zippy-logo.png (or .svg) and set LOGO_FILE.
-export const LOGO_FILE: string | null = 'zippy-logo.png'; // original logo from the zippy repo (public/logo-zippy.png)
-export const BRAND = {
-  primary: '#22C55E', // brand green, brightened for glow on dark
-  brand: '#16A34A', // exact brand green
-  secondary: '#F97316', // orange accent (logo tagline)
-  warm: '#FBBF24', // warm window lights
-  dark: '#07110B',
-  light: '#FFFFFF',
-};
-export const FPS = 30;
+// Brand values taken from the zippy app: green #16A34A, dark #111827, orange from the logo tagline.
+export const BRAND = {green: '#16A34A', greenBright: '#22C55E', orange: '#F97316', dark: '#06100A', ink: '#111827'};
 export const W = 1080;
 export const H = 1920;
-export const S = {s1: [0, 90], s2: [90, 210], s3: [210, 360], s4: [360, 540], s5: [540, 750]} as const;
-export const TOTAL = 750;
 export const FONT = "'Inter','Inter Display','DejaVu Sans',Arial,sans-serif";
-export const URL_TEXT = 'zippykadur.com';
+export const MONO = "'DejaVu Sans Mono','Courier New',monospace";
+export const SITE = 'zippykadur.com';
+// Platform safe areas (Reels / Shorts / Status overlay UI at top and bottom).
+export const SAFE = {side: 80, top: 230, bottom: 380};

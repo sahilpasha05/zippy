@@ -1,14 +1,20 @@
 import React from 'react';
 import {AbsoluteFill, Audio, Sequence, staticFile} from 'remotion';
-import {S} from './config';
-import {Scene1, Scene2, Scene3, Scene4, Scene5} from './scenes';
+import {sceneRange} from './timing';
+import {Scene1} from './scenes/Scene1';
+import {Scene2} from './scenes/Scene2';
+import {Scene3} from './scenes/Scene3';
+import {Scene4} from './scenes/Scene4';
+import {Scene5} from './scenes/Scene5';
+import {Scene6} from './scenes/Scene6';
+import {Scene7} from './scenes/Scene7';
+import {Scene8} from './scenes/Scene8';
+import {Scene9} from './scenes/Scene9';
 
-const seq = (r: readonly [number, number], C: React.FC) => (
-  <Sequence from={r[0]} durationInFrames={r[1] - r[0]}><C /></Sequence>
-);
+const SC: [string, React.FC][] = [['s1', Scene1], ['s2', Scene2], ['s3', Scene3], ['s4', Scene4], ['s5', Scene5], ['s6', Scene6], ['s7', Scene7], ['s8', Scene8], ['s9', Scene9]];
 export const Video: React.FC = () => (
   <AbsoluteFill style={{background: '#000'}}>
-    {seq(S.s1, Scene1)}{seq(S.s2, Scene2)}{seq(S.s3, Scene3)}{seq(S.s4, Scene4)}{seq(S.s5, Scene5)}
+    {SC.map(([id, C]) => <Sequence key={id} {...sceneRange(id)}><C /></Sequence>)}
     <Audio src={staticFile('music.wav')} />
   </AbsoluteFill>
 );

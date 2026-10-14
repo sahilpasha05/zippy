@@ -1,0 +1,18 @@
+{
+  "fps": 30,
+  "scenes": {
+    "s1": [0, 3], "s2": [3, 7], "s3": [7, 9], "s4": [9, 12], "s5": [12, 14],
+    "s6": [14, 17], "s7": [17, 19], "s8": [19, 22], "s9": [22, 25]
+  },
+  "cues": {
+    "kadur": 1.0, "ready": 2.0,
+    "food": 3.0, "pizza": 4.0, "burger": 5.0, "fries": 6.0,
+    "groceries": 7.0, "shelf": 8.0,
+    "logo": 9.0, "comingTo": 10.0,
+    "kadurHit": 12.0,
+    "rider": 14.0, "bag": 15.5,
+    "foodYouLove": 17.0, "groceriesYouNeed": 18.0,
+    "getReady": 19.0, "comingSoon": 20.0, "something": 21.0,
+    "end": 22.0, "stayTuned": 22.5, "url": 23.5, "sting": 24.0
+  }
+}
