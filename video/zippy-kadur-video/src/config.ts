@@ -14,4 +14,5 @@ export const W = 1080;
 export const H = 1920;
 export const S = {s1: [0, 90], s2: [90, 210], s3: [210, 360], s4: [360, 540], s5: [540, 750]} as const;
 export const TOTAL = 750;
-export const FONT = "'Arial Black','DejaVu Sans','Liberation Sans',Arial,sans-serif";
+export const FONT = "'Inter','Inter Display','DejaVu Sans',Arial,sans-serif";
+export const URL_TEXT = 'zippykadur.com';
