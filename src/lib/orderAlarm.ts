@@ -106,3 +106,39 @@ export function stopAlarm() {
     activeNotification = null
   }
 }
+
+// A short two-note chime for something that needs a glance but not the
+// looping order alarm (e.g. a new chat message). Generated with Web Audio so it
+// needs no sound file; silently does nothing if the browser still blocks audio.
+export function chime() {
+  if (typeof window === 'undefined') return
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new Ctx()
+    const note = (freq: number, start: number) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + start)
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + 0.28)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(ctx.currentTime + start)
+      osc.stop(ctx.currentTime + start + 0.3)
+    }
+    note(880, 0)
+    note(1175, 0.18)
+    setTimeout(() => ctx.close().catch(() => {}), 800)
+  } catch { /* audio unavailable */ }
+  try { navigator.vibrate?.([120, 60, 120]) } catch { /* not supported */ }
+}
+
+// A system notification, only while the panel is in the background (when it is
+// in front, the on-screen banner already says it). Needs the permission that
+// unlockAudio() asks for.
+export function systemNotify(title: string, body: string) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return
+  if (Notification.permission !== 'granted' || document.visibilityState === 'visible') return
+  try { new Notification(title, { body, tag: 'zippy-chat' }) } catch { /* not supported */ }
+}

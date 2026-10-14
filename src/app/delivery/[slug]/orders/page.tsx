@@ -5,9 +5,9 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, Filter, MessageCircle } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
-import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
+import { unlockAudio, startAlarm, stopAlarm, chime, systemNotify } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import OrderChat from '@/components/OrderChat'
 
@@ -177,6 +177,60 @@ export default function DeliveryOrdersPage() {
   pendingAcceptRef.current = pendingAccept
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
   const [chatOrder, setChatOrder] = useState<Order | null>(null)
+
+  // Customer chat alerts: how many messages each active order has received,
+  // against how many this rider has already seen on this device.
+  type ChatCount = { orderId: string; customer: string | null; count: number; lastBody: string }
+  const [chatCounts, setChatCounts] = useState<ChatCount[]>([])
+  const [chatBanner, setChatBanner] = useState<{ customer: string; body: string; orderId: string } | null>(null)
+  const seenKey = `zippy-rider-chat-seen-${slug}`
+  const [seenCounts, setSeenCounts] = useState<Record<string, number>>(() => {
+    try { return JSON.parse(localStorage.getItem(`zippy-rider-chat-seen-${slug}`) ?? '{}') } catch { return {} }
+  })
+  const chatCountsRef = useRef<Record<string, number>>({})
+  const seenRef = useRef<Record<string, number>>({})
+  seenRef.current = seenCounts
+
+  const markSeen = useCallback((orderId: string, count: number) => {
+    setSeenCounts((prev) => {
+      const next = { ...prev, [orderId]: Math.max(prev[orderId] ?? 0, count) }
+      try { localStorage.setItem(seenKey, JSON.stringify(next)) } catch { /* storage unavailable */ }
+      return next
+    })
+  }, [seenKey])
+
+  useEffect(() => {
+    let stop = false
+    async function poll() {
+      if (document.visibilityState !== 'visible' && Notification?.permission !== 'granted') return
+      try {
+        const res = await fetch(`/api/delivery/chat-summary?rider=${encodeURIComponent(slug)}`, { cache: 'no-store' })
+        if (!res.ok || stop) return
+        const json = await res.json() as { orders: ChatCount[] }
+        setChatCounts(json.orders)
+        for (const c of json.orders) {
+          const known = chatCountsRef.current[c.orderId]
+          chatCountsRef.current[c.orderId] = c.count
+          const seen = seenRef.current[c.orderId] ?? 0
+          // Ring only for something that arrived since the last poll (known is
+          // undefined on the first poll, so reopening the panel is quiet).
+          if (known !== undefined && c.count > known && c.count > seen) {
+            chime()
+            setChatBanner({ customer: c.customer ?? 'Customer', body: c.lastBody, orderId: c.orderId })
+            systemNotify(`New message from ${c.customer ?? 'customer'}`, c.lastBody)
+          }
+        }
+      } catch { /* try again next tick */ }
+    }
+    void poll()
+    const t = setInterval(poll, 7000)
+    return () => { stop = true; clearInterval(t) }
+  }, [slug])
+
+  const unreadFor = (orderId: string) => {
+    const c = chatCounts.find((x) => x.orderId === orderId)
+    return c ? Math.max(0, c.count - (seenCounts[orderId] ?? 0)) : 0
+  }
   const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
   const [deliveringBusy, setDeliveringBusy] = useState(false)
   const [deliverError, setDeliverError] = useState('')
@@ -427,15 +481,15 @@ export default function DeliveryOrdersPage() {
     <div className="min-h-screen bg-[#F8FAFC]">
       {/* Header */}
       <div className="bg-white border-b border-[#E5E7EB] sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-[#F5F3FF] rounded-xl flex items-center justify-center">
-                <Bike className="w-5 h-5 text-[#7C3AED]" />
+        <div className="max-w-2xl mx-auto px-3 py-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 bg-[#F5F3FF] rounded-lg flex items-center justify-center shrink-0">
+                <Bike className="w-4 h-4 text-[#7C3AED]" />
               </div>
-              <div>
-                <h1 className="text-[15px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>{partner.name}</h1>
-                <p className="text-[11.5px] text-[#9CA3AF] capitalize">{partner.vehicle_type ?? 'Rider'} · {partner.total_deliveries ?? 0} delivered</p>
+              <div className="min-w-0">
+                <h1 className="text-[14px] font-[800] text-[#111827] leading-tight truncate" style={{ fontWeight: 800 }}>{partner.name}</h1>
+                <p className="text-[10.5px] text-[#9CA3AF] capitalize leading-tight">{partner.vehicle_type ?? 'Rider'} · {partner.total_deliveries ?? 0} delivered</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -464,6 +518,15 @@ export default function DeliveryOrdersPage() {
           </div>
           {locationError && <p className="text-[11.5px] text-[#DC2626] mb-3">{locationError} — tap the location icon to retry</p>}
 
+          {chatBanner && (
+            <button onClick={() => { const o = orders.find((x) => x.id === chatBanner.orderId); if (o) { setChatOrder(o); const c = chatCounts.find((x) => x.orderId === o.id); if (c) markSeen(o.id, c.count) } setChatBanner(null) }}
+              className="mb-2 w-full flex items-center gap-2 px-3 py-2 bg-[#16A34A] rounded-xl text-left">
+              <MessageCircle className="w-4 h-4 text-white shrink-0" />
+              <span className="flex-1 min-w-0 text-[12.5px] text-white truncate"><strong>{chatBanner.customer}:</strong> {chatBanner.body}</span>
+              <span className="text-[11px] font-[700] text-white/90 shrink-0">Open</span>
+            </button>
+          )}
+
           {newOrderFlash && (
             <div className="mb-3 flex items-center gap-2 px-4 py-2.5 bg-[#7C3AED] rounded-xl animate-pulse">
               <BellRing className="w-4 h-4 text-white" />
@@ -474,79 +537,76 @@ export default function DeliveryOrdersPage() {
           {/* A per-day record, not a live-only snapshot — it tracks whichever
               day is selected below (today by default), so switching the date
               re-opens that day's own totals instead of losing them at midnight. */}
-          <div className="grid grid-cols-3 gap-2 mb-2.5">
-            <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-3 py-2">
-              <p className="text-[17px] font-[800] text-[#15803D] leading-none">{deliveredForStats.length}</p>
-              <p className="text-[10.5px] text-[#15803D]/70 mt-1">delivered {statsLabel}</p>
+          <div className="grid grid-cols-3 gap-1.5 mb-2">
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg px-2 py-1">
+              <p className="text-[14px] font-[800] text-[#15803D] leading-none">{deliveredForStats.length}</p>
+              <p className="text-[9.5px] text-[#15803D]/70 mt-0.5 truncate">delivered {statsLabel}</p>
             </div>
-            <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-xl px-3 py-2">
-              <p className="text-[17px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
-              <p className="text-[10.5px] text-[#6D28D9]/70 mt-1">still to deliver</p>
+            <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-lg px-2 py-1">
+              <p className="text-[14px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
+              <p className="text-[9.5px] text-[#6D28D9]/70 mt-0.5 truncate">still to deliver</p>
             </div>
-            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2">
-              <p className="text-[17px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
-              <p className="text-[10.5px] text-[#B45309]/70 mt-1">cash collected {statsLabel}</p>
+            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2 py-1">
+              <p className="text-[14px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
+              <p className="text-[9.5px] text-[#B45309]/70 mt-0.5 truncate">cash {statsLabel}</p>
             </div>
           </div>
 
-          <div className="relative mb-2.5">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search order, name, phone or address"
-              className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
-                <X className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9CA3AF]" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search order, name, phone…"
+                className="w-full pl-8 pr-7 py-1.5 border border-[#E5E7EB] rounded-lg text-[12.5px] outline-none focus:border-[#7C3AED] bg-white"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="relative shrink-0">
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                title="Filter by date"
+                className="w-[138px] px-1.5 py-1.5 border border-[#E5E7EB] rounded-lg text-[11.5px] outline-none focus:border-[#7C3AED] bg-white"
+              />
+            </div>
+            {dateFilter !== toLocalDateInput(new Date().toISOString()) ? (
+              <button onClick={() => setDateFilter(toLocalDateInput(new Date().toISOString()))}
+                className="px-2 py-1.5 rounded-lg text-[11.5px] font-[600] border border-[#E5E7EB] text-[#374151] whitespace-nowrap">
+                Today
+              </button>
+            ) : null}
+            {dateFilter && (
+              <button onClick={() => setDateFilter('')} title="Show every day" className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-[#E5E7EB] text-[#9CA3AF] hover:text-[#374151]">
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           <div className="flex gap-1.5">
             <button onClick={() => setTab('active')}
-              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+              className={cn('flex-1 py-1.5 rounded-lg text-[12.5px] font-[600] transition-all',
                 tab === 'active' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
               Active ({activeOrders.length})
             </button>
             <button onClick={() => setTab('pending')}
-              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+              className={cn('flex-1 py-1.5 rounded-lg text-[12.5px] font-[600] transition-all',
                 tab === 'pending' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
               Pending ({pendingOrders.length})
             </button>
             <button onClick={() => setTab('delivered')}
-              className={cn('flex-1 py-2 rounded-xl text-[13px] font-[600] transition-all',
+              className={cn('flex-1 py-1.5 rounded-lg text-[12.5px] font-[600] transition-all',
                 tab === 'delivered' ? 'bg-[#7C3AED] text-white' : 'bg-[#F3F4F6] text-[#6B7280]')}>
               Delivered ({deliveredOrders.length})
             </button>
           </div>
 
-          {/* Defaults to today; the calendar is how the rider reaches older
-              orders instead of scrolling a list spanning every day they've
-              ever ridden. Clearing it goes back to every day, grouped. */}
-          <div className="flex items-center gap-1.5 mt-2.5">
-            <div className="relative flex-1">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white"
-              />
-              {dateFilter && (
-                <button onClick={() => setDateFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#374151]">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {dateFilter !== toLocalDateInput(new Date().toISOString()) && (
-              <button onClick={() => setDateFilter(toLocalDateInput(new Date().toISOString()))}
-                className="px-3 py-2 rounded-xl text-[12.5px] font-[600] border border-[#E5E7EB] text-[#374151] hover:border-[#D1D5DB] transition-all whitespace-nowrap">
-                Today
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
@@ -661,9 +721,13 @@ export default function DeliveryOrdersPage() {
                         </a>
                       )}
                       {!['delivered', 'cancelled'].includes(o.status) && (
-                        <button onClick={() => setChatOrder(o)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A] transition-all">
+                        <button onClick={() => { unlockAudio(); setChatOrder(o); setChatBanner(null); const c = chatCounts.find((x) => x.orderId === o.id); if (c) markSeen(o.id, c.count) }}
+                          className={cn('relative flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-[12px] font-medium transition-all',
+                            unreadFor(o.id) > 0 ? 'border-[#16A34A] bg-[#F0FDF4] text-[#15803D]' : 'border-[#E5E7EB] text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A]')}>
                           <MessageCircle className="w-3.5 h-3.5" /> Chat
+                          {unreadFor(o.id) > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-[10px] font-[800]">{unreadFor(o.id)}</span>
+                          )}
                         </button>
                       )}
                       {o.delivery_latitude && o.delivery_longitude && (
