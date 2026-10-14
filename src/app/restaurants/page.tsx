@@ -11,6 +11,7 @@ import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
 import { createBrowserClient } from '@supabase/ssr'
 import SiteFooter from '@/components/layout/SiteFooter'
+import { CITY } from '@/lib/city'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -154,7 +155,7 @@ export default function RestaurantsPage() {
               <div>
                 <h1 className="text-[28px] font-[800] text-[#111827] tracking-tight" style={{ fontWeight: 800 }}>Restaurants near you</h1>
                 <p className="text-[14px] text-[#6B7280] mt-1">
-                  {loading ? 'Loading…' : `${restaurants.length} restaurants delivering to Tarikere`}
+                  {loading ? 'Loading…' : `${restaurants.length} restaurants delivering to ${CITY.name}`}
                 </p>
               </div>
               <div className="flex items-center gap-3">

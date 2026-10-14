@@ -19,6 +19,7 @@ import SiteFooter from '@/components/layout/SiteFooter'
 import LocationPicker from '@/components/LocationPicker'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
+import { CITY } from '@/lib/city'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -181,7 +182,7 @@ export default function CheckoutPage() {
           order_type: restaurantId ? 'restaurant' : 'grocery',
           status: selectedPayment === 'cod' && !needsConfirmation ? 'confirmed' : 'pending',
           notes: heldNote ?? (noLiveLocation
-            ? 'MANUAL ADDRESS - no live location (blocked on the customer\'s phone). Customer confirmed the address is inside Tarikere town. Check the address when calling or delivering.'
+            ? `MANUAL ADDRESS - no live location (blocked on the customer\'s phone). Customer confirmed the address is inside ${CITY.name} town. Check the address when calling or delivering.`
             : null),
           total: grandTotal,
           delivery_fee: deliveryFee,
@@ -417,10 +418,10 @@ export default function CheckoutPage() {
           {noLiveLocation && (
             <div className="mb-6 px-4 py-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-[13px] text-[#14532D] leading-relaxed">
               <p className="font-[700] mb-1.5">Ordering with a typed address</p>
-              <p className="mb-2">Your location is off, so we will use the address you entered. This is only for addresses inside Tarikere town.</p>
+              <p className="mb-2">Your location is off, so we will use the address you entered. This is only for addresses inside {CITY.name} town.</p>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input type="checkbox" checked={insideTownConfirmed} onChange={(e) => setInsideTownConfirmed(e.target.checked)} className="mt-0.5 accent-[#16A34A]" />
-                <span>My delivery address is inside Tarikere town.</span>
+                <span>My delivery address is inside {CITY.name} town.</span>
               </label>
               <button onClick={() => void requestLocation()} className="mt-2 text-[12px] font-[700] underline">I turned location on — try again</button>
             </div>
@@ -598,7 +599,7 @@ export default function CheckoutPage() {
                   ) : !selectedAddress ? (
                     <>Select a delivery address</>
                   ) : !locationReady ? (
-                    <>{noLiveLocation ? 'Confirm your address is in Tarikere town' : 'Allow live location to continue'}</>
+                    <>{noLiveLocation ? `Confirm your address is in ${CITY.name} town` : 'Allow live location to continue'}</>
                   ) : belowMinOrder ? (
                     <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
                   ) : (
@@ -625,7 +626,7 @@ export default function CheckoutPage() {
           ) : !selectedAddress ? (
             <>Select a delivery address</>
           ) : !locationReady ? (
-            <>{noLiveLocation ? 'Confirm your address is in Tarikere town' : 'Allow live location to continue'}</>
+            <>{noLiveLocation ? `Confirm your address is in ${CITY.name} town` : 'Allow live location to continue'}</>
           ) : belowMinOrder ? (
             <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
           ) : (

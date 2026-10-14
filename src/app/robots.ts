@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
+import { CITY } from '@/lib/city'
 
-const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.zippytarikere.com').replace(/\/+$/, '')
+const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL ?? CITY.siteUrl).replace(/\/+$/, '')
 
 export default function robots(): MetadataRoute.Robots {
   return {

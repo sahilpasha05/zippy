@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { createClient } from '@/lib/supabase/client'
 import LocationPicker from '@/components/LocationPicker'
+import { CITY } from '@/lib/city'
 
 const navLinks = [
   { label: 'Essentials', href: '/essentials', icon: Package },
@@ -66,7 +67,7 @@ export default function Navbar() {
   }
 
   const selectedAddress = addressesReady ? addresses.find((a) => a.id === selectedId) ?? null : null
-  const locationLabel = selectedAddress ? selectedAddress.address : 'Tarikere, Karnataka'
+  const locationLabel = selectedAddress ? selectedAddress.address : `${CITY.name}, ${CITY.state}`
   const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
 
   const onRestaurantSide = pathname.startsWith('/restaurant')

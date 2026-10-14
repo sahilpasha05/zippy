@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import { CITY } from '@/lib/city'
 
 const supabase = createClient()
 
@@ -15,7 +16,7 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState({
     platformName: 'Zippy',
-    supportEmail: 'zippytarikere@gmail.com',
+    supportEmail: CITY.supportEmail,
     deliveryMinutes: '10',
     maxDeliveryFee: '99',
     minOrderValue: '49',

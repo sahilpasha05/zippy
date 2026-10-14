@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import CategoryPageClient from './CategoryPageClient'
+import { CITY } from '@/lib/city'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `${category.name} — Order Online | Zippy`,
-    description: `Shop the best ${category.name.toLowerCase()} online with Zippy — handpicked quality, honest pricing, and delivery in minutes, right to your door in Tarikere.`,
+    description: `Shop the best ${category.name.toLowerCase()} online with Zippy — handpicked quality, honest pricing, and delivery in minutes, right to your door in ${CITY.name}.`,
     alternates: { canonical: `/essentials/${slug}` },
   }
 }

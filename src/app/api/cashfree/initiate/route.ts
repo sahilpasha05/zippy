@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createCashfreeOrder } from '@/lib/cashfree'
+import { CITY } from '@/lib/city'
 
 export async function POST(req: NextRequest) {
   const { orderId } = await req.json()
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   // back to the production domain there (the in-page checkout modal is what actually
   // resolves the payment locally; this URL only matters for the rare full-page-redirect case).
   const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
-  const appUrl = rawAppUrl.startsWith('https://') ? rawAppUrl : 'https://www.zippytarikere.com'
+  const appUrl = rawAppUrl.startsWith('https://') ? rawAppUrl : CITY.siteUrl
   const returnUrl = `${appUrl}/checkout/complete?orderId=${orderId}`
 
   try {

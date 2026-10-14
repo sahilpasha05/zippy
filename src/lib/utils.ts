@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { CITY } from '@/lib/city'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -49,7 +50,7 @@ export function matchesSearchQuery(query: string, ...fields: (string | null | un
 }
 
 // wa.me expects the number as digits only (country code, no + or leading 0).
-const SUPPORT_WHATSAPP_NUMBER = '918277802605'
+const SUPPORT_WHATSAPP_NUMBER = `91${CITY.supportWhatsapp}`
 
 export function whatsappSupportUrl(message: string): string {
   return `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`

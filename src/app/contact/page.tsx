@@ -2,17 +2,18 @@ import Link from 'next/link'
 import { ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import SiteFooter from '@/components/layout/SiteFooter'
+import { CITY } from '@/lib/city'
 
 export const metadata = { title: 'Contact Us — Zippy' }
 
-const WHATSAPP_NUMBER = '8277802605'
+const WHATSAPP_NUMBER = CITY.supportWhatsapp
 
 const ROWS = [
   {
     icon: Mail,
     label: 'Email',
-    value: 'zippytarikere@gmail.com',
-    href: 'mailto:zippytarikere@gmail.com',
+    value: CITY.supportEmail,
+    href: `mailto:${CITY.supportEmail}`,
     note: null,
   },
   {

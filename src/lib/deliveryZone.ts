@@ -1,6 +1,7 @@
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 import { point } from '@turf/helpers'
 import type { Feature, Polygon } from 'geojson'
+import { CITY } from '@/lib/city'
 
 // Two hand-drawn boundaries over Tarikere, Karnataka, traced from a Google
 // Maps screenshot (pixel positions converted using the map's centre and scale
@@ -137,6 +138,10 @@ function metresBetween(lat1: number, lng1: number, lat2: number, lng2: number): 
 // Turf/GeoJSON is [lng, lat] — this helper takes the more natural (lat, lng)
 // argument order used throughout the rest of the app (geolocation, reverse-geocode, etc).
 export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
+  // The traced boundaries above are Tarikere's. A city without its own traced
+  // boundaries (Kadur, for now) has one flat delivery area: everything is 'core'
+  // until its zones are added here.
+  if (CITY.slug !== 'tarikere') return 'core'
   const p = point([lng, lat])
   if (booleanPointInPolygon(p, DELIVERY_ZONE)) return 'core'
   if (booleanPointInPolygon(p, OUTER_ZONE)) return 'extended'
@@ -149,10 +154,10 @@ export const NEEDS_CONFIRMATION_MESSAGE =
   'Your order is not confirmed until our executive calls you. We will check whether a delivery partner is available in your area.'
 
 // Shown next to the "continue with manual address" option. That option is
-// only for addresses inside Tarikere town (the inner boundary), where the fee
+// only for addresses inside the town (the inner boundary), where the fee
 // is the standard one and no executive call is needed.
 export const MANUAL_ADDRESS_NOTE =
-  'Live inside Tarikere town? You can continue with the address you type instead.'
+  `Live inside ${CITY.name} town? You can continue with the address you type instead.`
 
 // One wording wherever location is blocked, so the cart, checkout and the
 // address form tell the customer the same thing.

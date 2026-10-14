@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import SiteFooter from '@/components/layout/SiteFooter'
+import { CITY } from '@/lib/city'
 
 export const metadata = { title: 'Privacy Policy — Zippy' }
 
@@ -67,7 +68,7 @@ export default function PrivacyPolicyPage() {
             </Section>
 
             <Section title="Contact us">
-              <p>Questions about this Privacy Policy can be sent to <a href="mailto:zippytarikere@gmail.com" className="text-[#16A34A] hover:underline">zippytarikere@gmail.com</a>, or see our <Link href="/contact" className="text-[#16A34A] hover:underline">Contact page</Link> for full business details.</p>
+              <p>Questions about this Privacy Policy can be sent to <a href={`mailto:${CITY.supportEmail}`} className="text-[#16A34A] hover:underline">{CITY.supportEmail}</a>, or see our <Link href="/contact" className="text-[#16A34A] hover:underline">Contact page</Link> for full business details.</p>
             </Section>
           </div>
         </div>

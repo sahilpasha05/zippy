@@ -15,6 +15,7 @@ import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
 import SiteFooter from '@/components/layout/SiteFooter'
+import { CITY } from '@/lib/city'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -229,7 +230,7 @@ export default function CategoryPageClient() {
                 {/* Category info blurb — like Blinkit's SEO footer */}
                 {category?.name && (
                   <p className="text-[12px] text-[#9CA3AF] leading-relaxed pt-4 border-t border-[#E5E7EB]">
-                    Shop the best {category.name.toLowerCase()} online with Zippy — handpicked quality, honest pricing, and delivery in minutes, right to your door in Tarikere.
+                    Shop the best {category.name.toLowerCase()} online with Zippy — handpicked quality, honest pricing, and delivery in minutes, right to your door in {CITY.name}.
                   </p>
                 )}
               </div>

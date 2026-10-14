@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import CanonicalUrl from "@/components/CanonicalUrl";
 import "./globals.css";
+import { CITY } from '@/lib/city'
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.zippytarikere.com"),
+  metadataBase: new URL(CITY.siteUrl),
   title: "Zippy — Groceries & Restaurants Delivered Fast",
   description: "India's most premium grocery and restaurant ordering platform. Delivered in minutes.",
   keywords: "groceries, restaurants, delivery, hyperlocal, India, Zippy",

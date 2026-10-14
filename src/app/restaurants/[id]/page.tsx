@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import RestaurantDetailClient from './RestaurantDetailClient'
+import { CITY } from '@/lib/city'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const cuisineLine = restaurant.cuisine?.length ? ` — ${restaurant.cuisine.join(', ')}` : ''
   return {
     title: `${restaurant.name} — Order Online | Zippy`,
-    description: restaurant.description || `Order from ${restaurant.name}${cuisineLine} on Zippy. Fast delivery in Tarikere.`,
+    description: restaurant.description || `Order from ${restaurant.name}${cuisineLine} on Zippy. Fast delivery in ${CITY.name}.`,
     alternates: { canonical: `/restaurants/${slug}` },
   }
 }

@@ -1,4 +1,5 @@
 import { Zap } from 'lucide-react'
+import { CITY } from '@/lib/city'
 
 export default function HeroSection() {
   return (
@@ -12,7 +13,7 @@ export default function HeroSection() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#DCFCE7] border border-[#BBF7D0] rounded-full mb-8">
             <Zap className="w-3.5 h-3.5 text-[#16A34A] fill-[#16A34A]" />
-            <span className="text-[12.5px] font-semibold text-[#15803D] tracking-wide uppercase">Now delivering in Tarikere</span>
+            <span className="text-[12.5px] font-semibold text-[#15803D] tracking-wide uppercase">Now delivering in {CITY.name}</span>
           </div>
 
           {/* Headline */}

@@ -8,6 +8,7 @@ import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCurrentPosition, reverseGeocode } from '@/lib/reverseGeocode'
 import { ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
+import { CITY } from '@/lib/city'
 
 const LABELS = [
   { key: 'Home', icon: Home },
@@ -226,7 +227,7 @@ export default function LocationPicker({ onClose }: { onClose: () => void }) {
               <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">
                 Apartment / Road / Area *
               </label>
-              <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder="e.g. Main Road, Tarikere"
+              <input value={areaLine} onChange={(e) => setAreaLine(e.target.value)} placeholder={`e.g. Main Road, ${CITY.name}`}
                 className={INPUT} />
             </div>
             <div>

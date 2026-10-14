@@ -2,8 +2,9 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { CITY } from '@/lib/city'
 
-const SITE_URL = 'https://www.zippytarikere.com'
+const SITE_URL = CITY.siteUrl
 
 // Nearly every page in this app is a Client Component, so the normal
 // per-page `export const metadata = { alternates: { canonical } }` (which
