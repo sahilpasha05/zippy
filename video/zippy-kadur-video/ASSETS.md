@@ -22,3 +22,17 @@ Clips: 1080×1920 or larger, ideally 30 fps, at least as long as the slot. Lands
 Timing: edit `timing.json`; the video AND the score (`scripts/make-audio.py`) both read it, so cuts, text and hits stay in sync.
 Website text: `SITE` in `src/config.ts` (currently zippykadur.com).
 Commands: `npm run render` (scan assets, rebuild score, render MP4).
+
+## Images currently used (Video A) – provenance
+Built by `python3 scripts/build-photo-frames.py` (needs local clones of the two repos below).
+| Slot | Source |
+|---|---|
+| s2-biryani, s2-fries | zippy repo `public/banners/` (cropped to the product only; offer text/badges cropped out) |
+| s2-pizza, s2-burger | `sahilpasha05/imgsapi` → `mybite/pizza-fresh-juice-combo.jpg`, `mybite/peri-peri-veg-burger.jpg` |
+| s3-produce | zippy repo `public/categories/cat-fruits-vegetables.jpg` |
+| s3-shelves | `sahilpasha05/imgsapi` → `nandini/milk/*` (Nandini packs) |
+Licence of these images is not recorded in the repos. Confirm you may use them commercially (Nandini is a third-party brand – check permission to show it).
+Still empty (typography backdrops used): s1-town-night, s5-town, s6-rider, s6-bag, s7-app.
+
+## Two outputs
+`ZippyKadurImages` → `out/zippy-kadur-A-with-images.mp4` · `ZippyKadurType` → `out/zippy-kadur-B-typography.mp4` (`npm run render` builds both).
