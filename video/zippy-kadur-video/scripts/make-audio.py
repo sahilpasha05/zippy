@@ -84,9 +84,9 @@ t = tt(DUR); put(np.sin(2 * np.pi * 55 * t) * (0.18 + 0.1 * np.sin(2 * np.pi * 0
 
 breath = (11.55, 12.0)   # everything drops out just before KADUR! hits
 def active(t, spans): return any(a <= t < b for a, b in spans)
-GROOVE1 = [(3.0, breath[0]), (12.0, 22.0)]
-HATS = [(4.0, breath[0]), (12.0, 22.0)]
-CLAPS = [(7.0, breath[0]), (12.0, 22.0)]
+GROOVE1 = [(3.0, breath[0]), (12.0, 22.5)]
+HATS = [(4.0, breath[0]), (12.0, 22.5)]
+CLAPS = [(7.0, breath[0]), (12.0, 22.5)]
 
 b = 0
 while b * BEAT < DUR:
@@ -100,7 +100,7 @@ while b * BEAT < DUR:
 # Bass line under groove (root of chord, 8ths)
 roots = [33, 29, 36, 31]
 t0 = 3.0
-while t0 < 22.0:
+while t0 < 22.5:
     if not breath[0] <= t0 < breath[1]:
         r = roots[int(t0 // 4) % 4]
         put(lp(np.sin(2 * np.pi * midi(r) * tt(0.3)) * np.exp(-tt(0.3) * 5) + 0.3 * np.sin(4 * np.pi * midi(r) * tt(0.3)) * np.exp(-tt(0.3) * 8), 400), t0, 0.5 * lvl(t0))
@@ -108,7 +108,7 @@ while t0 < 22.0:
 # Arp plucks from the rider/delivery section on
 arp = [0, 7, 12, 16]
 t0 = 14.0
-while t0 < 22.0:
+while t0 < 22.5:
     ch = prog[int(t0 // 4) % 4]
     put(pluck(ch[1] + 12 + arp[int((t0 - 14) / (BEAT / 2)) % 4] - 0, 0.4, 0.22), t0, 1.0, pan=0.5 * np.sin(t0 * 3), wet=0.45)
     t0 += BEAT / 2
@@ -134,7 +134,7 @@ for k in ['foodYouLove', 'groceriesYouNeed']: put(whoosh(0.4, False, 0.22), C[k]
 # announcement build
 put(whoosh(0.5, False, 0.3), C['getReady'] - 0.05); put(boom(2.0, 44, 0.8), C['getReady'], wet=0.3)
 put(boom(1.6, 48, 0.65), C['comingSoon'], wet=0.3); put(riser(0.95, 0.55), C['something'] - 0.05, wet=0.2) if False else None
-put(riser(1.95, 0.75), 20.05, wet=0.2)
+put(riser(1.95, 0.75), 20.5, wet=0.2)
 put(pluck(81, 0.8, 0.25), C['something'], wet=0.5)
 # end card: hit, then clean resolve into A major-ish sting
 put(boom(3.0, 40, 1.0), C['end'], wet=0.35); put(kick(1.1), C['end'])
