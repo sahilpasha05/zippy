@@ -72,6 +72,7 @@ def pad_chord(ms, d, g=0.18):
     return x * env(d, 1.2, 1.2) * g / len(ms)
 
 if TRACK:
+    whoosh = lambda *a, **k: np.zeros(1); riser = lambda *a, **k: np.zeros(1)   # no noise FX on top of the supplied music
     pluck = lambda *a, **k: np.zeros(1); bell = lambda *a, **k: np.zeros(1); hat = lambda *a, **k: np.zeros(1); clap = lambda *a, **k: np.zeros(1)
     _w = wave.open('public/track.wav'); _x = np.frombuffer(_w.readframes(_w.getnframes()), dtype=np.int16).reshape(-1, 2).astype(float) / 32768; _w.close()
     _x = _x[:n]; _x = _x / np.abs(_x).max() * 0.8
