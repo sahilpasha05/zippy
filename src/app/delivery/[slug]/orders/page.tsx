@@ -5,10 +5,11 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, Filter } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, Filter, MessageCircle } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
+import OrderChat from '@/components/OrderChat'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -175,6 +176,7 @@ export default function DeliveryOrdersPage() {
   const announcedRef = useRef<Set<string>>(new Set())
   pendingAcceptRef.current = pendingAccept
   const [mapOrder, setMapOrder] = useState<Order | null>(null)
+  const [chatOrder, setChatOrder] = useState<Order | null>(null)
   const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
   const [deliveringBusy, setDeliveringBusy] = useState(false)
   const [deliverError, setDeliverError] = useState('')
@@ -658,6 +660,12 @@ export default function DeliveryOrdersPage() {
                           <Phone className="w-3.5 h-3.5" /> Call
                         </a>
                       )}
+                      {!['delivered', 'cancelled'].includes(o.status) && (
+                        <button onClick={() => setChatOrder(o)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A] transition-all">
+                          <MessageCircle className="w-3.5 h-3.5" /> Chat
+                        </button>
+                      )}
                       {o.delivery_latitude && o.delivery_longitude && (
                         <>
                           <button onClick={() => setMapOrder(o)}
@@ -729,6 +737,24 @@ export default function DeliveryOrdersPage() {
             <p className="text-[11px] text-[#9CA3AF] mt-3">
               {pendingAccept.length > 1 ? `The alarm will keep ringing — 1 of ${pendingAccept.length} new deliveries` : 'The alarm will keep ringing until you accept'}
             </p>
+          </div>
+        </div>
+      )}
+
+      {chatOrder && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setChatOrder(null)} />
+          <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="min-w-0">
+                <h2 className="text-[15px] font-[800] text-[#111827]">Chat with {chatOrder.customer_name ?? 'customer'}</h2>
+                <p className="text-[11.5px] text-[#9CA3AF] font-mono">Order {chatOrder.id.slice(0, 8).toUpperCase()}</p>
+              </div>
+              <button onClick={() => setChatOrder(null)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6]">
+                <X className="w-4 h-4 text-[#6B7280]" />
+              </button>
+            </div>
+            <OrderChat orderId={chatOrder.id} riderSlug={slug} viewer="rider" />
           </div>
         </div>
       )}

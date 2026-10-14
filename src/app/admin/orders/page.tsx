@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Search, Clock, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, RefreshCw, Bike, Zap, ChevronRight, ChevronDown, Phone, MapPin, CreditCard, Package, ExternalLink, AlertTriangle } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
+import OrderChat from '@/components/OrderChat'
 import { cn, formatMoney, formatDateTime } from '@/lib/utils'
 
 const supabase = createClient()
@@ -633,6 +634,13 @@ export default function AdminOrdersPage() {
                               </div>
                             ) : (
                               <p className="text-[12.5px] text-[#9CA3AF]">No item details recorded for this order.</p>
+                            )}
+
+                            {o.delivery_partner_id && (
+                              <>
+                                <p className="text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mt-4 mb-2">Customer ↔ rider chat</p>
+                                <OrderChat orderId={o.id} viewer="admin" className="max-w-md" />
+                              </>
                             )}
 
                             {!['delivered', 'cancelled'].includes(o.status) && (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import OrderChat from '@/components/OrderChat'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin, Store, AlertTriangle } from 'lucide-react'
@@ -62,6 +63,14 @@ export default function TrackOrderPage() {
   const [partner, setPartner] = useState<Partner | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  // The rider can't be phoned until 20 minutes after the order was placed; the
+  // customer can chat with them from the moment one is assigned.
+  const CALL_LOCK_MS = 20 * 60 * 1000
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 15_000)
+    return () => clearInterval(t)
+  }, [])
 
   const loadOrder = useCallback(async () => {
     const { data } = await supabase
@@ -237,14 +246,26 @@ export default function TrackOrderPage() {
                         <p className="text-[13.5px] font-[700] text-[#111827] truncate">{partner.name}</p>
                         <p className="text-[11.5px] text-[#9CA3AF] capitalize">{partner.vehicle_type ?? 'Rider'}{partner.vehicle_number ? ` · ${partner.vehicle_number}` : ''}</p>
                       </div>
-                      {partner.phone && (
-                        <a href={`tel:${partner.phone}`}
-                          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F0FDF4] text-[#16A34A] rounded-xl text-[12.5px] font-[600] hover:bg-[#DCFCE7] transition-all shrink-0">
-                          <Phone className="w-3.5 h-3.5" /> Call
-                        </a>
-                      )}
+                      {partner.phone && (() => {
+                        const unlockAt = new Date(order.created_at).getTime() + CALL_LOCK_MS
+                        const minsLeft = Math.ceil((unlockAt - nowMs) / 60000)
+                        return minsLeft > 0 ? (
+                          <span className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] rounded-xl text-[12px] font-[600] shrink-0 text-center leading-tight">
+                            <Phone className="w-3.5 h-3.5 shrink-0" /> Call in {minsLeft} min
+                          </span>
+                        ) : (
+                          <a href={`tel:${partner.phone}`}
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F0FDF4] text-[#16A34A] rounded-xl text-[12.5px] font-[600] hover:bg-[#DCFCE7] transition-all shrink-0">
+                            <Phone className="w-3.5 h-3.5" /> Call
+                          </a>
+                        )
+                      })()}
                     </div>
                   )}
+                  <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 mb-5 shadow-zippy-sm">
+                    <p className="text-[13px] font-[700] text-[#111827] mb-2.5">Chat with your rider</p>
+                    <OrderChat orderId={order.id} viewer="customer" />
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-2 bg-white rounded-2xl border border-[#E5E7EB] p-8 text-center mb-5">
