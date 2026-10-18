@@ -118,6 +118,54 @@ export const OUTER_ZONE: Feature<Polygon> = {
   },
 }
 
+// Extra area on the north-east side (Upparabasavanahalli / Haliyuru) that is
+// charged the standard fee as well. Hand-drawn on a Google Maps screenshot, so
+// treat the edges as approximate.
+export const NORTH_EAST_CORE_ZONE: Feature<Polygon> = {
+  type: 'Feature',
+  properties: { name: 'Zippy North-East Standard Area' },
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [75.823446, 13.71008],
+        [75.825569, 13.710375],
+        [75.826933, 13.710758],
+        [75.827631, 13.711023],
+        [75.829511, 13.710316],
+        [75.832241, 13.709785],
+        [75.834667, 13.709638],
+        [75.838306, 13.709579],
+        [75.839368, 13.709137],
+        [75.839883, 13.708106],
+        [75.839974, 13.707222],
+        [75.840278, 13.706279],
+        [75.839671, 13.705159],
+        [75.838609, 13.703686],
+        [75.8377, 13.70236],
+        [75.83679, 13.701034],
+        [75.836032, 13.70015],
+        [75.83497, 13.699856],
+        [75.833757, 13.699856],
+        [75.832392, 13.70015],
+        [75.831725, 13.70074],
+        [75.831695, 13.701624],
+        [75.831483, 13.702508],
+        [75.831028, 13.703392],
+        [75.830269, 13.704276],
+        [75.829208, 13.705307],
+        [75.828298, 13.706043],
+        [75.826782, 13.706927],
+        [75.825569, 13.707664],
+        [75.824659, 13.708253],
+        [75.824052, 13.708843],
+        [75.823749, 13.709432],
+        [75.823446, 13.71008],
+      ],
+    ],
+  },
+}
+
 export type DeliveryTier = 'core' | 'extended' | 'outside'
 
 // Small areas that are always treated as INSIDE the red line (the ₹59 area:
@@ -144,6 +192,7 @@ export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
   if (CITY.slug !== 'tarikere') return 'core'
   const p = point([lng, lat])
   if (booleanPointInPolygon(p, DELIVERY_ZONE)) return 'core'
+  if (booleanPointInPolygon(p, NORTH_EAST_CORE_ZONE)) return 'core'
   if (booleanPointInPolygon(p, OUTER_ZONE)) return 'extended'
   if (ALWAYS_EXTENDED_AREAS.some((a) => metresBetween(lat, lng, a.lat, a.lng) <= a.radiusM)) return 'extended'
   return 'outside'
