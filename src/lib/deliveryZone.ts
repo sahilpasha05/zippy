@@ -118,12 +118,13 @@ export const OUTER_ZONE: Feature<Polygon> = {
   },
 }
 
-// Extra area on the north-east side (Upparabasavanahalli / Haliyuru) that is
-// charged the standard fee as well. Hand-drawn on a Google Maps screenshot, so
-// treat the edges as approximate.
-export const NORTH_EAST_CORE_ZONE: Feature<Polygon> = {
+// North-east area (Upparabasavanahalli / Haliyuru). Always treated as INSIDE the
+// red line (the ₹59 area): a normal order with no minimum and no executive
+// call, even where the traced red line would put part of it outside.
+// Hand-drawn on a Google Maps screenshot, so the edges are approximate.
+export const NORTH_EAST_ZONE: Feature<Polygon> = {
   type: 'Feature',
-  properties: { name: 'Zippy North-East Standard Area' },
+  properties: { name: 'Zippy North-East Area' },
   geometry: {
     type: 'Polygon',
     coordinates: [
@@ -192,7 +193,7 @@ export function getDeliveryTier(lat: number, lng: number): DeliveryTier {
   if (CITY.slug !== 'tarikere') return 'core'
   const p = point([lng, lat])
   if (booleanPointInPolygon(p, DELIVERY_ZONE)) return 'core'
-  if (booleanPointInPolygon(p, NORTH_EAST_CORE_ZONE)) return 'core'
+  if (booleanPointInPolygon(p, NORTH_EAST_ZONE)) return 'extended'
   if (booleanPointInPolygon(p, OUTER_ZONE)) return 'extended'
   if (ALWAYS_EXTENDED_AREAS.some((a) => metresBetween(lat, lng, a.lat, a.lng) <= a.radiusM)) return 'extended'
   return 'outside'
