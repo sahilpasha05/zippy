@@ -3,6 +3,35 @@
 import { useRef, useState } from 'react'
 import { Upload, X, Loader2, ImageIcon } from 'lucide-react'
 
+// Vercel rejects request bodies over ~4.5 MB (the browser only sees "Failed to
+// fetch"), and phone/camera photos are often bigger. Shrink large images before
+// uploading; small ones and GIFs are sent untouched.
+const SHRINK_ABOVE_BYTES = 2 * 1024 * 1024
+const MAX_SIDE = 1800
+
+async function shrinkImage(file: File): Promise<File> {
+  if (file.size <= SHRINK_ABOVE_BYTES || file.type === 'image/gif') return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bitmap.width * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    // webp keeps transparency (logos); fall back to jpeg where the browser can't encode it.
+    for (const type of ['image/webp', 'image/jpeg']) {
+      const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, type, 0.85))
+      if (blob && blob.type === type && blob.size < file.size) {
+        const name = file.name.replace(/\.[^.]+$/, '') + (type === 'image/webp' ? '.webp' : '.jpg')
+        return new File([blob], name, { type })
+      }
+    }
+  } catch {
+    // fall through and upload the original
+  }
+  return file
+}
+
 export default function ImageUploadField({ label, value, onChange, endpoint = '/api/admin/upload-image', onUploadingChange }: { label: string; value: string | null; onChange: (url: string | null) => void; endpoint?: string; onUploadingChange?: (uploading: boolean) => void }) {
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -15,13 +44,14 @@ export default function ImageUploadField({ label, value, onChange, endpoint = '/
     setError('')
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', await shrinkImage(file))
       const res = await fetch(endpoint, { method: 'POST', body: formData })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Upload failed')
       onChange(data.url)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      setError(msg === 'Failed to fetch' ? 'Upload failed. The image may be too large, so try a smaller one.' : msg)
     } finally {
       setUploading(false)
       onUploadingChange?.(false)
