@@ -232,6 +232,14 @@ export default function DeliveryOrdersPage() {
     return c ? Math.max(0, c.count - (seenCounts[orderId] ?? 0)) : 0
   }
   const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
+  // Rider-side status changes: out for delivery (one "are you sure"), and cancel
+  // (a reason of at least 5 characters, then a second "are you sure").
+  const [outTarget, setOutTarget] = useState<Order | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelStep, setCancelStep] = useState<'reason' | 'confirm'>('reason')
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
   const [deliveringBusy, setDeliveringBusy] = useState(false)
   const [deliverError, setDeliverError] = useState('')
   const [slideAttempt, setSlideAttempt] = useState(0)
@@ -392,6 +400,50 @@ export default function DeliveryOrdersPage() {
     })
     setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, accepted_at: new Date().toISOString() } : o))
     supabase.from('orders').update({ accepted_at: new Date().toISOString() }).eq('id', orderId).then()
+  }
+
+  const MIN_CANCEL_REASON = 5
+
+  async function markOutForDelivery(orderId: string) {
+    setActionBusy(true); setActionError('')
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'out_for_delivery', updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .in('status', ['pending', 'confirmed', 'preparing'])
+      .select('id')
+    setActionBusy(false)
+    if (error) { setActionError(error.message); return }
+    if (!data || data.length === 0) { setActionError('This order has already changed. Pull to refresh.'); return }
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'out_for_delivery' } : o))
+    setOutTarget(null)
+  }
+
+  function openCancel(o: Order) {
+    setCancelTarget(o); setCancelReason(''); setCancelStep('reason'); setActionError('')
+  }
+
+  // The reason is kept on the order's notes, so the admin and the restaurant can
+  // read who cancelled it and why. The rider stays attached for the same reason.
+  async function cancelAsRider(orderId: string) {
+    const reason = cancelReason.trim()
+    if (reason.length < MIN_CANCEL_REASON) return
+    setActionBusy(true); setActionError('')
+    const { data: current } = await supabase.from('orders').select('notes').eq('id', orderId).single()
+    const stamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    const line = `CANCELLED BY RIDER ${partner?.name ?? ''} (${stamp}): ${reason}`
+    const notes = current?.notes ? `${current.notes}\n${line}` : line
+    const { data, error } = await supabase
+      .from('orders')
+      .update({ status: 'cancelled', notes, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .not('status', 'in', '(delivered,cancelled)')
+      .select('id')
+    setActionBusy(false)
+    if (error) { setActionError(error.message); return }
+    if (!data || data.length === 0) { setActionError('This order was already delivered or cancelled.'); return }
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'cancelled' } : o))
+    setCancelTarget(null)
   }
 
   // Only the orders that actually hand over cash also settle the payment
@@ -752,10 +804,20 @@ export default function DeliveryOrdersPage() {
                         {amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}
                       </button>
                     )}
-                    {!isReady && o.status !== 'delivered' && (
-                      <span className="text-[11.5px] text-[#9CA3AF]">Waiting on restaurant</span>
+                    {!isReady && !['delivered', 'cancelled'].includes(o.status) && (
+                      <button onClick={() => { setOutTarget(o); setActionError('') }}
+                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#7C3AED] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#6D28D9] active:scale-95 transition-all">
+                        <Truck className="w-3.5 h-3.5" /> Out for delivery
+                      </button>
                     )}
                   </div>
+                  {!['delivered', 'cancelled'].includes(o.status) && (
+                    <div className="mt-2.5 text-right">
+                      <button onClick={() => openCancel(o)} className="text-[12px] font-[600] text-[#DC2626] hover:text-[#B91C1C] underline underline-offset-2">
+                        Cancel this order
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
                 )
@@ -842,6 +904,83 @@ export default function DeliveryOrdersPage() {
               className="h-64"
             />
             {mapOrder.address && <p className="text-[12.5px] text-[#374151] p-4">{mapOrder.address}</p>}
+          </div>
+        </div>
+      )}
+
+      {outTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!actionBusy) setOutTarget(null) }} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10 text-center">
+            <div className="w-16 h-16 bg-[#F5F3FF] rounded-full flex items-center justify-center mx-auto mb-4">
+              <Truck className="w-8 h-8 text-[#7C3AED]" />
+            </div>
+            <h2 className="text-[18px] font-[800] text-[#111827] mb-1">Are you sure?</h2>
+            <p className="text-[13px] text-[#6B7280] mb-5">
+              Mark {outTarget.customer_name ?? 'this'} order {outTarget.id.slice(0, 8).toUpperCase()} as picked up and <strong>out for delivery</strong>. The customer will see it is on the way.
+            </p>
+            {actionError && <p className="text-[12px] text-[#DC2626] mb-3">{actionError}</p>}
+            <div className="flex gap-2">
+              <button onClick={() => setOutTarget(null)} disabled={actionBusy}
+                className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-[600] text-[#374151] disabled:opacity-50">Not yet</button>
+              <button onClick={() => markOutForDelivery(outTarget.id)} disabled={actionBusy}
+                className="flex-1 py-3 bg-[#7C3AED] text-white rounded-xl text-[13.5px] font-[700] disabled:opacity-60 flex items-center justify-center gap-2">
+                {actionBusy && <Loader2 className="w-4 h-4 animate-spin" />} Yes, out for delivery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!actionBusy) setCancelTarget(null) }} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mx-auto mb-3">
+              <XCircle className="w-7 h-7 text-[#DC2626]" />
+            </div>
+            {cancelStep === 'reason' ? (
+              <>
+                <h2 className="text-[18px] font-[800] text-[#111827] text-center mb-1">Cancel this order?</h2>
+                <p className="text-[12.5px] text-[#6B7280] text-center mb-4">
+                  {cancelTarget.customer_name ?? 'Customer'} · {cancelTarget.id.slice(0, 8).toUpperCase()}. Tell us why. It is recorded on the order.
+                </p>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={3}
+                  maxLength={300}
+                  placeholder="Reason for cancelling (at least 5 characters)"
+                  className="w-full rounded-xl border border-[#E5E7EB] px-3.5 py-2.5 text-[14px] text-[#111827] outline-none focus:border-[#DC2626] resize-none"
+                />
+                <p className={cn('text-[11.5px] mt-1', cancelReason.trim().length >= MIN_CANCEL_REASON ? 'text-[#15803D]' : 'text-[#9CA3AF]')}>
+                  {cancelReason.trim().length}/{MIN_CANCEL_REASON} characters minimum
+                </p>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setCancelTarget(null)}
+                    className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-[600] text-[#374151]">Keep order</button>
+                  <button onClick={() => setCancelStep('confirm')} disabled={cancelReason.trim().length < MIN_CANCEL_REASON}
+                    className="flex-1 py-3 bg-[#DC2626] text-white rounded-xl text-[13.5px] font-[700] disabled:opacity-40 disabled:cursor-not-allowed">Continue</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-[18px] font-[800] text-[#111827] text-center mb-1">Are you sure?</h2>
+                <p className="text-[13px] text-[#6B7280] text-center mb-3">
+                  Cancelling order {cancelTarget.id.slice(0, 8).toUpperCase()} cannot be undone from here. The admin will be able to see your reason:
+                </p>
+                <p className="rounded-xl bg-[#FEF2F2] px-3.5 py-2.5 text-[13px] text-[#991B1B] mb-3 break-words">{cancelReason.trim()}</p>
+                {actionError && <p className="text-[12px] text-[#DC2626] mb-3">{actionError}</p>}
+                <div className="flex gap-2">
+                  <button onClick={() => setCancelStep('reason')} disabled={actionBusy}
+                    className="flex-1 py-3 border border-[#E5E7EB] rounded-xl text-[13.5px] font-[600] text-[#374151] disabled:opacity-50">Go back</button>
+                  <button onClick={() => cancelAsRider(cancelTarget.id)} disabled={actionBusy}
+                    className="flex-1 py-3 bg-[#DC2626] text-white rounded-xl text-[13.5px] font-[700] disabled:opacity-60 flex items-center justify-center gap-2">
+                    {actionBusy && <Loader2 className="w-4 h-4 animate-spin" />} Yes, cancel order
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
