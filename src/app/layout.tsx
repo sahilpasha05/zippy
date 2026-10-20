@@ -3,6 +3,7 @@ import Script from "next/script";
 import CanonicalUrl from "@/components/CanonicalUrl";
 import BottomNav from "@/components/layout/BottomNav";
 import ActiveOrderBar from "@/components/ActiveOrderBar";
+import LocationDialog from "@/components/LocationDialog";
 import "./globals.css";
 import { CITY } from '@/lib/city'
 
@@ -25,6 +26,7 @@ export default function RootLayout({
         {children}
         <BottomNav />
         <ActiveOrderBar />
+        <LocationDialog />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-7L0GLNZ8MP" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">
           {`
