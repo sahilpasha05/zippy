@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star, Phone, Bike } from 'lucide-react'
+import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star, Phone, Bike, RotateCcw, X } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import ReviewModal from '@/components/ReviewModal'
@@ -10,6 +10,9 @@ import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
+import CartConflictDialog from '@/components/CartConflictDialog'
+import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
+import type { CartItem } from '@/types'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,7 +60,7 @@ function riderInfo(o: OrderRow): { name: string; phone: string | null } | null {
   return Array.isArray(o.delivery_partners) ? o.delivery_partners[0] ?? null : o.delivery_partners
 }
 
-function OrderCard({ order, eta, onReview }: { order: OrderRow; eta: number; onReview: (o: OrderRow) => void }) {
+function OrderCard({ order, eta, onReview, onReorder, reordering }: { order: OrderRow; eta: number; onReview: (o: OrderRow) => void; onReorder: (o: OrderRow) => void; reordering: boolean }) {
   const config = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending
   const isActive = !CLOSED.includes(order.status)
   const currentStep = STEPS.indexOf(order.status)
@@ -185,6 +188,15 @@ function OrderCard({ order, eta, onReview }: { order: OrderRow; eta: number; onR
             <Link href={`/orders/${order.id}/track`} className="flex items-center gap-1 text-[12.5px] font-medium text-[#16A34A] hover:text-[#15803D] transition-colors">
               Details <ChevronRight className="w-3.5 h-3.5" />
             </Link>
+            {!isActive && (
+              <button
+                onClick={() => onReorder(order)}
+                disabled={reordering}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#16A34A] text-white text-[12.5px] font-[700] hover:bg-[#15803D] disabled:opacity-60 active:scale-95 transition-all"
+              >
+                {reordering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Order again
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -199,6 +211,75 @@ export default function OrdersPage() {
   const [signedIn, setSignedIn] = useState(true)
   const [reviewing, setReviewing] = useState<OrderRow | null>(null)
   const eta = useDeliveryEta()
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [pendingReplace, setPendingReplace] = useState<Omit<CartItem, 'id'>[] | null>(null)
+  const { items: cartItems, addItem, clearCart, openCart } = useCartStore()
+
+  // Order again: put the same items back in the cart at today's prices. Items
+  // that are gone or sold out are skipped, and a closed restaurant is refused.
+  async function reorder(order: OrderRow) {
+    setReorderingId(order.id)
+    setNotice(null)
+    try {
+      const { data: lines } = await supabase.from('order_items').select('product_id, product_type, quantity').eq('order_id', order.id)
+      const rows = (lines as { product_id: string | null; product_type: 'grocery' | 'restaurant' | null; quantity: number }[] | null) ?? []
+      const groceryIds = rows.filter((r) => r.product_id && r.product_type === 'grocery').map((r) => r.product_id!)
+      const dishIds = rows.filter((r) => r.product_id && r.product_type === 'restaurant').map((r) => r.product_id!)
+
+      if (order.restaurant_id) {
+        const { data: rest } = await supabase.from('restaurants').select('name, is_open, is_active').eq('id', order.restaurant_id).maybeSingle()
+        if (!rest || !rest.is_active || !rest.is_open) {
+          setNotice(`${rest?.name ?? restName(order) ?? 'This restaurant'} is closed right now, so this order can't be repeated yet.`)
+          return
+        }
+      }
+
+      const [groceries, dishes] = await Promise.all([
+        groceryIds.length
+          ? supabase.from('grocery_products').select('id, name, price, image_url, in_stock, is_active').in('id', groceryIds)
+          : Promise.resolve({ data: [] as { id: string; name: string; price: number; image_url: string | null; in_stock: boolean; is_active: boolean }[] }),
+        dishIds.length
+          ? supabase.from('restaurant_products').select('id, name, price, image_url, is_available').in('id', dishIds)
+          : Promise.resolve({ data: [] as { id: string; name: string; price: number; image_url: string | null; is_available: boolean }[] }),
+      ])
+      const g = new Map((groceries.data ?? []).map((p) => [p.id, p]))
+      const d = new Map((dishes.data ?? []).map((p) => [p.id, p]))
+
+      const drafts: Omit<CartItem, 'id'>[] = []
+      let skipped = 0
+      for (const r of rows) {
+        if (!r.product_id || !r.product_type) { skipped++; continue }
+        const p = r.product_type === 'grocery' ? g.get(r.product_id) : d.get(r.product_id)
+        const available = p && (r.product_type === 'grocery' ? (p as { in_stock: boolean; is_active: boolean }).in_stock && (p as { is_active: boolean }).is_active : (p as { is_available: boolean }).is_available)
+        if (!p || !available) { skipped++; continue }
+        drafts.push({
+          product_id: p.id,
+          product_type: r.product_type,
+          restaurant_id: r.product_type === 'restaurant' ? order.restaurant_id : null,
+          name: p.name,
+          image_url: p.image_url,
+          price: Number(p.price),
+          quantity: Math.max(1, r.quantity),
+        })
+      }
+
+      if (drafts.length === 0) { setNotice("None of the items from that order are available right now."); return }
+      if (skipped > 0) setNotice(`${skipped} item${skipped === 1 ? ' is' : 's are'} no longer available and ${skipped === 1 ? 'was' : 'were'} left out.`)
+
+      if (conflictsWithCart(cartItems, drafts[0].restaurant_id)) { setPendingReplace(drafts); return }
+      applyDrafts(drafts, false)
+    } finally {
+      setReorderingId(null)
+    }
+  }
+
+  function applyDrafts(drafts: Omit<CartItem, 'id'>[], replace: boolean) {
+    if (replace) clearCart()
+    for (const dft of drafts) for (let i = 0; i < dft.quantity; i++) addItem({ ...dft, quantity: 1 })
+    setPendingReplace(null)
+    openCart()
+  }
 
   useEffect(() => {
     async function load() {
@@ -213,7 +294,10 @@ export default function OrdersPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      setOrders((data as OrderRow[]) ?? [])
+      const loaded = (data as OrderRow[]) ?? []
+      setOrders(loaded)
+      // Landing here from "Order Again": show past orders unless something is in progress.
+      setTab(loaded.some((o) => !CLOSED.includes(o.status)) ? 'active' : 'past')
       setLoading(false)
     }
     load()
@@ -236,6 +320,13 @@ export default function OrdersPage() {
           </div>
 
           <h1 className="text-[28px] font-[800] text-[#111827] mb-6" style={{ fontWeight: 800 }}>My Orders</h1>
+
+          {notice && (
+            <div className="mb-5 flex items-start gap-2 rounded-xl border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-[13px] text-[#92400E]">
+              <span className="flex-1">{notice}</span>
+              <button onClick={() => setNotice(null)} aria-label="Dismiss" className="shrink-0 text-[#B45309]"><X className="w-4 h-4" /></button>
+            </div>
+          )}
 
           <div className="flex gap-1 p-1 bg-[#F3F4F6] rounded-xl w-fit mb-8">
             {([['active', `Active (${active.length})`], ['past', `Past (${past.length})`]] as const).map(([key, label]) => (
@@ -271,11 +362,14 @@ export default function OrdersPage() {
                 </Link>
               </div>
             ) : (
-              shown.map((o) => <OrderCard key={o.id} order={o} eta={eta} onReview={setReviewing} />)
+              shown.map((o) => <OrderCard key={o.id} order={o} eta={eta} onReview={setReviewing} onReorder={reorder} reordering={reorderingId === o.id} />)
             )}
           </div>
         </div>
       </div>
+      {pendingReplace && (
+        <CartConflictDialog onCancel={() => setPendingReplace(null)} onReplace={() => applyDrafts(pendingReplace, true)} />
+      )}
       {reviewing && (
         <ReviewModal
           orderId={reviewing.id}
