@@ -17,10 +17,15 @@ type Banner = {
 }
 
 const ROTATE_MS = 4000
+// Shape used until a banner's real size is known, and the tallest the frame may get.
+const DEFAULT_RATIO = 7 / 5
+const MAX_FRAME_HEIGHT = 520
 
 export default function BannerCarousel() {
   const [banners, setBanners] = useState<Banner[]>([])
   const [active, setActive] = useState(0)
+  // Natural shape (width / height) of each banner, learned by preloading them.
+  const [ratios, setRatios] = useState<Record<string, number>>({})
 
   useEffect(() => {
     async function load() {
@@ -38,6 +43,16 @@ export default function BannerCarousel() {
     load()
   }, [])
 
+  useEffect(() => {
+    banners.forEach((b) => {
+      const img = new window.Image()
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) setRatios((r) => ({ ...r, [b.id]: img.naturalWidth / img.naturalHeight }))
+      }
+      img.src = b.image_url
+    })
+  }, [banners])
+
   // Timer is keyed on `active`, not set once — a shared interval keeps its own
   // cadence, so a slide reached by the arrows (or the wrap back to the first)
   // inherited whatever was left of the previous tick and could flip almost
@@ -53,31 +68,22 @@ export default function BannerCarousel() {
 
   if (banners.length === 0) return null
 
+  const frameRatio = Math.min(2.6, Math.max(1, ratios[banners[active]?.id] ?? DEFAULT_RATIO))
+
   return (
     <section id="offers">
       {/* Banner creatives are complete designs (own headline, own CTA), so the
           slide shows the artwork alone - `title` is the admin-side label and the
-          alt text, not an overlay. Uploads come in every shape (square, 4:3,
-          2:1 ...), so each slide is drawn whole (object-contain) on top of a
-          blurred copy of itself that fills the 7:5 frame. Nothing is ever cut
-          off, and a banner that already is 7:5 fills the frame exactly. */}
-      <div className="relative mx-auto max-w-[900px] rounded-3xl overflow-hidden aspect-[7/5] bg-[#111827] shadow-zippy-lg group">
+          alt text, not an overlay. Uploads come in every shape, so the frame
+          takes the shape of the slide on show (eased between slides): the whole
+          picture is visible, with nothing cropped and no bars around it. */}
+      <div
+        className="relative mx-auto max-w-[900px] rounded-3xl overflow-hidden bg-[#111827] shadow-zippy-lg group transition-[aspect-ratio,width] duration-500 ease-out"
+        style={{ aspectRatio: frameRatio, width: `min(100%, ${Math.round(MAX_FRAME_HEIGHT * frameRatio)}px)` }}
+      >
         {banners.map((b, i) => {
           const content = (
             <div className="relative h-full w-full">
-              {/* `priority` is deprecated in Next 16 — the docs point to
-                  loading/fetchPriority instead. The first slide is the LCP
-                  candidate, so it loads eagerly and the rest stay lazy. */}
-              {/* blurred backdrop: the same image, zoomed to fill the frame */}
-              <Image
-                src={b.image_url}
-                alt=""
-                aria-hidden
-                fill
-                className="scale-125 object-cover opacity-90 blur-2xl"
-                loading="lazy"
-                sizes="(max-width: 900px) 100vw, 900px"
-              />
               {/* `priority` is deprecated in Next 16 - the docs point to
                   loading/fetchPriority instead. The first slide is the LCP
                   candidate, so it loads eagerly and the rest stay lazy. */}
@@ -85,7 +91,7 @@ export default function BannerCarousel() {
                 src={b.image_url}
                 alt={b.title}
                 fill
-                className="object-contain"
+                className="object-cover"
                 loading={i === 0 ? 'eager' : 'lazy'}
                 fetchPriority={i === 0 ? 'high' : 'auto'}
                 sizes="(max-width: 900px) 100vw, 900px"

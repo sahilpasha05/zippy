@@ -20,7 +20,7 @@ export default function ViewCartBar() {
   const thumbs = items.slice(0, 3)
 
   return (
-    <div className={`fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none ${aboveBottomNav ? 'bottom-[88px] lg:bottom-4' : 'bottom-4'}`}>
+    <div className={`fixed inset-x-0 z-40 flex justify-center px-4 pointer-events-none ${aboveBottomNav ? 'bottom-[72px] lg:bottom-4' : 'bottom-4'}`}>
       <button
         onClick={openCart}
         aria-label={`View cart, ${count} item${count !== 1 ? 's' : ''}`}

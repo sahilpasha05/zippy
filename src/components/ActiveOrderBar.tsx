@@ -99,7 +99,7 @@ export default function ActiveOrderBar() {
   const pillSub = orders.length > 1 ? 'Tap to see them' : `${one(latest.restaurants)?.name ?? 'Zippy'} · ₹${Number(latest.total).toFixed(0)}`
 
   const hasCartPill = cartCount > 0 && !cartOpen
-  const position = hasCartPill ? 'bottom-[152px] lg:bottom-[80px]' : 'bottom-[88px] lg:bottom-4'
+  const position = hasCartPill ? 'bottom-[132px] lg:bottom-[80px]' : 'bottom-[72px] lg:bottom-4'
 
   return (
     <>
