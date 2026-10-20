@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import CanonicalUrl from "@/components/CanonicalUrl";
+import BottomNav from "@/components/layout/BottomNav";
+import ActiveOrderBar from "@/components/ActiveOrderBar";
 import "./globals.css";
 import { CITY } from '@/lib/city'
 
@@ -21,6 +23,8 @@ export default function RootLayout({
       <body className="min-h-screen bg-white antialiased">
         <CanonicalUrl />
         {children}
+        <BottomNav />
+        <ActiveOrderBar />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-7L0GLNZ8MP" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">
           {`
