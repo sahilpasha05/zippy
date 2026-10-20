@@ -89,12 +89,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (useLiveLocation.getState().status === 'idle') void useLiveLocation.getState().request()
   }, [])
-  // Location blocked: the customer may carry on with the address they typed,
-  // but only if they confirm it is inside Tarikere town. That is the inner
-  // zone, so the standard fee applies and the order is a normal one.
+  // Location blocked: the customer may carry on with the address they typed.
+  // They confirm that in a small pop-up when placing the order; if the address
+  // turns out to be outside town, the delivery partner calls to confirm the price.
   const noLiveLocation = manualMode && !liveCoords
-  const [insideTownConfirmed, setInsideTownConfirmed] = useState(false)
-  const locationReady = (liveStatus === 'granted' && !!liveCoords) || (noLiveLocation && insideTownConfirmed)
+  // Carrying on without location only needs a one-tap confirmation when they place the order.
+  const [showNoLocationConfirm, setShowNoLocationConfirm] = useState(false)
+  const locationReady = (liveStatus === 'granted' && !!liveCoords) || noLiveLocation
 
   const tier = liveCoords ? getDeliveryTier(liveCoords.lat, liveCoords.lng) : 'core'
   const needsConfirmation = tier === 'outside'
@@ -112,7 +113,7 @@ export default function CheckoutPage() {
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
 
-  const handlePlace = async () => {
+  const handlePlace = async (confirmedNoLocation = false) => {
     if (submittingRef.current) return
     if (items.length === 0 || !selectedAddress) return
 
@@ -128,6 +129,8 @@ export default function CheckoutPage() {
     }
 
     if (!signedIn) { setShowAuth(true); return }
+
+    if (noLiveLocation && !confirmedNoLocation) { setShowNoLocationConfirm(true); return }
 
     if (selectedPayment !== 'cod') {
       const normalizedPhone = (selectedAddress.contactPhone ?? '').replace(/^\+91/, '').slice(-10)
@@ -182,7 +185,7 @@ export default function CheckoutPage() {
           order_type: restaurantId ? 'restaurant' : 'grocery',
           status: selectedPayment === 'cod' && !needsConfirmation ? 'confirmed' : 'pending',
           notes: heldNote ?? (noLiveLocation
-            ? `MANUAL ADDRESS - no live location (blocked on the customer\'s phone). Customer confirmed the address is inside ${CITY.name} town. Check the address when calling or delivering.`
+            ? `MANUAL ADDRESS - no live location (blocked on the customer\'s phone). Customer chose to continue without location. If the address is outside ${CITY.name} town, call the customer to confirm the delivery price before delivering.`
             : null),
           total: grandTotal,
           delivery_fee: deliveryFee,
@@ -415,18 +418,6 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {noLiveLocation && (
-            <div className="mb-6 px-4 py-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl text-[13px] text-[#14532D] leading-relaxed">
-              <p className="font-[700] mb-1.5">Ordering with a typed address</p>
-              <p className="mb-2">Your location is off, so we will use the address you entered. This is only for addresses inside {CITY.name} town.</p>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input type="checkbox" checked={insideTownConfirmed} onChange={(e) => setInsideTownConfirmed(e.target.checked)} className="mt-0.5 accent-[#16A34A]" />
-                <span>My delivery address is inside {CITY.name} town.</span>
-              </label>
-              <button onClick={() => void requestLocation()} className="mt-2 text-[12px] font-[700] underline">I turned location on — try again</button>
-            </div>
-          )}
-
           {needsConfirmation && (
             <div className="mb-6 px-4 py-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[13px] text-[#B45309] leading-relaxed">
               {NEEDS_CONFIRMATION_MESSAGE}{' '}
@@ -589,7 +580,7 @@ export default function CheckoutPage() {
 
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
-                  onClick={handlePlace}
+                  onClick={() => void handlePlace()}
                   disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady || belowMinOrder}
                   className="hidden lg:flex w-full mt-5 items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
                   style={{ fontWeight: 800 }}
@@ -599,7 +590,7 @@ export default function CheckoutPage() {
                   ) : !selectedAddress ? (
                     <>Select a delivery address</>
                   ) : !locationReady ? (
-                    <>{noLiveLocation ? `Confirm your address is in ${CITY.name} town` : 'Allow live location to continue'}</>
+                    <>Allow live location to continue</>
                   ) : belowMinOrder ? (
                     <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
                   ) : (
@@ -615,7 +606,7 @@ export default function CheckoutPage() {
       {/* Mobile: Place Order stays fixed at the bottom, always visible without scrolling */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E5E7EB] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
         <button
-          onClick={handlePlace}
+          onClick={() => void handlePlace()}
           disabled={placing || !mounted || items.length === 0 || !selectedAddress || !locationReady || belowMinOrder}
           className="w-full flex items-center justify-center gap-2 py-4 bg-[#16A34A] text-white text-[15px] font-[800] rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_4px_20px_rgba(22,163,74,0.4)]"
         >
@@ -626,7 +617,7 @@ export default function CheckoutPage() {
           ) : !selectedAddress ? (
             <>Select a delivery address</>
           ) : !locationReady ? (
-            <>{noLiveLocation ? `Confirm your address is in ${CITY.name} town` : 'Allow live location to continue'}</>
+            <>Allow live location to continue</>
           ) : belowMinOrder ? (
             <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
           ) : (
@@ -634,6 +625,34 @@ export default function CheckoutPage() {
           )}
         </button>
       </div>
+
+      {showNoLocationConfirm && (
+        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowNoLocationConfirm(false)} />
+          <div role="dialog" aria-modal="true" className="relative z-10 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl bg-white p-5">
+            <div className="w-11 h-11 bg-[#DCFCE7] rounded-2xl flex items-center justify-center mb-3">
+              <MapPin className="w-5 h-5 text-[#16A34A]" strokeWidth={2} />
+            </div>
+            <h2 className="text-[16px] font-[800] text-[#111827] mb-1.5" style={{ fontWeight: 800 }}>Continue without location?</h2>
+            <p className="text-[13px] text-[#4B5563] leading-relaxed mb-5">
+              We could not get your live location. If your address is in {CITY.name} town, no worries and the order goes through as normal.
+              If it is outside, our delivery partner will call you to confirm the price.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowNoLocationConfirm(false)} className="flex-1 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] font-[600] text-[#374151]">
+                Go back
+              </button>
+              <button
+                onClick={() => { setShowNoLocationConfirm(false); void handlePlace(true) }}
+                className="flex-1 py-2.5 bg-[#16A34A] text-white rounded-xl text-[13.5px] font-[700] hover:bg-[#15803D]"
+                style={{ fontWeight: 700 }}
+              >
+                Yes, continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showLocationPicker && <LocationPicker onClose={() => setShowLocationPicker(false)} />}
 
