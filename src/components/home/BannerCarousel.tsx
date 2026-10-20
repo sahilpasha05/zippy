@@ -28,7 +28,11 @@ export default function BannerCarousel() {
         .from('banners')
         .select('id, title, subtitle, image_url, link')
         .eq('is_active', true)
+        // Pinned banners lead (the admin list already sorts this way); within the
+        // same pin and order number the most recently added one comes first.
+        .order('is_pinned', { ascending: false })
         .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false })
       setBanners((data as Banner[]) ?? [])
     }
     load()
