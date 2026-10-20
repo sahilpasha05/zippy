@@ -29,11 +29,9 @@ export default function CartSidebar() {
   async function handleProceed() {
     setLocationError(''); setOfferManual(false)
     setLocating(true)
-    const ok = await useLiveLocation.getState().ensure()
+    const ok = await useLiveLocation.getState().request()
     setLocating(false)
     if (!ok) {
-      // They chose "use my typed address" inside the pop-up.
-      if (useLiveLocation.getState().manualMode) { closeCart(); router.push('/checkout'); return }
       setLocationError(`${ALLOW_LOCATION_MESSAGE} ${useLiveLocation.getState().error} ${MANUAL_ADDRESS_NOTE}`.replace(/\s+/g, ' ').trim())
       setOfferManual(true)
       return

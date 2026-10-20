@@ -85,11 +85,9 @@ export default function CheckoutPage() {
   // all come from the customer's actual GPS position, even when a saved
   // address is selected. It's requested again here (the cart asks first) so a
   // direct visit to checkout can't skip it.
-  const { coords: liveCoords, status: liveStatus, error: liveError, manualMode, ensure: ensureLocation, continueManually } = useLiveLocation()
+  const { coords: liveCoords, status: liveStatus, error: liveError, manualMode, request: requestLocation, continueManually } = useLiveLocation()
   useEffect(() => {
-    const s = useLiveLocation.getState()
-    // Pop-up on arrival unless location is already on or they chose a typed address.
-    if (s.status !== 'granted' && !s.manualMode) void s.ensure()
+    if (useLiveLocation.getState().status === 'idle') void useLiveLocation.getState().request()
   }, [])
   // Location blocked: the customer may carry on with the address they typed,
   // but only if they confirm it is inside Tarikere town. That is the inner
@@ -125,7 +123,7 @@ export default function CheckoutPage() {
 
     if (!locationReady) {
       setPlaceError('We need your live location to place the order. Allow location access and try again.')
-      void ensureLocation()
+      void requestLocation()
       return
     }
 
@@ -410,7 +408,7 @@ export default function CheckoutPage() {
                     {ALLOW_LOCATION_MESSAGE} {liveError}
                     <span className="block mt-1">{MANUAL_ADDRESS_NOTE}</span>
                     <span className="flex flex-wrap gap-3 mt-2">
-                      <button onClick={() => void ensureLocation()} className="font-[700] underline">Try again</button>
+                      <button onClick={() => void requestLocation()} className="font-[700] underline">Try again</button>
                       <button onClick={continueManually} className="font-[700] underline">Continue with manual address</button>
                     </span>
                   </>)}
@@ -425,7 +423,7 @@ export default function CheckoutPage() {
                 <input type="checkbox" checked={insideTownConfirmed} onChange={(e) => setInsideTownConfirmed(e.target.checked)} className="mt-0.5 accent-[#16A34A]" />
                 <span>My delivery address is inside {CITY.name} town.</span>
               </label>
-              <button onClick={() => void ensureLocation()} className="mt-2 text-[12px] font-[700] underline">I turned location on — try again</button>
+              <button onClick={() => void requestLocation()} className="mt-2 text-[12px] font-[700] underline">I turned location on — try again</button>
             </div>
           )}
 
