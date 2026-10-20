@@ -207,6 +207,16 @@ export default function AdminOrdersPage() {
     setConfirmCancel(null)
   }
 
+  // Brings a cancelled order back (e.g. cancelled by mistake): it returns as
+  // Confirmed with no rider, so it shows up for the restaurant and in the
+  // Unassigned tab again. Cancel it again from the same row if needed.
+  async function reviveOrder(orderId: string) {
+    const patch = { status: 'confirmed', delivery_partner_id: null, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('orders').update(patch).eq('id', orderId)
+    if (error) { window.alert(`Could not revive the order: ${error.message}`); return }
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, ...patch } : o))
+  }
+
   async function assignOrder(orderId: string, partnerId: string) {
     // updated_at has no trigger in this database, so stamp it here: the rider
     // board sorts on it to put a freshly assigned order at the top, including a
@@ -641,6 +651,16 @@ export default function AdminOrdersPage() {
                                 <p className="text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mt-4 mb-2">Customer ↔ rider chat</p>
                                 <OrderChat orderId={o.id} viewer="admin" className="max-w-md" />
                               </>
+                            )}
+
+                            {o.status === 'cancelled' && (
+                              <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-[#F3F4F6]">
+                                <button onClick={() => reviveOrder(o.id)}
+                                  className="px-3.5 py-1.5 bg-[#16A34A] text-white rounded-lg text-[12px] font-[700] hover:bg-[#15803D] transition-all">
+                                  Revive order
+                                </button>
+                                <span className="text-[11.5px] text-[#6B7280]">Moves it back to Confirmed, with no rider, so it shows up again.</span>
+                              </div>
                             )}
 
                             {!['delivered', 'cancelled'].includes(o.status) && (
