@@ -56,10 +56,11 @@ export default function BannerCarousel() {
   return (
     <section id="offers">
       {/* Banner creatives are complete designs (own headline, own CTA), so the
-          slide shows the artwork alone — `title` is the admin-side label and the
-          alt text, not an overlay. The 7:5 frame sits between the poster aspects
-          in use (3:2 and 4:3) so object-cover fills the box edge to edge while
-          trimming only ~3% off the margins, well clear of the offer text. */}
+          slide shows the artwork alone - `title` is the admin-side label and the
+          alt text, not an overlay. Uploads come in every shape (square, 4:3,
+          2:1 ...), so each slide is drawn whole (object-contain) on top of a
+          blurred copy of itself that fills the 7:5 frame. Nothing is ever cut
+          off, and a banner that already is 7:5 fills the frame exactly. */}
       <div className="relative mx-auto max-w-[900px] rounded-3xl overflow-hidden aspect-[7/5] bg-[#111827] shadow-zippy-lg group">
         {banners.map((b, i) => {
           const content = (
@@ -67,16 +68,24 @@ export default function BannerCarousel() {
               {/* `priority` is deprecated in Next 16 — the docs point to
                   loading/fetchPriority instead. The first slide is the LCP
                   candidate, so it loads eagerly and the rest stay lazy. */}
+              {/* blurred backdrop: the same image, zoomed to fill the frame */}
+              <Image
+                src={b.image_url}
+                alt=""
+                aria-hidden
+                fill
+                className="scale-125 object-cover opacity-90 blur-2xl"
+                loading="lazy"
+                sizes="(max-width: 900px) 100vw, 900px"
+              />
+              {/* `priority` is deprecated in Next 16 - the docs point to
+                  loading/fetchPriority instead. The first slide is the LCP
+                  candidate, so it loads eagerly and the rest stay lazy. */}
               <Image
                 src={b.image_url}
                 alt={b.title}
                 fill
-                className="object-cover"
-                // This frame is tuned for the 3:2/4:3 landscape posters most
-                // banners use (see comment above) — a portrait poster like
-                // this one loses its header and price to the crop either way,
-                // so bias down to keep the price/CTA over the branding.
-                style={b.image_url.includes('jaihind-dhamaka-weekend') ? { objectPosition: 'center 75%' } : undefined}
+                className="object-contain"
                 loading={i === 0 ? 'eager' : 'lazy'}
                 fetchPriority={i === 0 ? 'high' : 'auto'}
                 sizes="(max-width: 900px) 100vw, 900px"

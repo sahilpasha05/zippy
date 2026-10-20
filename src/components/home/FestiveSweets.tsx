@@ -47,8 +47,8 @@ function FestiveBox({ title, subtitle, pics, href, onClick, tone }: {
   const shown = [0, 1, 2, 3].map((k) => pics[(tick * 2 + k) % pics.length])
   const body = (
     <>
-      <p className={`text-center text-[16px] leading-tight font-[800] ${sweet ? 'text-[#7A1F0E]' : 'text-[#14532D]'}`} style={{ fontWeight: 800 }}>{title}</p>
-      <p className={`mt-0.5 text-center text-[11.5px] ${sweet ? 'text-[#8A5A12]' : 'text-[#2F6F45]'}`}>{subtitle}</p>
+      <p className={`text-center text-[clamp(14px,4vw,16px)] leading-tight font-[800] ${sweet ? 'text-[#7A1F0E]' : 'text-[#14532D]'}`} style={{ fontWeight: 800 }}>{title}</p>
+      <p className={`mt-0.5 text-center text-[clamp(10.5px,2.9vw,11.5px)] ${sweet ? 'text-[#8A5A12]' : 'text-[#2F6F45]'}`}>{subtitle}</p>
       <div className="mt-2.5 grid grid-cols-2 gap-1.5">
         {shown.map((p, k) => (
           <div key={`${tick}-${k}`} className="aspect-square overflow-hidden rounded-xl bg-white/85 p-1" style={{ animation: `festive-fade .6s ease both ${k * 70}ms` }}>
@@ -214,16 +214,16 @@ export default function FestiveSweets() {
 
       {/* Banner */}
       <div className="relative px-6 lg:px-10 pt-4 pb-5 text-center">
-        <p className="text-[11.5px] font-[700] tracking-[0.3em] text-[#FDE68A] uppercase">
+        <p className="text-[clamp(9.5px,2.8vw,11.5px)] font-[700] tracking-[0.2em] text-[#FDE68A] uppercase">
           <span aria-hidden>✦</span> {festival.eyebrow} <span aria-hidden>✦</span>
         </p>
-        <h2 className="mt-1.5 flex items-center justify-center gap-2.5 text-[32px] lg:text-[44px] leading-tight font-[900] tracking-tight text-white"
+        <h2 className="mt-1.5 flex items-center justify-center gap-2.5 text-[clamp(24px,7.4vw,32px)] lg:text-[44px] leading-tight font-[900] tracking-tight text-white"
           style={{ fontWeight: 900, textShadow: '0 2px 0 rgba(0,0,0,0.25), 0 0 22px rgba(253,224,71,0.55)' }}>
-          <span aria-hidden className="text-[26px] lg:text-[34px]">🪔</span>
+          <span aria-hidden className="text-[clamp(18px,5.4vw,26px)] lg:text-[34px]">🪔</span>
           {festival.title}
-          <span aria-hidden className="text-[26px] lg:text-[34px]">🪔</span>
+          <span aria-hidden className="text-[clamp(18px,5.4vw,26px)] lg:text-[34px]">🪔</span>
         </h2>
-        <p className="mt-1.5 text-[13.5px] text-[#DCFCE7]">{festival.subtitle}</p>
+        <p className="mt-1.5 text-[clamp(12px,3.3vw,13.5px)] text-[#DCFCE7]">{festival.subtitle}</p>
       </div>
 
       {/* Two boxes: sweets and fruits */}
