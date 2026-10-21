@@ -96,6 +96,8 @@ export default function AdminOrdersPage() {
   // shared counter hands out orders, whichever devices have this page open.
   const [rr, setRr] = useState<RrSettings | null>(null)
   const [rrBusy, setRrBusy] = useState(false)
+  // Refreshed with every load, so the 24-hour pending counts below stay pure during render.
+  const [nowMs, setNowMs] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -120,6 +122,7 @@ export default function AdminOrdersPage() {
     setStorePartners((storeParts as Partner[]) ?? [])
     setRestaurantList((rests as Partner[]) ?? [])
     setRr((rrRow as RrSettings | null) ?? null)
+    setNowMs(Date.now())
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
@@ -282,10 +285,10 @@ export default function AdminOrdersPage() {
   // Same counting the database uses: unfinished orders from the last 24 hours.
   const rrPending = (partnerId: string) => orders.filter((o) =>
     o.delivery_partner_id === partnerId && !['delivered', 'cancelled'].includes(o.status)
-    && Date.now() - new Date(o.placed_at).getTime() < 24 * 3600 * 1000).length
+    && nowMs - new Date(o.placed_at).getTime() < 24 * 3600 * 1000).length
   const rrWaiting = rr?.enabled
     ? orders.filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status) && !isHeld(o.notes)
-        && Date.now() - new Date(o.placed_at).getTime() < 6 * 3600 * 1000
+        && nowMs - new Date(o.placed_at).getTime() < 6 * 3600 * 1000
         && !((Number(o.online_amount ?? 0) > 0) && ['pending', 'failed'].includes(o.payment_status ?? ''))).length
     : 0
 
