@@ -301,6 +301,10 @@ export default function AdminOrdersPage() {
   const rrPending = (partnerId: string) => orders.filter((o) =>
     o.delivery_partner_id === partnerId && !['delivered', 'cancelled'].includes(o.status)
     && nowMs - new Date(o.placed_at).getTime() < 24 * 3600 * 1000).length
+  // Orders given to a rider since midnight (India time), cancelled ones excluded.
+  const istDayStart = Math.floor((nowMs + 19800000) / 86400000) * 86400000 - 19800000
+  const rrToday = (partnerId: string) => orders.filter((o) =>
+    o.delivery_partner_id === partnerId && o.status !== 'cancelled' && new Date(o.placed_at).getTime() >= istDayStart).length
   const rrWaiting = rr?.enabled
     ? orders.filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status) && !isHeld(o.notes)
         && nowMs - new Date(o.placed_at).getTime() < 6 * 3600 * 1000
@@ -411,13 +415,13 @@ export default function AdminOrdersPage() {
               {rr.enabled && (
                 <div className="mt-2 text-[11.5px] text-[#9A3412] space-y-0.5">
                   <p>
-                    One by one: <strong>{rr.partner_ids.map((id) => partners.find((p) => p.id === id)?.name).join(' → ')}</strong>.
+                    Each new order goes to the rider with the fewest orders today (then the fewest pending): <strong>{rr.partner_ids.map((id) => partners.find((p) => p.id === id)?.name).join(', ')}</strong>.
                     A rider is paused at {rr.max_pending} pending and gets orders again once down to {rr.resume_at}.
                   </p>
                   <p className="flex flex-wrap gap-x-3 gap-y-0.5">
                     {rr.partner_ids.map((id) => (
                       <span key={id}>
-                        {partners.find((p) => p.id === id)?.name}: <strong>{rrPending(id)}/{rr.max_pending}</strong>
+                        {partners.find((p) => p.id === id)?.name}: <strong>{rrToday(id)} today</strong>, <strong>{rrPending(id)}/{rr.max_pending}</strong> pending
                         {rr.full_ids.includes(id) && <span className="ml-1 px-1.5 py-0.5 rounded bg-[#EF4444] text-white text-[10px] font-[700]">FULL</span>}
                       </span>
                     ))}

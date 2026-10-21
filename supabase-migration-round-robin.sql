@@ -1,7 +1,7 @@
 -- Server-side round robin for delivery partners.
 --
--- Each order goes to the rider (in rr_settings.partner_ids) holding the fewest pending
--- orders; riders who are level take turns, using a single shared counter (next_idx), so it no longer matters how many admin
+-- Each order goes to the rider (in rr_settings.partner_ids) with the fewest orders today
+-- (then the fewest pending); riders who are level take turns, using a shared counter (next_idx), so it no longer matters how many admin
 -- browsers are open. A rider with max_pending unfinished orders (placed in the
 -- last stale_hours) is "full" and is skipped until down to resume_at; if every
 -- rider is full the new orders wait unassigned and are handed out as riders
@@ -29,7 +29,9 @@ language plpgsql security definer set search_path = public as $$
 declare
   s public.rr_settings%rowtype;
   ids uuid[]; full_list uuid[]; n int; i int; idx int; chosen_idx int;
-  cand uuid; chosen uuid; ord record; pend int; best int;
+  cand uuid; chosen uuid; ord record;
+  pend int; today_cnt int; best_today int; best_pend int;
+  day_start timestamptz := date_trunc('day', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata';
 begin
   if pg_trigger_depth() > 1 then return; end if;
   perform pg_advisory_xact_lock(4242001);
@@ -63,10 +65,11 @@ begin
     order by o.placed_at, o.id
     for update
   loop
-    chosen := null; best := null;
-    -- Each order goes to the rider holding the FEWEST pending orders. The walk starts
-    -- from whose turn it is and only a strictly lower load wins, so when riders are
-    -- level the rotation decides.
+    chosen := null; best_today := null; best_pend := null;
+    -- Fair share by day: fewest orders TODAY (delivered + pending; cancelled do not
+    -- count; day = India time) wins. Level on today's orders -> fewer pending wins;
+    -- still level -> whoever's turn it is (next_idx). Only a strictly better rider
+    -- replaces the current pick while walking from whose turn it is.
     for i in 0 .. n - 1 loop
       idx := (s.next_idx + i) % n;
       cand := ids[idx + 1];
@@ -75,8 +78,10 @@ begin
       select count(*) into pend from public.orders
         where delivery_partner_id = cand and status not in ('delivered', 'cancelled')
           and placed_at > now() - make_interval(hours => s.stale_hours);
-      if best is null or pend < best then
-        best := pend; chosen := cand; chosen_idx := idx;
+      select count(*) into today_cnt from public.orders
+        where delivery_partner_id = cand and status <> 'cancelled' and placed_at >= day_start;
+      if chosen is null or today_cnt < best_today or (today_cnt = best_today and pend < best_pend) then
+        chosen := cand; chosen_idx := idx; best_today := today_cnt; best_pend := pend;
       end if;
     end loop;
     exit when chosen is null;
@@ -85,7 +90,7 @@ begin
     update public.orders set delivery_partner_id = chosen, accepted_at = null, updated_at = now()
       where id = ord.id and delivery_partner_id is null;
 
-    if best + 1 >= s.max_pending and not (chosen = any(full_list)) then full_list := array_append(full_list, chosen); end if;
+    if best_pend + 1 >= s.max_pending and not (chosen = any(full_list)) then full_list := array_append(full_list, chosen); end if;
   end loop;
 
   update public.rr_settings set next_idx = s.next_idx, full_ids = full_list, updated_at = now() where id = 1;
