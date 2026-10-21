@@ -6,6 +6,7 @@ import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Phone
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn, formatDateTime, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,13 +35,6 @@ type Order = {
   order_items: OrderItem[]
 }
 type Restaurant = { id: string; name: string }
-
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m} min ago`
-  return `${Math.floor(m / 60)}h ago`
-}
 
 function etaMinutes(placedAt: string, status: string) {
   const minutesSince = Math.floor((Date.now() - new Date(placedAt).getTime()) / 60000)
@@ -337,7 +331,7 @@ export default function RestaurantOrdersPage() {
                               <Icon className="w-3 h-3" /> {cfg.label}
                             </span>
                           </div>
-                          <p className="text-[12px] text-[#9CA3AF]">{o.customer_name ?? 'Customer'} · {timeAgo(o.placed_at)}</p>
+                          <p className="text-[12px] text-[#9CA3AF]">{o.customer_name ?? 'Customer'} · <TimeAgo date={o.placed_at} /></p>
                           <p className="text-[11px] text-[#9CA3AF]">{formatDateTime(o.placed_at)}</p>
                         </div>
                         <div className="text-right">

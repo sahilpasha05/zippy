@@ -12,6 +12,8 @@ import LiveTrackingMap from '@/components/LiveTrackingMap'
 import OrderChat from '@/components/OrderChat'
 import CollectQrModal from '@/components/CollectQrModal'
 import { CITY } from '@/lib/city'
+import TimeAgo from '@/components/TimeAgo'
+import { formatDuration } from '@/lib/timeAgo'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,13 +40,6 @@ type Order = {
   collection_mode: 'cash' | 'online' | null; collected_amount: number | null
   order_items: OrderItem[]
   restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
-}
-
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m} min ago`
-  return `${Math.floor(m / 60)}h ago`
 }
 
 function restName(o: Order) {
@@ -240,6 +235,18 @@ export default function DeliveryOrdersPage() {
   const [qrOrder, setQrOrder] = useState<Order | null>(null)
   // Cards stay short; the arrow on a card opens its items and details.
   const [openCards, setOpenCards] = useState<string[]>([])
+  // Which of the day's collections the rider is looking at (tap the cash / online tiles).
+  const [collectList, setCollectList] = useState<'cash' | 'online' | null>(null)
+  // Ticks every 30 seconds so "waiting 1 h 5 min" stays exact without a reload.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30000)
+    return () => clearInterval(id)
+  }, [])
+  const openAndScrollTo = (id: string) => {
+    setOpenCards((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    setTimeout(() => document.getElementById(`order-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
+  }
   const toggleCard = (id: string) => setOpenCards((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   // Rider-side status changes: out for delivery (one "are you sure"), and cancel
   // (a reason of at least 5 characters, then a second "are you sure").
@@ -556,6 +563,20 @@ export default function DeliveryOrdersPage() {
     sum + (o.collection_mode === 'online' ? 0 : Number(o.collected_amount ?? o.cod_amount ?? 0)), 0)
   const onlineForStats = deliveredForStats.reduce((sum, o) =>
     sum + (o.collection_mode === 'online' ? Number(o.collected_amount ?? 0) : 0), 0)
+  // Orders still open that were placed 50+ minutes ago (within the last day, so old
+  // stuck orders do not clutter this), longest waiting first.
+  const DELAYED_AFTER_MIN = 50
+  const delayedOrders = activeOrders
+    .map((o) => ({ o, mins: Math.floor((nowMs - new Date(o.placed_at).getTime()) / 60000) }))
+    .filter(({ mins }) => mins >= DELAYED_AFTER_MIN && mins < 24 * 60)
+    .sort((a, b) => b.mins - a.mins)
+  const collectedAmountOf = (o: Order) => Number(o.collected_amount ?? o.cod_amount ?? 0)
+  const cashOrders = deliveredForStats
+    .filter((o) => o.collection_mode !== 'online' && collectedAmountOf(o) > 0)
+    .sort((a, b) => new Date(b.delivered_at ?? b.placed_at).getTime() - new Date(a.delivered_at ?? a.placed_at).getTime())
+  const onlineOrders = deliveredForStats
+    .filter((o) => o.collection_mode === 'online')
+    .sort((a, b) => new Date(b.delivered_at ?? b.placed_at).getTime() - new Date(a.delivered_at ?? a.placed_at).getTime())
   const statsLabel = dateFilter ? dayLabel(dateFilter).toLowerCase() : 'all time'
 
   return (
@@ -627,14 +648,16 @@ export default function DeliveryOrdersPage() {
               <p className="text-[14px] font-[800] text-[#6D28D9] leading-none">{activeOrders.length}</p>
               <p className="text-[9.5px] text-[#6D28D9]/70 mt-0.5 truncate">still to deliver</p>
             </div>
-            <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2 py-1">
+            <button type="button" onClick={() => setCollectList('cash')} aria-label="See who paid cash"
+              className="text-left bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2 py-1 active:scale-95 transition-transform">
               <p className="text-[14px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
-              <p className="text-[9.5px] text-[#B45309]/70 mt-0.5 truncate">cash {statsLabel}</p>
-            </div>
-            <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg px-2 py-1">
+              <p className="text-[9.5px] text-[#B45309]/70 mt-0.5 truncate">cash {statsLabel} ›</p>
+            </button>
+            <button type="button" onClick={() => setCollectList('online')} aria-label="See who paid online"
+              className="text-left bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg px-2 py-1 active:scale-95 transition-transform">
               <p className="text-[14px] font-[800] text-[#1D4ED8] leading-none">₹{onlineForStats.toFixed(0)}</p>
-              <p className="text-[9.5px] text-[#1D4ED8]/70 mt-0.5 truncate">online {statsLabel}</p>
-            </div>
+              <p className="text-[9.5px] text-[#1D4ED8]/70 mt-0.5 truncate">online {statsLabel} ›</p>
+            </button>
           </div>
 
           <div className="flex items-center gap-1.5 mb-2">
@@ -697,6 +720,24 @@ export default function DeliveryOrdersPage() {
 
       {/* Orders */}
       <div className="max-w-2xl mx-auto p-4 space-y-3">
+        {tab !== 'delivered' && delayedOrders.length > 0 && (
+          <div className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-3 py-2">
+            <p className="flex items-center gap-1.5 text-[12px] font-[800] text-[#B91C1C]" style={{ fontWeight: 800 }}>
+              <Clock className="w-3.5 h-3.5" />
+              {delayedOrders.length} delayed order{delayedOrders.length !== 1 ? 's' : ''} · open {DELAYED_AFTER_MIN}+ min
+            </p>
+            <div className="mt-1 divide-y divide-[#FECACA]/60">
+              {delayedOrders.slice(0, 6).map(({ o, mins }) => (
+                <button key={o.id} type="button" onClick={() => { if (tab === 'pending' && !pendingOrders.some((x) => x.id === o.id)) setTab('active'); openAndScrollTo(o.id) }}
+                  className="flex w-full items-center justify-between gap-2 py-1 text-left text-[11.5px] text-[#991B1B]">
+                  <span className="truncate"><span className="font-mono font-[700]">{o.id.slice(0, 8).toUpperCase()}</span> · {o.customer_name ?? 'Customer'}</span>
+                  <span className="shrink-0 font-[800]" style={{ fontWeight: 800 }}>{formatDuration(mins)}</span>
+                </button>
+              ))}
+              {delayedOrders.length > 6 && <p className="pt-1 text-[11px] text-[#B91C1C]/80">+{delayedOrders.length - 6} more</p>}
+            </div>
+          </div>
+        )}
         {shown.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-24 text-[#9CA3AF]">
             <Truck className="w-12 h-12" strokeWidth={1} />
@@ -723,12 +764,12 @@ export default function DeliveryOrdersPage() {
                 const Icon = cfg.icon
                 const isReady = o.status === 'out_for_delivery'
                 return (
-              <div key={o.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', isReady ? 'border-[#7C3AED]' : 'border-[#E5E7EB]')}>
+              <div key={o.id} id={`order-${o.id}`} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', isReady ? 'border-[#7C3AED]' : 'border-[#E5E7EB]')}>
                 <div className="px-3.5 py-3">
                   {/* Header: order, age, status, and the arrow that opens the details */}
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] font-mono font-bold text-[#374151]">{o.id.slice(0,8).toUpperCase()}</span>
-                    <span className="text-[11.5px] text-[#9CA3AF] truncate">· {timeAgo(o.placed_at)}</span>
+                    <span className="text-[11.5px] text-[#9CA3AF] truncate">· <TimeAgo date={o.placed_at} /></span>
                     <span className="ml-auto shrink-0 text-[10.5px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1" style={{ background: cfg.bg, color: cfg.color }}>
                       <Icon className="w-3 h-3" /> {isReady ? 'Ready for pickup' : cfg.label}
                     </span>
@@ -1043,6 +1084,43 @@ export default function DeliveryOrdersPage() {
           </div>
         </div>
       )}
+
+      {collectList && (() => {
+        const list = collectList === 'cash' ? cashOrders : onlineOrders
+        const total = list.reduce((sum, o) => sum + collectedAmountOf(o), 0)
+        return (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setCollectList(null)} />
+            <div role="dialog" aria-modal="true" className="relative z-10 flex max-h-[80vh] w-full flex-col rounded-t-3xl bg-white sm:max-w-sm sm:rounded-3xl">
+              <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+                <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', collectList === 'cash' ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#EFF6FF] text-[#1D4ED8]')}>
+                  {collectList === 'cash' ? <Banknote className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-[15px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>{collectList === 'cash' ? 'Cash collected' : 'Paid online (UPI)'} {statsLabel}</h2>
+                  <p className="text-[12px] text-[#6B7280]">{list.length} order{list.length !== 1 ? 's' : ''} · ₹{total.toFixed(0)}</p>
+                </div>
+                <button onClick={() => setCollectList(null)} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#374151]"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="overflow-y-auto border-t border-[#F3F4F6] px-5 pb-5">
+                {list.length === 0 ? (
+                  <p className="py-10 text-center text-[13px] text-[#9CA3AF]">Nothing {collectList === 'cash' ? 'collected in cash' : 'paid online'} {statsLabel}.</p>
+                ) : list.map((o) => (
+                  <div key={o.id} className="flex items-center justify-between gap-3 border-b border-[#F3F4F6] py-3 last:border-0">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13.5px] font-[700] text-[#111827]">{o.customer_name ?? 'Customer'}</p>
+                      <p className="text-[11.5px] text-[#9CA3AF]">
+                        <span className="font-mono">{o.id.slice(0, 8).toUpperCase()}</span> · {format(new Date(o.delivered_at ?? o.placed_at), 'd MMM, h:mm a')}
+                      </p>
+                    </div>
+                    <span className={cn('shrink-0 text-[14px] font-[800]', collectList === 'cash' ? 'text-[#B45309]' : 'text-[#1D4ED8]')} style={{ fontWeight: 800 }}>₹{collectedAmountOf(o).toFixed(0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {qrOrder && (
         <CollectQrModal

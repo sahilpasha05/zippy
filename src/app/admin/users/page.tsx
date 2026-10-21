@@ -5,18 +5,12 @@ import { createClient } from '@/lib/supabase/client'
 import { Search, UserCheck, UserX, Shield, Store, KeyRound, X, Loader2 } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { cn } from '@/lib/utils'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createClient()
 
 type Profile = { id: string; full_name: string | null; email: string | null; role: string | null; created_at: string }
 type Restaurant = { owner_id: string | null; name: string }
-
-function timeAgo(d: string) {
-  const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  return `${days}d ago`
-}
 
 export default function AdminUsersPage() {
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -122,7 +116,7 @@ export default function AdminUsersPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">{timeAgo(u.created_at)}</td>
+                        <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]"><TimeAgo date={u.created_at} /></td>
                         <td className="px-5 py-3.5 text-right">
                           <button
                             onClick={() => { setResetTarget(u); setNewPassword(''); setResetError(''); setResetDone(false) }}

@@ -7,6 +7,7 @@ import AdminSidebar from '@/components/admin/AdminSidebar'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import OrderChat from '@/components/OrderChat'
 import { cn, formatMoney, formatDateTime } from '@/lib/utils'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createClient()
 
@@ -54,15 +55,6 @@ const PAYMENT_STATUS_CFG: Record<string, { label: string; color: string; bg: str
   partially_paid:  { label: 'Half Paid (Cash Due)', color: '#D97706', bg: '#FFFBEB' },
   pending:         { label: 'Pending',             color: '#D97706', bg: '#FFFBEB' },
   failed:          { label: 'Failed',               color: '#DC2626', bg: '#FEF2F2' },
-}
-
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
 }
 
 
@@ -340,7 +332,7 @@ export default function AdminOrdersPage() {
             <div>
               <h1 className="text-[20px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>All Orders</h1>
               <p className="text-[12.5px] text-[#9CA3AF]">
-                {activeCnt} active · {unassignedCnt} unassigned · last updated {timeAgo(lastRefresh.toISOString())}
+                {activeCnt} active · {unassignedCnt} unassigned · last updated <TimeAgo date={lastRefresh.toISOString()} />
                 <span className="ml-2 inline-flex items-center gap-1 text-[#16A34A] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse inline-block" /> Live
                 </span>
@@ -632,7 +624,7 @@ export default function AdminOrdersPage() {
                           />
                         </td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">
-                          <span className="block">{timeAgo(o.placed_at)}</span>
+                          <span className="block"><TimeAgo date={o.placed_at} /></span>
                           <span className="block text-[11px]">{formatDateTime(o.placed_at)}</span>
                         </td>
                       </tr>

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Star, Loader2, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createClient()
 
@@ -20,14 +21,6 @@ type Review = {
 }
 
 const one = <T,>(r: Rel<T>): T | null => (Array.isArray(r) ? r[0] ?? null : r)
-
-function timeAgo(d: string) {
-  const m = Math.floor((new Date().getTime() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  if (m < 1440) return `${Math.floor(m / 60)}h ago`
-  return `${Math.floor(m / 1440)}d ago`
-}
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([])
@@ -113,7 +106,7 @@ export default function AdminReviewsPage() {
                           {r.order_id && <span className="font-mono text-[#9CA3AF]"> · #{r.order_id.slice(0, 8).toUpperCase()}</span>}
                         </p>
                       </div>
-                      <span className="text-[11.5px] text-[#9CA3AF] shrink-0">{timeAgo(r.created_at)}</span>
+                      <span className="text-[11.5px] text-[#9CA3AF] shrink-0"><TimeAgo date={r.created_at} /></span>
                     </div>
                     {r.comment && <p className="text-[13px] text-[#374151] leading-relaxed mb-2">{r.comment}</p>}
                     <p className="text-[11.5px] text-[#9CA3AF]">

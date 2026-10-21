@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { TrendingUp, ShoppingBag, Star, Clock, ArrowUp, ArrowDown, Eye, ChefHat, Truck, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn } from '@/lib/utils'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,13 +27,6 @@ type Order = {
   placed_at: string; order_items: { name: string; quantity: number; price: number }[]
 }
 type Restaurant = { id: string; name: string; slug: string; is_open: boolean; rating: number }
-
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m} min ago`
-  return `${Math.floor(m / 60)}h ago`
-}
 
 export default function SlugDashboard() {
   const { slug } = useParams<{ slug: string }>()
@@ -195,7 +189,7 @@ export default function SlugDashboard() {
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-[13px] font-[700] text-[#111827]">₹{o.total}</div>
-                          <div className="text-[11px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</div>
+                          <div className="text-[11px] text-[#9CA3AF]"><TimeAgo date={o.placed_at} /></div>
                         </div>
                       </div>
                     )

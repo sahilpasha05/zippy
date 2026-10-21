@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Loader2, Phone } from 'lucide-react'
 import DairySidebar from '@/components/dairy/DairySidebar'
 import { cn } from '@/lib/utils'
+import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,13 +31,6 @@ type Order = {
   order_items: OrderItem[]
 }
 type Partner = { id: string; name: string; slug: string }
-
-function timeAgo(d: string) {
-  const m = Math.floor((Date.now() - new Date(d).getTime()) / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m} min ago`
-  return `${Math.floor(m / 60)}h ago`
-}
 
 export default function DairyOrdersPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -163,7 +157,7 @@ export default function DairyOrdersPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-[14px] font-[800] text-[#111827]">₹{o.total}</div>
-                        <div className="text-[11px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</div>
+                        <div className="text-[11px] text-[#9CA3AF]"><TimeAgo date={o.placed_at} /></div>
                       </div>
                     </div>
 
