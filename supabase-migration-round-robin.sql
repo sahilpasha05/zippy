@@ -1,7 +1,7 @@
 -- Server-side round robin for delivery partners.
 --
--- Orders are handed to the riders in rr_settings.partner_ids one by one, with a
--- single shared counter (next_idx), so it no longer matters how many admin
+-- Each order goes to the rider (in rr_settings.partner_ids) holding the fewest pending
+-- orders; riders who are level take turns, using a single shared counter (next_idx), so it no longer matters how many admin
 -- browsers are open. A rider with max_pending unfinished orders (placed in the
 -- last stale_hours) is "full" and is skipped until down to resume_at; if every
 -- rider is full the new orders wait unassigned and are handed out as riders
@@ -28,8 +28,8 @@ create or replace function public.rr_dispatch() returns void
 language plpgsql security definer set search_path = public as $$
 declare
   s public.rr_settings%rowtype;
-  ids uuid[]; full_list uuid[]; n int; i int; idx int;
-  cand uuid; chosen uuid; ord record; pend int;
+  ids uuid[]; full_list uuid[]; n int; i int; idx int; chosen_idx int;
+  cand uuid; chosen uuid; ord record; pend int; best int;
 begin
   if pg_trigger_depth() > 1 then return; end if;
   perform pg_advisory_xact_lock(4242001);
@@ -41,6 +41,7 @@ begin
   if n = 0 then return; end if;
   full_list := s.full_ids;
 
+  -- A rider fills up at max_pending and only comes back at resume_at.
   foreach cand in array ids loop
     select count(*) into pend from public.orders
       where delivery_partner_id = cand and status not in ('delivered', 'cancelled')
@@ -62,25 +63,29 @@ begin
     order by o.placed_at, o.id
     for update
   loop
-    chosen := null;
+    chosen := null; best := null;
+    -- Each order goes to the rider holding the FEWEST pending orders. The walk starts
+    -- from whose turn it is and only a strictly lower load wins, so when riders are
+    -- level the rotation decides.
     for i in 0 .. n - 1 loop
       idx := (s.next_idx + i) % n;
       cand := ids[idx + 1];
       if cand = any(full_list) then continue; end if;
       if not exists (select 1 from public.delivery_partners dp where dp.id = cand and dp.is_active and coalesce(dp.is_available, true)) then continue; end if;
-      chosen := cand;
-      s.next_idx := (idx + 1) % n;
-      exit;
+      select count(*) into pend from public.orders
+        where delivery_partner_id = cand and status not in ('delivered', 'cancelled')
+          and placed_at > now() - make_interval(hours => s.stale_hours);
+      if best is null or pend < best then
+        best := pend; chosen := cand; chosen_idx := idx;
+      end if;
     end loop;
     exit when chosen is null;
 
+    s.next_idx := (chosen_idx + 1) % n;
     update public.orders set delivery_partner_id = chosen, accepted_at = null, updated_at = now()
       where id = ord.id and delivery_partner_id is null;
 
-    select count(*) into pend from public.orders
-      where delivery_partner_id = chosen and status not in ('delivered', 'cancelled')
-        and placed_at > now() - make_interval(hours => s.stale_hours);
-    if pend >= s.max_pending and not (chosen = any(full_list)) then full_list := array_append(full_list, chosen); end if;
+    if best + 1 >= s.max_pending and not (chosen = any(full_list)) then full_list := array_append(full_list, chosen); end if;
   end loop;
 
   update public.rr_settings set next_idx = s.next_idx, full_ids = full_list, updated_at = now() where id = 1;
