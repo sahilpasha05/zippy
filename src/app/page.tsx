@@ -7,6 +7,7 @@ import TrendingProducts from '@/components/home/TrendingProducts'
 import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
 import QuickCategories from '@/components/home/QuickCategories'
 import FestiveSweets from '@/components/home/FestiveSweets'
+import ChilledDrinks from '@/components/home/ChilledDrinks'
 import SiteFooter from '@/components/layout/SiteFooter'
 import HomeSignInPrompt from '@/components/HomeSignInPrompt'
 
@@ -26,6 +27,7 @@ export default function HomePage() {
       <div className="max-w-[1440px] mx-auto px-6 lg:px-10 space-y-10 lg:space-y-16 pb-20 pt-4 lg:pt-0">
         <BannerCarousel />
         <FestiveSweets />
+        <ChilledDrinks />
         <QuickCategories />
         <TrendingProducts />
         <FeaturedRestaurants />
