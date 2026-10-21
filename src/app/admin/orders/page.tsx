@@ -47,6 +47,7 @@ type Order = {
   order_items: OrderItem[]
 }
 type Partner = { id: string; name: string; is_active: boolean }
+type RrSettings = { enabled: boolean; partner_ids: string[]; max_pending: number; resume_at: number; full_ids: string[] }
 
 const PAYMENT_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
   paid:            { label: 'Paid',                color: '#16A34A', bg: '#DCFCE7' },
@@ -91,14 +92,14 @@ export default function AdminOrdersPage() {
   const [autoAssignMsg, setAutoAssignMsg] = useState('')
   const [autoAssignOn, setAutoAssignOn] = useState(() => { try { return localStorage.getItem('zippy-aa-on') === '1' } catch { return false } })
   const autoAssignPartnerRef = useRef('')
-  const [rrPartners, setRrPartners] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('zippy-rr-partners') ?? '[]') } catch { return [] } })
-  const [rrOn, setRrOn] = useState(() => { try { return localStorage.getItem('zippy-rr-on') === '1' } catch { return false } })
-  const rrPartnersRef = useRef<string[]>([])
-  const rrIndexRef = useRef(0)
+  // Round robin lives in the database (rr_settings + a trigger on orders) so one
+  // shared counter hands out orders, whichever devices have this page open.
+  const [rr, setRr] = useState<RrSettings | null>(null)
+  const [rrBusy, setRrBusy] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }, { data: rests }] = await Promise.all([
+    const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }, { data: rests }, { data: rrRow }] = await Promise.all([
       supabase
         .from('orders')
         .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, delay_issue, delay_minutes, delay_reported_at, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
@@ -111,12 +112,14 @@ export default function AdminOrdersPage() {
       supabase.from('grocery_partners').select('id, name, is_active').order('name'),
       supabase.from('store_partners').select('id, name, is_active').order('name'),
       supabase.from('restaurants').select('id, name, is_active').order('name'),
+      supabase.from('rr_settings').select('enabled, partner_ids, max_pending, resume_at, full_ids').eq('id', 1).maybeSingle(),
     ])
     setOrders((ords as unknown as Order[]) ?? [])
     setPartners((parts as Partner[]) ?? [])
     setGroceryPartners((groceryParts as Partner[]) ?? [])
     setStorePartners((storeParts as Partner[]) ?? [])
     setRestaurantList((rests as Partner[]) ?? [])
+    setRr((rrRow as RrSettings | null) ?? null)
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
@@ -134,8 +137,6 @@ export default function AdminOrdersPage() {
 
   useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner; try { localStorage.setItem('zippy-aa-partner', autoAssignPartner) } catch {} }, [autoAssignPartner])
   useEffect(() => { try { localStorage.setItem('zippy-aa-on', autoAssignOn ? '1' : '0') } catch {} }, [autoAssignOn])
-  useEffect(() => { rrPartnersRef.current = rrPartners; try { localStorage.setItem('zippy-rr-partners', JSON.stringify(rrPartners)) } catch {} }, [rrPartners])
-  useEffect(() => { try { localStorage.setItem('zippy-rr-on', rrOn ? '1' : '0') } catch {} }, [rrOn])
 
   useEffect(() => {
     if (!autoAssignOn) return
@@ -152,23 +153,22 @@ export default function AdminOrdersPage() {
     return () => { supabase.removeChannel(ch) }
   }, [autoAssignOn])
 
-  useEffect(() => {
-    if (!rrOn) return
-    rrIndexRef.current = 0
-    const ch = supabase
-      .channel(`admin-orders-round-robin-${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
-        const list = rrPartnersRef.current
-        if (!list.length) return
-        const newOrder = payload.new as { id: string; delivery_partner_id: string | null; notes: string | null }
-        if (newOrder.delivery_partner_id || isHeld(newOrder.notes)) return
-        const partnerId = list[rrIndexRef.current % list.length]
-        rrIndexRef.current += 1
-        await supabase.from('orders').update({ delivery_partner_id: partnerId, accepted_at: null, updated_at: new Date().toISOString() }).eq('id', newOrder.id)
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(ch) }
-  }, [rrOn])
+  // Changing the rotation or switching it on/off. After any change the database
+  // is asked to hand out whatever is already waiting.
+  async function saveRr(patch: Partial<RrSettings> & { next_idx?: number }) {
+    if (!rr) return
+    setRrBusy(true)
+    const next = { ...rr, ...patch }
+    const { error } = await supabase.from('rr_settings').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', 1)
+    if (!error) {
+      setRr(next)
+      if (next.enabled) await supabase.rpc('rr_dispatch')
+      await load()
+    } else {
+      window.alert(`Could not save round robin: ${error.message}`)
+    }
+    setRrBusy(false)
+  }
 
   // Lets an admin move an order to a different kitchen, or clear it when the
   // restaurant can't take it — the order itself stays on file either way.
@@ -279,6 +279,16 @@ export default function AdminOrdersPage() {
     setTimeout(() => setAutoAssignMsg(''), 2500)
   }
 
+  // Same counting the database uses: unfinished orders from the last 24 hours.
+  const rrPending = (partnerId: string) => orders.filter((o) =>
+    o.delivery_partner_id === partnerId && !['delivered', 'cancelled'].includes(o.status)
+    && Date.now() - new Date(o.placed_at).getTime() < 24 * 3600 * 1000).length
+  const rrWaiting = rr?.enabled
+    ? orders.filter((o) => !o.delivery_partner_id && !['delivered', 'cancelled'].includes(o.status) && !isHeld(o.notes)
+        && Date.now() - new Date(o.placed_at).getTime() < 6 * 3600 * 1000
+        && !((Number(o.online_amount ?? 0) > 0) && ['pending', 'failed'].includes(o.payment_status ?? ''))).length
+    : 0
+
   const filtered = orders.filter((o) => {
     const matchTab =
       tab === 'All'        ? true :
@@ -354,31 +364,51 @@ export default function AdminOrdersPage() {
             )}
           </div>
 
-          {/* Round-robin auto-assign */}
-          <div className={cn("flex flex-wrap items-center gap-2 mb-4 p-3 border rounded-xl transition-colors", rrOn ? "bg-[#FFF7ED] border-[#FED7AA]" : "bg-[#F8FAFC] border-[#E5E7EB]")}>
-            <Bike className={cn("w-4 h-4 shrink-0", rrOn ? "text-[#EA580C]" : "text-[#6B7280]")} />
-            <span className={cn("text-[12.5px] font-medium shrink-0", rrOn ? "text-[#9A3412]" : "text-[#374151]")}>Round-robin</span>
-            <div className="flex flex-wrap gap-1.5 flex-1">
-              {partners.filter((p) => p.is_active).map((p) => (
-                <label key={p.id} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] cursor-pointer select-none transition-colors", rrPartners.includes(p.id) ? "bg-[#EA580C] border-[#EA580C] text-white" : "bg-white border-[#E5E7EB] text-[#374151] hover:border-[#EA580C]")}>
-                  <input type="checkbox" className="sr-only" checked={rrPartners.includes(p.id)}
-                    onChange={(e) => setRrPartners((prev) => e.target.checked ? [...prev, p.id] : prev.filter((id) => id !== p.id))} />
-                  {p.name}
-                </label>
-              ))}
+          {/* Round-robin: settings and the counter live in the database */}
+          {rr && (
+            <div className={cn("mb-4 p-3 border rounded-xl transition-colors", rr.enabled ? "bg-[#FFF7ED] border-[#FED7AA]" : "bg-[#F8FAFC] border-[#E5E7EB]")}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Bike className={cn("w-4 h-4 shrink-0", rr.enabled ? "text-[#EA580C]" : "text-[#6B7280]")} />
+                <span className={cn("text-[12.5px] font-medium shrink-0", rr.enabled ? "text-[#9A3412]" : "text-[#374151]")}>Round-robin</span>
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {partners.filter((p) => p.is_active).map((p) => {
+                    const on = rr.partner_ids.includes(p.id)
+                    return (
+                      <label key={p.id} className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] cursor-pointer select-none transition-colors", on ? "bg-[#EA580C] border-[#EA580C] text-white" : "bg-white border-[#E5E7EB] text-[#374151] hover:border-[#EA580C]", rrBusy && "opacity-60 pointer-events-none")}>
+                        <input type="checkbox" className="sr-only" checked={on}
+                          onChange={(e) => saveRr({ partner_ids: e.target.checked ? [...rr.partner_ids, p.id] : rr.partner_ids.filter((id) => id !== p.id), next_idx: 0, full_ids: [] })} />
+                        {p.name}
+                      </label>
+                    )
+                  })}
+                </div>
+                <button
+                  onClick={() => { if (!rr.partner_ids.length && !rr.enabled) return; saveRr({ enabled: !rr.enabled }) }}
+                  disabled={rrBusy}
+                  className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-[600] rounded-lg transition-all shrink-0 disabled:opacity-60", rr.enabled ? "bg-[#EA580C] text-white hover:bg-[#C2410C]" : "bg-[#6B7280] text-white hover:bg-[#4B5563]", !rr.partner_ids.length && !rr.enabled ? "opacity-50 cursor-not-allowed" : "")}>
+                  <Zap className="w-3.5 h-3.5" />
+                  {rr.enabled ? 'ON - distributing' : 'Enable round-robin'}
+                </button>
+              </div>
+              {rr.enabled && (
+                <div className="mt-2 text-[11.5px] text-[#9A3412] space-y-0.5">
+                  <p>
+                    One by one: <strong>{rr.partner_ids.map((id) => partners.find((p) => p.id === id)?.name).join(' → ')}</strong>.
+                    A rider is paused at {rr.max_pending} pending and gets orders again once down to {rr.resume_at}.
+                  </p>
+                  <p className="flex flex-wrap gap-x-3 gap-y-0.5">
+                    {rr.partner_ids.map((id) => (
+                      <span key={id}>
+                        {partners.find((p) => p.id === id)?.name}: <strong>{rrPending(id)}/{rr.max_pending}</strong>
+                        {rr.full_ids.includes(id) && <span className="ml-1 px-1.5 py-0.5 rounded bg-[#EF4444] text-white text-[10px] font-[700]">FULL</span>}
+                      </span>
+                    ))}
+                    {rrWaiting > 0 && <span className="font-[700]">· {rrWaiting} order{rrWaiting !== 1 ? 's' : ''} waiting for a free rider</span>}
+                  </p>
+                </div>
+              )}
             </div>
-            <button
-              onClick={() => { if (!rrPartners.length && !rrOn) return; setRrOn((v) => !v) }}
-              className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-[12px] font-[600] rounded-lg transition-all shrink-0", rrOn ? "bg-[#EA580C] text-white hover:bg-[#C2410C]" : "bg-[#6B7280] text-white hover:bg-[#4B5563]", !rrPartners.length && !rrOn ? "opacity-50 cursor-not-allowed" : "")}>
-              <Zap className="w-3.5 h-3.5" />
-              {rrOn ? 'ON — distributing' : 'Enable round-robin'}
-            </button>
-            {rrOn && (
-              <span className="text-[11.5px] text-[#9A3412] font-medium w-full">
-                New orders rotating between: <strong>{rrPartners.map((id) => partners.find((p) => p.id === id)?.name).join(' → ')}</strong>
-              </span>
-            )}
-          </div>
+          )}
 
           {/* Re-asks Cashfree about every order still marked unpaid and settles
               the ones that actually went through — covers payments whose webhook
