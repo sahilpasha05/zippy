@@ -99,7 +99,7 @@ export default function AdminCollectionsPage() {
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10 space-y-3">
           <div>
             <h1 className="text-[18px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Delivery Collections</h1>
-            <p className="text-[12.5px] text-[#9CA3AF]">Amounts collected at the door (cash or online through the rider's QR) and still outstanding, per rider</p>
+            <p className="text-[12.5px] text-[#9CA3AF]">Amounts collected at the door (cash or online through the rider&apos;s QR) and still outstanding, per rider</p>
           </div>
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
