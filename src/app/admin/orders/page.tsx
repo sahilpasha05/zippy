@@ -135,7 +135,22 @@ export default function AdminOrdersPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => load())
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Round robin is shared by every admin panel: when anyone switches it on/off or
+    // changes the riders, every open panel updates at once (and re-checks every
+    // 20 seconds in case a realtime message was missed).
+    const rrChannel = supabase
+      .channel('admin-round-robin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rr_settings' }, (payload) => {
+        const row = payload.new as Partial<RrSettings> | undefined
+        if (row && typeof row.enabled === 'boolean') setRr((prev) => (prev ? { ...prev, ...row } as RrSettings : (row as RrSettings)))
+      })
+      .subscribe()
+    const rrTimer = setInterval(async () => {
+      const { data } = await supabase.from('rr_settings').select('enabled, partner_ids, max_pending, resume_at, full_ids').eq('id', 1).maybeSingle()
+      if (data) setRr(data as RrSettings)
+    }, 20000)
+
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(rrChannel); clearInterval(rrTimer) }
   }, [load])
 
   useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner; try { localStorage.setItem('zippy-aa-partner', autoAssignPartner) } catch {} }, [autoAssignPartner])

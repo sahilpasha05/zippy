@@ -115,3 +115,6 @@ create trigger rr_after_update after update of status, delivery_partner_id, paym
   execute function public.rr_dispatch_trigger();
 
 -- Row for a new city: insert into public.rr_settings (id, enabled, partner_ids) values (1, false, '{...rider uuids...}');
+
+-- Realtime, so every open admin panel sees changes at once:
+-- alter publication supabase_realtime add table public.rr_settings;
