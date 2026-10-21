@@ -7,6 +7,9 @@ import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn, formatDateTime, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import TimeAgo from '@/components/TimeAgo'
+import DelayedStrip from '@/components/DelayedStrip'
+import { useNow } from '@/lib/useNow'
+import { DELAYED_AFTER_MIN, DELAYED_MAX_AGE_MIN, delayedMinutes } from '@/lib/delay'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -212,6 +215,20 @@ export default function RestaurantOrdersPage() {
     setAdvancing(null)
   }
 
+  // Orders the kitchen has not got ready 50+ minutes after they were placed.
+  const nowMs = useNow()
+  const delayedOrders = orders
+    .filter((o) => ['pending', 'confirmed', 'preparing'].includes(o.status))
+    .map((o) => ({ o, mins: delayedMinutes(o.placed_at, nowMs) }))
+    .filter(({ mins }) => mins >= DELAYED_AFTER_MIN && mins < DELAYED_MAX_AGE_MIN)
+    .sort((a, b) => b.mins - a.mins)
+  const jumpToOrder = (id: string) => {
+    const el = document.getElementById(`order-${id}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el?.classList.add('ring-2', 'ring-[#DC2626]')
+    setTimeout(() => el?.classList.remove('ring-2', 'ring-[#DC2626]'), 2500)
+  }
+
   const filtered = orders.filter((o) => {
     const matchTab =
       activeTab === 'All'       ? true :
@@ -294,6 +311,12 @@ export default function RestaurantOrdersPage() {
         </div>
 
         <div className="p-6">
+          <div className="mb-4 empty:hidden">
+            <DelayedStrip
+              items={delayedOrders.map(({ o, mins }) => ({ id: o.id, name: o.customer_name ?? 'Customer', minutes: mins }))}
+              onSelect={jumpToOrder}
+            />
+          </div>
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <Loader2 className="w-8 h-8 text-[#16A34A] animate-spin" />
@@ -314,7 +337,7 @@ export default function RestaurantOrdersPage() {
                 const items = Array.isArray(o.order_items) ? o.order_items : []
 
                 return (
-                  <div key={o.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm transition-all', isActive ? 'border-[#16A34A]' : 'border-[#E5E7EB]')}>
+                  <div key={o.id} id={`order-${o.id}`} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm transition-all', isActive ? 'border-[#16A34A]' : 'border-[#E5E7EB]')}>
                     {isActive && (
                       <div className="bg-[#F0FDF4] px-4 py-2 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
