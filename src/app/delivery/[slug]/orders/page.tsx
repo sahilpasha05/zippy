@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle, QrCode, Banknote, Smartphone } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle, QrCode, Banknote, Smartphone, ChevronDown } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm, chime, systemNotify } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
@@ -238,6 +238,9 @@ export default function DeliveryOrdersPage() {
   // How the amount due at the door was taken: chosen before the slide to deliver.
   const [collectMode, setCollectMode] = useState<'cash' | 'online' | null>(null)
   const [qrOrder, setQrOrder] = useState<Order | null>(null)
+  // Cards stay short; the arrow on a card opens its items and details.
+  const [openCards, setOpenCards] = useState<string[]>([])
+  const toggleCard = (id: string) => setOpenCards((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   // Rider-side status changes: out for delivery (one "are you sure"), and cancel
   // (a reason of at least 5 characters, then a second "are you sure").
   const [outTarget, setOutTarget] = useState<Order | null>(null)
@@ -721,69 +724,39 @@ export default function DeliveryOrdersPage() {
                 const isReady = o.status === 'out_for_delivery'
                 return (
               <div key={o.id} className={cn('bg-white rounded-2xl border overflow-hidden shadow-zippy-sm', isReady ? 'border-[#7C3AED]' : 'border-[#E5E7EB]')}>
-                {isReady && (
-                  <div className="bg-[#F5F3FF] px-4 py-2 flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-[#7C3AED]" />
-                    <span className="text-[11.5px] font-semibold text-[#5B21B6]">Ready for pickup</span>
-                  </div>
-                )}
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                      <span className="text-[13px] font-mono font-bold text-[#374151]">{o.id.slice(0,8).toUpperCase()}</span>
-                      <p className="text-[12px] text-[#9CA3AF]">{timeAgo(o.placed_at)}</p>
-                    </div>
-                    <span className="text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1" style={{ background: cfg.bg, color: cfg.color }}>
-                      <Icon className="w-3 h-3" /> {cfg.label}
+                <div className="px-3.5 py-3">
+                  {/* Header: order, age, status, and the arrow that opens the details */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-mono font-bold text-[#374151]">{o.id.slice(0,8).toUpperCase()}</span>
+                    <span className="text-[11.5px] text-[#9CA3AF] truncate">· {timeAgo(o.placed_at)}</span>
+                    <span className="ml-auto shrink-0 text-[10.5px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1" style={{ background: cfg.bg, color: cfg.color }}>
+                      <Icon className="w-3 h-3" /> {isReady ? 'Ready for pickup' : cfg.label}
                     </span>
+                    <button onClick={() => toggleCard(o.id)} aria-expanded={openCards.includes(o.id)} aria-label={openCards.includes(o.id) ? 'Hide details' : 'Show items and details'}
+                      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E7EB] text-[#6B7280] hover:border-[#7C3AED] hover:text-[#7C3AED] transition-all">
+                      <ChevronDown className={cn('w-4 h-4 transition-transform', openCards.includes(o.id) && 'rotate-180')} />
+                    </button>
                   </div>
 
-                  <div className="space-y-2 mb-3">
-                    <div className="flex items-start gap-2 text-[12.5px]">
-                      <MapPin className="w-3.5 h-3.5 text-[#7C3AED] mt-0.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-[600] text-[#111827]">Pickup: {restName(o)}</p>
-                          {restPhone(o) && (
-                            <a href={`tel:${restPhone(o)}`} className="text-[11px] font-[600] text-[#7C3AED] hover:underline shrink-0">Call restaurant</a>
-                          )}
-                        </div>
-                        {restAddress(o) && <p className="text-[#6B7280]">{restAddress(o)}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 text-[12.5px]">
-                      <MapPin className="w-3.5 h-3.5 text-[#16A34A] mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-[600] text-[#111827]">Drop: {o.customer_name ?? 'Customer'}</p>
-                        {o.address && <p className="text-[#6B7280]">{o.address}</p>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {o.order_items?.length > 0 && (
-                    <div className="mb-3 space-y-1">
-                      <p className="flex items-center gap-1.5 text-[10.5px] font-[600] text-[#9CA3AF] uppercase tracking-wide"><Package className="w-3 h-3" /> Items</p>
-                      {o.order_items.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between text-[12px] text-[#374151]">
-                          <span>{item.name} × {item.quantity}</span>
-                          <span className="font-[600]">₹{item.price * item.quantity}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* Where it goes, one short line each */}
+                  <p className="mt-2 text-[12.5px] text-[#111827] truncate">
+                    <span className="font-[700]">{o.customer_name ?? 'Customer'}</span>
+                    {o.address && <span className="text-[#6B7280]"> · {o.address}</span>}
+                  </p>
+                  <p className="text-[11.5px] text-[#6B7280] truncate">From {restName(o)} · {(o.order_items ?? []).reduce((n, i) => n + i.quantity, 0)} item{(o.order_items ?? []).reduce((n, i) => n + i.quantity, 0) === 1 ? '' : 's'}</p>
 
                   {/* The rider has to know what has already been received, or they
                       will collect the cash half of a split order whose online half
                       never went through. */}
                   {!['delivered', 'cancelled'].includes(o.status) && (
-                    <div className={cn('flex items-center gap-2 rounded-xl px-3 py-2 mb-3 text-[12px] font-[600]',
+                    <div className={cn('mt-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12px] font-[600]',
                       amountToCollect(o) > 0 ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#DCFCE7] text-[#15803D]')}>
                       <span>
                         {amountToCollect(o) > 0
-                          ? <>Collect <strong>₹{amountToCollect(o)}</strong> from the customer</>
-                          : <>Fully paid — collect nothing</>}
+                          ? <>Collect <strong>₹{amountToCollect(o)}</strong></>
+                          : <>Fully paid · collect nothing</>}
                       </span>
-                      <span className="ml-auto text-[11px] font-[500] opacity-80">
+                      <span className="ml-auto text-[11px] font-[500] opacity-80 truncate">
                         {onlineSettled(o)
                           ? `₹${o.online_amount} received online`
                           : (o.online_amount ?? 0) > 0
@@ -793,74 +766,115 @@ export default function DeliveryOrdersPage() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F3F4F6]">
-                    <div className="flex flex-wrap items-center gap-2 min-w-0">
-                      <span className="text-[14px] font-[800] text-[#111827]">₹{o.total}</span>
-                      {o.customer_phone && (
-                        <a href={`tel:${o.customer_phone}`}
-                          className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
-                          <Phone className="w-3.5 h-3.5" /> Call
-                        </a>
-                      )}
-                      {!['delivered', 'cancelled'].includes(o.status) && (
-                        <button onClick={() => { unlockAudio(); setChatOrder(o); setChatBanner(null); const c = chatCounts.find((x) => x.orderId === o.id); if (c) markSeen(o.id, c.count) }}
-                          className={cn('relative flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-[12px] font-medium transition-all',
-                            unreadFor(o.id) > 0 ? 'border-[#16A34A] bg-[#F0FDF4] text-[#15803D]' : 'border-[#E5E7EB] text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A]')}>
-                          <MessageCircle className="w-3.5 h-3.5" /> Chat
-                          {unreadFor(o.id) > 0 && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-[10px] font-[800]">{unreadFor(o.id)}</span>
-                          )}
-                        </button>
-                      )}
-                      {o.delivery_latitude && o.delivery_longitude && (
-                        <>
-                          <button onClick={() => setMapOrder(o)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
-                            <Map className="w-3.5 h-3.5" /> Map
-                          </button>
-                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
-                            target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
-                            <Navigation className="w-3.5 h-3.5" /> Go to
-                          </a>
-                        </>
-                      )}
-                    </div>
-                    {isReady && (
-                      <div className="flex w-full sm:w-auto items-center gap-2">
-                      {amountToCollect(o) > 0 && CITY.upiId && (
+                  {/* Actions: call and chat on the left, the main action on the right */}
+                  <div className="mt-2.5 flex items-center gap-2">
+                    {o.customer_phone && (
+                      <a href={`tel:${o.customer_phone}`} aria-label="Call the customer"
+                        className="shrink-0 w-10 h-10 flex items-center justify-center border border-[#E5E7EB] rounded-xl text-[#374151] hover:border-[#D1D5DB] transition-all">
+                        <Phone className="w-4 h-4" />
+                      </a>
+                    )}
+                    {!['delivered', 'cancelled'].includes(o.status) && (
+                      <button aria-label="Chat with the customer" onClick={() => { unlockAudio(); setChatOrder(o); setChatBanner(null); const c = chatCounts.find((x) => x.orderId === o.id); if (c) markSeen(o.id, c.count) }}
+                        className={cn('relative shrink-0 w-10 h-10 flex items-center justify-center border rounded-xl transition-all',
+                          unreadFor(o.id) > 0 ? 'border-[#16A34A] bg-[#F0FDF4] text-[#15803D]' : 'border-[#E5E7EB] text-[#374151] hover:border-[#16A34A] hover:text-[#16A34A]')}>
+                        <MessageCircle className="w-4 h-4" />
+                        {unreadFor(o.id) > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#EF4444] text-white text-[10px] font-[800]">{unreadFor(o.id)}</span>
+                        )}
+                      </button>
+                    )}
+                    <div className="flex flex-1 min-w-0 items-center justify-end gap-2">
+                      {isReady && amountToCollect(o) > 0 && CITY.upiId && (
                         <button onClick={() => setQrOrder(o)} aria-label={`Show QR to collect ₹${amountToCollect(o)}`} title="Show the payment QR for this amount"
-                          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl border border-[#DDD6FE] bg-[#F5F3FF] text-[#7C3AED] hover:bg-[#EDE9FE] active:scale-95 transition-all">
+                          className="shrink-0 w-10 h-10 flex items-center justify-center rounded-xl border border-[#DDD6FE] bg-[#F5F3FF] text-[#7C3AED] hover:bg-[#EDE9FE] active:scale-95 transition-all">
                           <QrCode className="w-5 h-5" />
                         </button>
                       )}
-                      <button onClick={() => { setConfirmingDelivery(o); setCollectMode(null); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
-                        title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then mark delivered` : 'Mark this order delivered'}
-                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)]">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        {amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}
-                      </button>
-                      </div>
-                    )}
-                    {o.status === 'delivered' && o.collection_mode && (
-                      <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-[700]',
-                        o.collection_mode === 'online' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-[#FFFBEB] text-[#B45309]')}>
-                        {o.collection_mode === 'online' ? <Smartphone className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
-                        {o.collection_mode === 'online' ? 'Online' : 'Cash'} ₹{Number(o.collected_amount ?? 0).toFixed(0)}
-                      </span>
-                    )}
-                    {!isReady && !['delivered', 'cancelled'].includes(o.status) && (
-                      <button onClick={() => { setOutTarget(o); setActionError('') }}
-                        className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#7C3AED] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#6D28D9] active:scale-95 transition-all">
-                        <Truck className="w-3.5 h-3.5" /> Out for delivery
-                      </button>
-                    )}
+                      {isReady && (
+                        <button onClick={() => { setConfirmingDelivery(o); setCollectMode(null); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
+                          title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)}, then mark delivered` : 'Mark this order delivered'}
+                          className="flex-1 min-w-0 h-10 justify-center flex items-center gap-1.5 px-3 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.3)]">
+                          <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}</span>
+                        </button>
+                      )}
+                      {!isReady && !['delivered', 'cancelled'].includes(o.status) && (
+                        <button onClick={() => { setOutTarget(o); setActionError('') }}
+                          className="flex-1 min-w-0 h-10 justify-center flex items-center gap-1.5 px-3 bg-[#7C3AED] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#6D28D9] active:scale-95 transition-all">
+                          <Truck className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">Out for delivery</span>
+                        </button>
+                      )}
+                      {o.status === 'delivered' && o.collection_mode && (
+                        <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-[700]',
+                          o.collection_mode === 'online' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-[#FFFBEB] text-[#B45309]')}>
+                          {o.collection_mode === 'online' ? <Smartphone className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
+                          {o.collection_mode === 'online' ? 'Online' : 'Cash'} ₹{Number(o.collected_amount ?? 0).toFixed(0)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {!['delivered', 'cancelled'].includes(o.status) && (
-                    <div className="mt-2.5 text-right">
-                      <button onClick={() => openCancel(o)} className="text-[12px] font-[600] text-[#DC2626] hover:text-[#B91C1C] underline underline-offset-2">
-                        Cancel this order
-                      </button>
+
+                  {/* Details, opened with the arrow */}
+                  {openCards.includes(o.id) && (
+                    <div className="mt-3 pt-3 border-t border-[#F3F4F6] space-y-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2 text-[12.5px]">
+                          <MapPin className="w-3.5 h-3.5 text-[#7C3AED] mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-[600] text-[#111827]">Pickup: {restName(o)}</p>
+                              {restPhone(o) && (
+                                <a href={`tel:${restPhone(o)}`} className="text-[11px] font-[600] text-[#7C3AED] hover:underline shrink-0">Call restaurant</a>
+                              )}
+                            </div>
+                            {restAddress(o) && <p className="text-[#6B7280]">{restAddress(o)}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2 text-[12.5px]">
+                          <MapPin className="w-3.5 h-3.5 text-[#16A34A] mt-0.5 shrink-0" />
+                          <div>
+                            <p className="font-[600] text-[#111827]">Drop: {o.customer_name ?? 'Customer'}</p>
+                            {o.address && <p className="text-[#6B7280]">{o.address}</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {o.order_items?.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="flex items-center gap-1.5 text-[10.5px] font-[600] text-[#9CA3AF] uppercase tracking-wide"><Package className="w-3 h-3" /> Items</p>
+                          {o.order_items.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-[12px] text-[#374151]">
+                              <span>{item.name} × {item.quantity}</span>
+                              <span className="font-[600]">₹{item.price * item.quantity}</span>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-between border-t border-dashed border-[#E5E7EB] pt-1 text-[12.5px] font-[800] text-[#111827]">
+                            <span>Order total</span><span>₹{o.total}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {o.delivery_latitude && o.delivery_longitude && (
+                          <>
+                            <button onClick={() => setMapOrder(o)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                              <Map className="w-3.5 h-3.5" /> Map
+                            </button>
+                            <a href={`https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E5E7EB] rounded-xl text-[12px] font-medium text-[#374151] hover:border-[#D1D5DB] transition-all">
+                              <Navigation className="w-3.5 h-3.5" /> Go to
+                            </a>
+                          </>
+                        )}
+                        {!['delivered', 'cancelled'].includes(o.status) && (
+                          <button onClick={() => openCancel(o)} className="ml-auto text-[12px] font-[600] text-[#DC2626] hover:text-[#B91C1C] underline underline-offset-2">
+                            Cancel this order
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
