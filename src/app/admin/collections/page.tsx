@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Wallet, Clock, CheckCircle2, X, Phone, Bike, Loader2, XCircle, Truck, Store } from 'lucide-react'
+import { Wallet, Clock, CheckCircle2, X, Phone, Bike, Loader2, XCircle, Truck, Store, Smartphone } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 
@@ -12,6 +12,7 @@ type Partner = { id: string; name: string; phone: string | null }
 type Order = {
   id: string; placed_at: string; customer_name: string | null; customer_phone: string | null
   status: string; total: number; cod_amount: number | null; cash_collected_at: string | null
+  collection_mode: 'cash' | 'online' | null; collected_amount: number | null
   delivery_partner_id: string | null
   restaurant_id: string | null
   restaurants: { name: string } | null
@@ -34,14 +35,14 @@ export default function AdminCollectionsPage() {
       const [{ data: parts }, { data: ords }, { data: cancelled }] = await Promise.all([
         supabase.from('delivery_partners').select('id, name, phone').order('name'),
         supabase.from('orders')
-          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, delivery_partner_id, restaurant_id, restaurants(name)')
+          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, collection_mode, collected_amount, delivery_partner_id, restaurant_id, restaurants(name)')
           .not('delivery_partner_id', 'is', null)
           .gt('cod_amount', 0)
           .neq('status', 'cancelled')
           .gte('placed_at', fromISO).lte('placed_at', toISO)
           .order('placed_at', { ascending: false }),
         supabase.from('orders')
-          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, delivery_partner_id, restaurant_id, restaurants(name)')
+          .select('id, placed_at, customer_name, customer_phone, status, total, cod_amount, cash_collected_at, collection_mode, collected_amount, delivery_partner_id, restaurant_id, restaurants(name)')
           .not('delivery_partner_id', 'is', null)
           .eq('status', 'cancelled')
           .gte('placed_at', fromISO).lte('placed_at', toISO)
@@ -65,13 +66,18 @@ export default function AdminCollectionsPage() {
   const rows = partners
     .map((p) => {
       const theirOrders = orders.filter((o) => o.delivery_partner_id === p.id)
-      const collected = theirOrders.filter((o) => o.cash_collected_at)
-      const pending = theirOrders.filter((o) => !o.cash_collected_at)
+      // Online = paid to the company UPI account through the rider's QR: that is not
+      // cash the rider holds, so it is neither "collected cash" nor "still to collect".
+      const online = theirOrders.filter((o) => o.collection_mode === 'online')
+      const collected = theirOrders.filter((o) => o.cash_collected_at && o.collection_mode !== 'online')
+      const pending = theirOrders.filter((o) => !o.cash_collected_at && o.collection_mode !== 'online')
       return {
         partner: p,
         orders: theirOrders,
-        collectedAmount: collected.reduce((s, o) => s + Number(o.cod_amount ?? 0), 0),
+        collectedAmount: collected.reduce((s, o) => s + Number(o.collected_amount ?? o.cod_amount ?? 0), 0),
         collectedCount: collected.length,
+        onlineAmount: online.reduce((s, o) => s + Number(o.collected_amount ?? 0), 0),
+        onlineCount: online.length,
         pendingAmount: pending.reduce((s, o) => s + Number(o.cod_amount ?? 0), 0),
         pendingCount: pending.length,
       }
@@ -80,6 +86,7 @@ export default function AdminCollectionsPage() {
     .sort((a, b) => b.pendingAmount - a.pendingAmount)
 
   const totalCollected = rows.reduce((s, r) => s + r.collectedAmount, 0)
+  const totalOnline = rows.reduce((s, r) => s + r.onlineAmount, 0)
   const totalPending = rows.reduce((s, r) => s + r.pendingAmount, 0)
   const drillRow = rows.find((r) => r.partner.id === drillPartnerId) ?? null
 
@@ -90,7 +97,7 @@ export default function AdminCollectionsPage() {
         <div className="bg-white border-b border-[#E5E7EB] px-6 py-5 sticky top-0 z-10 space-y-3">
           <div>
             <h1 className="text-[18px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Delivery Collections</h1>
-            <p className="text-[12.5px] text-[#9CA3AF]">Cash-on-delivery amounts, collected and still outstanding, per rider</p>
+            <p className="text-[12.5px] text-[#9CA3AF]">Amounts collected at the door (cash or online through the rider's QR) and still outstanding, per rider</p>
           </div>
           <DateRangeFilter value={range} onChange={setRange} />
         </div>
@@ -103,9 +110,10 @@ export default function AdminCollectionsPage() {
           ) : (
             <>
               {/* Summary Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
                   { label: 'Cash Collected',  value: totalCollected, icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7' },
+                  { label: 'Online Collected (QR)', value: totalOnline, icon: Smartphone, color: '#1D4ED8', bg: '#EFF6FF' },
                   { label: 'Still to Collect', value: totalPending,   icon: Clock,        color: '#D97706', bg: '#FFFBEB' },
                   { label: 'Riders with COD orders', value: rows.length, icon: Bike, color: '#7C3AED', bg: '#F5F3FF', isCount: true },
                   { label: 'COD Orders',       value: orders.length,  icon: Wallet,       color: '#0891B2', bg: '#ECFEFF', isCount: true },
@@ -145,7 +153,11 @@ export default function AdminCollectionsPage() {
                         <div className="flex items-center gap-6 shrink-0">
                           <div className="text-right">
                             <p className="text-[13px] font-[700] text-[#16A34A]">₹{r.collectedAmount.toLocaleString()}</p>
-                            <p className="text-[10.5px] text-[#9CA3AF]">{r.collectedCount} collected</p>
+                            <p className="text-[10.5px] text-[#9CA3AF]">{r.collectedCount} cash</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[13px] font-[700] text-[#1D4ED8]">₹{r.onlineAmount.toLocaleString()}</p>
+                            <p className="text-[10.5px] text-[#9CA3AF]">{r.onlineCount} online</p>
                           </div>
                           <div className="text-right min-w-[80px]">
                             <p className="text-[13px] font-[700]" style={{ color: r.pendingAmount > 0 ? '#D97706' : '#9CA3AF' }}>₹{r.pendingAmount.toLocaleString()}</p>
@@ -227,7 +239,11 @@ export default function AdminCollectionsPage() {
             <div className="flex items-center gap-3 px-5 py-3 border-b border-[#F3F4F6] shrink-0">
               <div className="flex-1 rounded-xl bg-[#DCFCE7] px-3 py-2">
                 <p className="text-[15px] font-[800] text-[#15803D]">₹{drillRow.collectedAmount.toLocaleString()}</p>
-                <p className="text-[10.5px] text-[#15803D]/70">Collected</p>
+                <p className="text-[10.5px] text-[#15803D]/70">Cash collected</p>
+              </div>
+              <div className="flex-1 rounded-xl bg-[#EFF6FF] px-3 py-2">
+                <p className="text-[15px] font-[800] text-[#1D4ED8]">₹{drillRow.onlineAmount.toLocaleString()}</p>
+                <p className="text-[10.5px] text-[#1D4ED8]/70">Online (QR)</p>
               </div>
               <div className="flex-1 rounded-xl bg-[#FFFBEB] px-3 py-2">
                 <p className="text-[15px] font-[800] text-[#B45309]">₹{drillRow.pendingAmount.toLocaleString()}</p>
@@ -278,8 +294,10 @@ export default function AdminCollectionsPage() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-[13px] font-[800] text-[#111827]">₹{Number(o.cod_amount).toLocaleString()}</p>
-                      {o.cash_collected_at ? (
-                        <span className="text-[10.5px] font-[600] text-[#16A34A]">✓ Collected</span>
+                      {o.collection_mode === 'online' ? (
+                        <span className="text-[10.5px] font-[600] text-[#1D4ED8]">✓ Online (QR) ₹{Number(o.collected_amount ?? 0).toLocaleString()}</span>
+                      ) : o.cash_collected_at ? (
+                        <span className="text-[10.5px] font-[600] text-[#16A34A]">✓ Cash collected</span>
                       ) : o.status === 'out_for_delivery' ? (
                         <span className="text-[10.5px] font-[600] text-[#7C3AED]">On the way</span>
                       ) : (

@@ -14,6 +14,7 @@ type Order = {
   payment_method: string | null; payment_status: string | null
   total: number; online_amount: number | null; cod_amount: number | null
   cash_collected_at: string | null; cash_proof_image_url: string | null
+  collection_mode: 'cash' | 'online' | null; collected_amount: number | null
 }
 
 const PAYMENT_STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
@@ -37,7 +38,7 @@ export default function AdminLedgerPage() {
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
       const data = await fetchAllRows<Order>((from, to) => supabase
         .from('orders')
-        .select('id, placed_at, customer_name, payment_method, payment_status, total, online_amount, cod_amount, cash_collected_at, cash_proof_image_url')
+        .select('id, placed_at, customer_name, payment_method, payment_status, total, online_amount, cod_amount, cash_collected_at, collection_mode, collected_amount, cash_proof_image_url')
         .gte('placed_at', fromISO).lte('placed_at', toISO)
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
@@ -54,12 +55,17 @@ export default function AdminLedgerPage() {
     .filter((o) => o.cash_collected_at)
     .reduce((s, o) => s + (o.cod_amount ?? 0), 0)
   const cashPending = orders
-    .filter((o) => (o.cod_amount ?? 0) > 0 && !o.cash_collected_at)
+    .filter((o) => (o.cod_amount ?? 0) > 0 && !o.cash_collected_at && o.collection_mode !== 'online')
     .reduce((s, o) => s + (o.cod_amount ?? 0), 0)
+  // Paid to the company UPI account through a rider's QR at the door.
+  const riderQrCollected = orders
+    .filter((o) => o.collection_mode === 'online')
+    .reduce((s, o) => s + (o.collected_amount ?? 0), 0)
 
   const stats = [
     { label: 'Collected Online', value: `₹${onlineCollected.toLocaleString()}`, icon: Smartphone, color: '#16A34A', bg: '#DCFCE7' },
     { label: 'Cash Collected',   value: `₹${cashCollected.toLocaleString()}`,   icon: Banknote,    color: '#7C3AED', bg: '#F5F3FF' },
+    { label: 'Rider QR (UPI)',   value: `₹${riderQrCollected.toLocaleString()}`, icon: Smartphone, color: '#1D4ED8', bg: '#EFF6FF' },
     { label: 'Cash Pending',     value: `₹${cashPending.toLocaleString()}`,     icon: Clock,       color: '#D97706', bg: '#FFFBEB' },
     { label: 'Total Orders',     value: orders.length,                          icon: ShoppingBag, color: '#0891B2', bg: '#ECFEFF' },
   ]
@@ -83,7 +89,7 @@ export default function AdminLedgerPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {stats.map(({ label, value, icon: Icon, color, bg }) => (
                   <div key={label} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: bg }}>

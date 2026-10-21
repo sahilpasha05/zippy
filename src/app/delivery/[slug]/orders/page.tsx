@@ -5,11 +5,13 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, Zap, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle, QrCode, Banknote, Smartphone } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm, chime, systemNotify } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import OrderChat from '@/components/OrderChat'
+import CollectQrModal from '@/components/CollectQrModal'
+import { CITY } from '@/lib/city'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,6 +35,7 @@ type Order = {
   accepted_at: string | null
   online_amount: number | null; cod_amount: number | null
   payment_status: string | null; cash_collected_at: string | null; delivered_at: string | null
+  collection_mode: 'cash' | 'online' | null; collected_amount: number | null
   order_items: OrderItem[]
   restaurants: { name: string; address: string | null; phone: string | null } | { name: string; address: string | null; phone: string | null }[] | null
 }
@@ -232,6 +235,9 @@ export default function DeliveryOrdersPage() {
     return c ? Math.max(0, c.count - (seenCounts[orderId] ?? 0)) : 0
   }
   const [confirmingDelivery, setConfirmingDelivery] = useState<Order | null>(null)
+  // How the amount due at the door was taken: chosen before the slide to deliver.
+  const [collectMode, setCollectMode] = useState<'cash' | 'online' | null>(null)
+  const [qrOrder, setQrOrder] = useState<Order | null>(null)
   // Rider-side status changes: out for delivery (one "are you sure"), and cancel
   // (a reason of at least 5 characters, then a second "are you sure").
   const [outTarget, setOutTarget] = useState<Order | null>(null)
@@ -247,7 +253,7 @@ export default function DeliveryOrdersPage() {
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, online_amount, cod_amount, payment_status, cash_collected_at, order_items(name, quantity, price), restaurants(name, address, phone)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, online_amount, cod_amount, payment_status, cash_collected_at, collection_mode, collected_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
@@ -448,28 +454,43 @@ export default function DeliveryOrdersPage() {
 
   // Only the orders that actually hand over cash also settle the payment
   // and stamp the cash-collection time — no photo involved anywhere here.
-  async function completeDelivery(orderId: string) {
+  async function completeDelivery(orderId: string, mode: 'cash' | 'online' | null) {
     setDeliveringBusy(true)
     setDeliverError('')
     try {
       const now = new Date().toISOString()
       const order = orders.find((o) => o.id === orderId)
-      const collectsCash = order ? amountToCollect(order) > 0 : false
+      const toCollect = order ? amountToCollect(order) : 0
       // If the online leg was never confirmed by Cashfree (payment_status still
-      // pending/failed), the rider just collected the ENTIRE total in cash —
+      // pending/failed), the rider just collected the ENTIRE total at the door —
       // amountToCollect() already accounts for that. Reclassify online_amount
-      // into cod_amount so the admin dashboard reports it as cash, not as a
-      // UPI payment that never actually went through Cashfree.
+      // into cod_amount so the admin dashboard and the Cashfree numbers do not
+      // count it as a Cashfree payment that never actually went through.
       const onlineWasConfirmed = order ? ['partially_paid', 'paid'].includes(order.payment_status ?? '') : false
+      const reclassify = order && !onlineWasConfirmed ? { online_amount: 0, cod_amount: order.total } : {}
+
+      // Cash: the rider holds it and hands it over, so it is stamped as cash collected.
+      // Online: the customer paid the company UPI account directly through the QR,
+      // so there is no cash to hand over (and no cash_collected_at).
+      const collection = toCollect <= 0 ? {} : mode === 'online' ? {
+        payment_status: 'paid',
+        collection_mode: 'online',
+        collected_amount: toCollect,
+        collected_at: now,
+        ...reclassify,
+      } : {
+        payment_status: 'paid',
+        cash_collected_at: now,
+        collection_mode: 'cash',
+        collected_amount: toCollect,
+        collected_at: now,
+        ...reclassify,
+      }
 
       const { error } = await supabase.from('orders').update({
         status: 'delivered',
         delivered_at: now,
-        ...(collectsCash ? {
-          payment_status: 'paid',
-          cash_collected_at: now,
-          ...(order && !onlineWasConfirmed ? { online_amount: 0, cod_amount: order.total } : {}),
-        } : {}),
+        ...collection,
       }).eq('id', orderId)
       if (error) throw error
 
@@ -477,7 +498,7 @@ export default function DeliveryOrdersPage() {
         await supabase.from('delivery_partners').update({ total_deliveries: (partner.total_deliveries ?? 0) + 1 }).eq('id', partner.id)
         setPartner((prev) => prev ? { ...prev, total_deliveries: (prev.total_deliveries ?? 0) + 1 } : prev)
       }
-      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'delivered' } : o))
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: 'delivered', ...(toCollect > 0 ? { collection_mode: (mode === 'online' ? 'online' : 'cash') as 'cash' | 'online', collected_amount: toCollect } : {}) } : o))
       setDeliveringBusy(false)
       setTimeout(() => setConfirmingDelivery(null), 700)
     } catch (err: unknown) {
@@ -526,7 +547,12 @@ export default function DeliveryOrdersPage() {
   // Clearing the filter rolls it up to an all-time total instead.
   const deliveredForStats = orders.filter((o) => o.status === 'delivered'
     && (!dateFilter || toLocalDateInput(o.delivered_at ?? o.placed_at) === dateFilter))
-  const collectedForStats = deliveredForStats.reduce((sum, o) => sum + Number(o.cod_amount ?? 0), 0)
+  // Cash taken at the door, and amounts paid online through the QR. Deliveries from
+  // before the choice existed have no mode: they count as cash, as they always did.
+  const collectedForStats = deliveredForStats.reduce((sum, o) =>
+    sum + (o.collection_mode === 'online' ? 0 : Number(o.collected_amount ?? o.cod_amount ?? 0)), 0)
+  const onlineForStats = deliveredForStats.reduce((sum, o) =>
+    sum + (o.collection_mode === 'online' ? Number(o.collected_amount ?? 0) : 0), 0)
   const statsLabel = dateFilter ? dayLabel(dateFilter).toLowerCase() : 'all time'
 
   return (
@@ -589,7 +615,7 @@ export default function DeliveryOrdersPage() {
           {/* A per-day record, not a live-only snapshot — it tracks whichever
               day is selected below (today by default), so switching the date
               re-opens that day's own totals instead of losing them at midnight. */}
-          <div className="grid grid-cols-3 gap-1.5 mb-2">
+          <div className="grid grid-cols-4 gap-1.5 mb-2">
             <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-lg px-2 py-1">
               <p className="text-[14px] font-[800] text-[#15803D] leading-none">{deliveredForStats.length}</p>
               <p className="text-[9.5px] text-[#15803D]/70 mt-0.5 truncate">delivered {statsLabel}</p>
@@ -601,6 +627,10 @@ export default function DeliveryOrdersPage() {
             <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-lg px-2 py-1">
               <p className="text-[14px] font-[800] text-[#B45309] leading-none">₹{collectedForStats.toFixed(0)}</p>
               <p className="text-[9.5px] text-[#B45309]/70 mt-0.5 truncate">cash {statsLabel}</p>
+            </div>
+            <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg px-2 py-1">
+              <p className="text-[14px] font-[800] text-[#1D4ED8] leading-none">₹{onlineForStats.toFixed(0)}</p>
+              <p className="text-[9.5px] text-[#1D4ED8]/70 mt-0.5 truncate">online {statsLabel}</p>
             </div>
           </div>
 
@@ -797,12 +827,27 @@ export default function DeliveryOrdersPage() {
                       )}
                     </div>
                     {isReady && (
-                      <button onClick={() => { setConfirmingDelivery(o); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
+                      <div className="flex w-full sm:w-auto items-center gap-2">
+                      {amountToCollect(o) > 0 && CITY.upiId && (
+                        <button onClick={() => setQrOrder(o)} aria-label={`Show QR to collect ₹${amountToCollect(o)}`} title="Show the payment QR for this amount"
+                          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl border border-[#DDD6FE] bg-[#F5F3FF] text-[#7C3AED] hover:bg-[#EDE9FE] active:scale-95 transition-all">
+                          <QrCode className="w-5 h-5" />
+                        </button>
+                      )}
+                      <button onClick={() => { setConfirmingDelivery(o); setCollectMode(null); setDeliverError(''); setSlideAttempt((n) => n + 1) }}
                         title={amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} cash, then mark delivered` : 'Mark this order delivered'}
                         className="w-full sm:w-auto justify-center flex items-center gap-1.5 px-4 py-2.5 bg-[#16A34A] text-white text-[12.5px] font-[600] rounded-xl hover:bg-[#15803D] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,163,74,0.25)]">
                         <CheckCircle className="w-3.5 h-3.5" />
                         {amountToCollect(o) > 0 ? `Collect ₹${amountToCollect(o)} & Deliver` : 'Mark as Delivered'}
                       </button>
+                      </div>
+                    )}
+                    {o.status === 'delivered' && o.collection_mode && (
+                      <span className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-[700]',
+                        o.collection_mode === 'online' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-[#FFFBEB] text-[#B45309]')}>
+                        {o.collection_mode === 'online' ? <Smartphone className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
+                        {o.collection_mode === 'online' ? 'Online' : 'Cash'} ₹{Number(o.collected_amount ?? 0).toFixed(0)}
+                      </span>
                     )}
                     {!isReady && !['delivered', 'cancelled'].includes(o.status) && (
                       <button onClick={() => { setOutTarget(o); setActionError('') }}
@@ -985,6 +1030,15 @@ export default function DeliveryOrdersPage() {
         </div>
       )}
 
+      {qrOrder && (
+        <CollectQrModal
+          amount={amountToCollect(qrOrder)}
+          orderId={qrOrder.id}
+          customerName={qrOrder.customer_name}
+          onClose={() => setQrOrder(null)}
+        />
+      )}
+
       {confirmingDelivery && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!deliveringBusy) setConfirmingDelivery(null) }} />
@@ -997,7 +1051,47 @@ export default function DeliveryOrdersPage() {
               {confirmingDelivery.customer_name ?? 'Customer'} · {confirmingDelivery.id.slice(0, 8).toUpperCase()}
               {amountToCollect(confirmingDelivery) > 0 && <> · collect ₹{amountToCollect(confirmingDelivery)}</>}
             </p>
-            <SlideToDeliver key={slideAttempt} busy={deliveringBusy} onComplete={() => completeDelivery(confirmingDelivery.id)} />
+            {amountToCollect(confirmingDelivery) > 0 && collectMode === null ? (
+              <div>
+                <p className="text-[13.5px] font-[800] text-[#111827] mb-3" style={{ fontWeight: 800 }}>
+                  How did the customer pay ₹{amountToCollect(confirmingDelivery).toFixed(2)}?
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setCollectMode('cash')}
+                    className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#FDE68A] bg-[#FFFBEB] py-4 text-[#B45309] active:scale-95 transition-all">
+                    <Banknote className="w-6 h-6" />
+                    <span className="text-[13px] font-[800]" style={{ fontWeight: 800 }}>Cash collected</span>
+                  </button>
+                  {CITY.upiId && (
+                    <button onClick={() => setCollectMode('online')}
+                      className="flex flex-col items-center gap-1.5 rounded-2xl border-2 border-[#BFDBFE] bg-[#EFF6FF] py-4 text-[#1D4ED8] active:scale-95 transition-all">
+                      <Smartphone className="w-6 h-6" />
+                      <span className="text-[13px] font-[800]" style={{ fontWeight: 800 }}>Online (UPI)</span>
+                    </button>
+                  )}
+                </div>
+                {CITY.upiId && (
+                  <button onClick={() => setQrOrder(confirmingDelivery)}
+                    className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-[700] text-[#7C3AED]">
+                    <QrCode className="w-4 h-4" /> Show payment QR
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {amountToCollect(confirmingDelivery) > 0 && collectMode && (
+                  <div className={cn('mb-3 flex items-center justify-between rounded-xl px-3.5 py-2.5 text-[12.5px] font-[700]',
+                    collectMode === 'online' ? 'bg-[#EFF6FF] text-[#1D4ED8]' : 'bg-[#FFFBEB] text-[#B45309]')}>
+                    <span className="flex items-center gap-1.5">
+                      {collectMode === 'online' ? <Smartphone className="w-4 h-4" /> : <Banknote className="w-4 h-4" />}
+                      {collectMode === 'online' ? 'Paid online (UPI)' : 'Cash collected'}: ₹{amountToCollect(confirmingDelivery).toFixed(2)}
+                    </span>
+                    <button onClick={() => setCollectMode(null)} disabled={deliveringBusy} className="underline text-[11.5px] disabled:opacity-50">Change</button>
+                  </div>
+                )}
+                <SlideToDeliver key={slideAttempt} busy={deliveringBusy} onComplete={() => completeDelivery(confirmingDelivery.id, collectMode)} />
+              </>
+            )}
             {deliverError && <p className="text-[12px] text-[#DC2626] mt-3">{deliverError}</p>}
             <button onClick={() => setConfirmingDelivery(null)} disabled={deliveringBusy}
               className="mt-4 text-[12.5px] font-[600] text-[#9CA3AF] hover:text-[#374151] disabled:opacity-50">

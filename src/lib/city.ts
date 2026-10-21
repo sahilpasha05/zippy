@@ -10,6 +10,9 @@ export type CityConfig = {
   supportEmail: string
   // 10 digits, no country code
   supportWhatsapp: string
+  // Where riders' UPI QR payments go. Leave empty to hide the QR / online option.
+  upiId: string
+  upiName: string
 }
 
 const CITIES: Record<CityConfig['slug'], CityConfig> = {
@@ -20,6 +23,8 @@ const CITIES: Record<CityConfig['slug'], CityConfig> = {
     siteUrl: 'https://www.zippytarikere.com',
     supportEmail: 'zippytarikere@gmail.com',
     supportWhatsapp: '8277802605',
+    upiId: 'Q072600719@ybl',
+    upiName: 'Zippy',
   },
   kadur: {
     slug: 'kadur',
@@ -28,6 +33,8 @@ const CITIES: Record<CityConfig['slug'], CityConfig> = {
     siteUrl: 'https://www.zippykadur.com',
     supportEmail: 'zippykadur@gmail.com', // TODO: confirm Kadur support email
     supportWhatsapp: '8277802605', // TODO: confirm Kadur support WhatsApp number
+    upiId: '', // TODO: Kadur's own UPI ID - until set, riders there only collect cash
+    upiName: 'Zippy',
   },
 }
 
