@@ -87,6 +87,8 @@ export default function AdminCollectionsPage() {
 
   const totalCollected = rows.reduce((s, r) => s + r.collectedAmount, 0)
   const totalOnline = rows.reduce((s, r) => s + r.onlineAmount, 0)
+  const totalCashCount = rows.reduce((s, r) => s + r.collectedCount, 0)
+  const totalOnlineCount = rows.reduce((s, r) => s + r.onlineCount, 0)
   const totalPending = rows.reduce((s, r) => s + r.pendingAmount, 0)
   const drillRow = rows.find((r) => r.partner.id === drillPartnerId) ?? null
 
@@ -112,18 +114,18 @@ export default function AdminCollectionsPage() {
               {/* Summary Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
-                  { label: 'Cash Collected',  value: totalCollected, icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7' },
-                  { label: 'Online Collected (QR)', value: totalOnline, icon: Smartphone, color: '#1D4ED8', bg: '#EFF6FF' },
+                  { label: 'Cash Collected',  value: totalCollected, icon: CheckCircle2, color: '#16A34A', bg: '#DCFCE7', sub: `${totalCashCount} order${totalCashCount !== 1 ? 's' : ''}` },
+                  { label: 'Online Collected (QR)', value: totalOnline, icon: Smartphone, color: '#1D4ED8', bg: '#EFF6FF', sub: `${totalOnlineCount} order${totalOnlineCount !== 1 ? 's' : ''}` },
                   { label: 'Still to Collect', value: totalPending,   icon: Clock,        color: '#D97706', bg: '#FFFBEB' },
                   { label: 'Riders with COD orders', value: rows.length, icon: Bike, color: '#7C3AED', bg: '#F5F3FF', isCount: true },
                   { label: 'COD Orders',       value: orders.length,  icon: Wallet,       color: '#0891B2', bg: '#ECFEFF', isCount: true },
-                ].map(({ label, value, icon: Icon, color, bg, isCount }) => (
+                ].map(({ label, value, icon: Icon, color, bg, isCount, sub }: { label: string; value: number; icon: typeof Wallet; color: string; bg: string; isCount?: boolean; sub?: string }) => (
                   <div key={label} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: bg }}>
                       <Icon className="w-5 h-5" style={{ color }} />
                     </div>
                     <div className="text-[22px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>{isCount ? value : `₹${value.toLocaleString()}`}</div>
-                    <div className="text-[12px] text-[#9CA3AF] mt-0.5">{label}</div>
+                    <div className="text-[12px] text-[#9CA3AF] mt-0.5">{label}{sub ? <span className="text-[#6B7280] font-[600]"> · {sub}</span> : null}</div>
                   </div>
                 ))}
               </div>
