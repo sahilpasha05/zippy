@@ -11,6 +11,11 @@ import { useRain, DEFAULT_RAIN_MESSAGE } from '@/lib/store/rain'
 // Open any page with ?rain=1 to preview it on your own device without switching it
 // on for customers (?rain=0 turns the preview off again).
 
+// The rain falls for this long after the customer arrives, then fades away. The notice
+// and the cart / order notes stay for as long as rain mode is on.
+const RAIN_SECONDS = 7
+const FADE_MS = 700
+
 const PREVIEW_KEY = 'zippy-rain-preview'
 const SEEN_KEY = 'zippy-rain-notice-seen'
 
@@ -19,7 +24,7 @@ function isCustomerPage(pathname: string) {
     pathname.startsWith('/essentials') || pathname.startsWith('/restaurants') || pathname.startsWith('/orders/')
 }
 
-function RainCanvas() {
+function RainCanvas({ fading }: { fading: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -90,7 +95,11 @@ function RainCanvas() {
     }
   }, [])
 
-  return <canvas ref={ref} aria-hidden className="pointer-events-none fixed inset-0 z-[60] h-full w-full" />
+  return (
+    <canvas ref={ref} aria-hidden
+      className="pointer-events-none fixed inset-0 z-[60] h-full w-full transition-opacity ease-out"
+      style={{ opacity: fading ? 0 : 1, transitionDuration: `${FADE_MS}ms` }} />
+  )
 }
 
 export default function RainMode() {
@@ -100,6 +109,9 @@ export default function RainMode() {
   const [message, setMessage] = useState(DEFAULT_RAIN_MESSAGE)
   const [preview, setPreview] = useState(false)
   const [showNotice, setShowNotice] = useState(false)
+  const [fading, setFading] = useState(false)
+  const [rainOver, setRainOver] = useState(false)
+  const rainStartedAt = useRef<number | null>(null)
 
   // The admin switch, live (settings are public to read; changes arrive in real time).
   useEffect(() => {
@@ -134,7 +146,19 @@ export default function RainMode() {
     } catch { /* storage blocked: no preview */ }
   }, [pathname])
 
-  const on = (adminOn || preview) && isCustomerPage(pathname)
+  const rainEnabled = adminOn || preview
+  const on = rainEnabled && isCustomerPage(pathname)
+
+  // The animation runs for RAIN_SECONDS from the moment it is first switched on for this
+  // visitor (so moving between pages does not start it again), then fades and unmounts.
+  useEffect(() => {
+    if (!rainEnabled) return
+    if (rainStartedAt.current === null) rainStartedAt.current = Date.now()
+    const left = Math.max(0, RAIN_SECONDS * 1000 - (Date.now() - rainStartedAt.current))
+    const fadeTimer = setTimeout(() => setFading(true), left)
+    const endTimer = setTimeout(() => setRainOver(true), left + FADE_MS)
+    return () => { clearTimeout(fadeTimer); clearTimeout(endTimer) }
+  }, [rainEnabled])
 
   useEffect(() => { setRain(adminOn || preview, message) }, [adminOn, preview, message, setRain])
 
@@ -157,7 +181,7 @@ export default function RainMode() {
 
   return (
     <>
-      <RainCanvas />
+      {!rainOver && <RainCanvas fading={fading} />}
       {showNotice && (
         <div className="fixed inset-0 z-[130] flex items-end justify-center p-4 sm:items-center">
           <div className="absolute inset-0 bg-[#0F172A]/50 backdrop-blur-sm" onClick={closeNotice} />
