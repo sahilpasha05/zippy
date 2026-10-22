@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Wallet, Clock, CheckCircle2, X, Phone, Bike, Loader2, XCircle, Truck, Store, Smartphone } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
+import RiderCollectionRow from '@/components/admin/RiderCollectionRow'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 
 const supabase = createClient()
@@ -141,32 +142,8 @@ export default function AdminCollectionsPage() {
                 ) : (
                   <div className="divide-y divide-[#F3F4F6]">
                     {rows.map((r) => (
-                      <button key={r.partner.id} onClick={() => setDrillPartnerId(r.partner.id)}
-                        className="w-full flex items-center justify-between gap-4 px-5 py-4 hover:bg-[#F8FAFC] transition-all text-left">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-[#F5F3FF] flex items-center justify-center shrink-0">
-                            <Bike className="w-4.5 h-4.5 text-[#7C3AED]" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[13.5px] font-[700] text-[#111827] truncate">{r.partner.name}</p>
-                            <p className="text-[11.5px] text-[#9CA3AF]">{r.partner.phone ?? 'No phone on file'}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6 shrink-0">
-                          <div className="text-right">
-                            <p className="text-[13px] font-[700] text-[#16A34A]">₹{r.collectedAmount.toLocaleString()}</p>
-                            <p className="text-[10.5px] text-[#9CA3AF]">{r.collectedCount} cash</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[13px] font-[700] text-[#1D4ED8]">₹{r.onlineAmount.toLocaleString()}</p>
-                            <p className="text-[10.5px] text-[#9CA3AF]">{r.onlineCount} online</p>
-                          </div>
-                          <div className="text-right min-w-[80px]">
-                            <p className="text-[13px] font-[700]" style={{ color: r.pendingAmount > 0 ? '#D97706' : '#9CA3AF' }}>₹{r.pendingAmount.toLocaleString()}</p>
-                            <p className="text-[10.5px] text-[#9CA3AF]">{r.pendingCount} pending</p>
-                          </div>
-                        </div>
-                      </button>
+                      <RiderCollectionRow key={r.partner.id} onClick={() => setDrillPartnerId(r.partner.id)}
+                        r={{ name: r.partner.name, phone: r.partner.phone, collectedAmount: r.collectedAmount, collectedCount: r.collectedCount, onlineAmount: r.onlineAmount, onlineCount: r.onlineCount, pendingAmount: r.pendingAmount, pendingCount: r.pendingCount }} />
                     ))}
                   </div>
                 )}
