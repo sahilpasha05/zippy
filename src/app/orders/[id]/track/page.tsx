@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import OrderChat from '@/components/OrderChat'
+import CallRiderButton from '@/components/CallRiderButton'
+import RainNote from '@/components/RainNote'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { CheckCircle, ChefHat, Truck, AlertCircle, XCircle, Clock, Phone, Bike, Loader2, ChevronRight, MapPin, Store, AlertTriangle } from 'lucide-react'
@@ -27,7 +29,7 @@ type OrderItem = { name: string; quantity: number; price: number; image_url: str
 type Order = {
   id: string; status: string; total: number; address: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
-  delivery_partner_id: string | null
+  delivery_partner_id: string | null; rider_calls_used: number | null
   created_at: string; order_type: string
   delivery_fee: number | null; discount: number | null
   payment_method: string | null; payment_status: string | null
@@ -36,7 +38,7 @@ type Order = {
   order_items: OrderItem[] | null
 }
 type Partner = {
-  id: string; name: string; phone: string | null; vehicle_type: string | null; vehicle_number: string | null
+  id: string; name: string; phone?: string | null; vehicle_type: string | null; vehicle_number: string | null
   current_latitude: number | null; current_longitude: number | null; last_location_at: string | null
 }
 
@@ -75,7 +77,7 @@ export default function TrackOrderPage() {
   const loadOrder = useCallback(async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, created_at, order_type, delivery_fee, discount, payment_method, payment_status, delay_issue, delay_minutes, delay_reported_at, restaurants(name, phone, address), order_items(name, quantity, price, image_url)')
+      .select('id, status, total, address, delivery_latitude, delivery_longitude, delivery_partner_id, rider_calls_used, created_at, order_type, delivery_fee, discount, payment_method, payment_status, delay_issue, delay_minutes, delay_reported_at, restaurants(name, phone, address), order_items(name, quantity, price, image_url)')
       .eq('id', id)
       .single()
     if (!data) { setNotFound(true); return null }
@@ -86,7 +88,7 @@ export default function TrackOrderPage() {
   const loadPartner = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('delivery_partners')
-      .select('id, name, phone, vehicle_type, vehicle_number, current_latitude, current_longitude, last_location_at')
+      .select('id, name, vehicle_type, vehicle_number, current_latitude, current_longitude, last_location_at')
       .eq('id', partnerId)
       .single()
     setPartner((data as Partner) ?? null)
@@ -234,6 +236,7 @@ export default function TrackOrderPage() {
 
           {!isCancelled && !isDelivered && (
             <>
+              <RainNote className="mb-4" />
               {order.delivery_partner_id ? (
                 <>
                   <LiveTrackingMap riderLocation={riderLocation} dropLocation={dropLocation} riderStale={riderStale} className="h-72 mb-4" />
@@ -246,20 +249,12 @@ export default function TrackOrderPage() {
                         <p className="text-[13.5px] font-[700] text-[#111827] truncate">{partner.name}</p>
                         <p className="text-[11.5px] text-[#9CA3AF] capitalize">{partner.vehicle_type ?? 'Rider'}{partner.vehicle_number ? ` · ${partner.vehicle_number}` : ''}</p>
                       </div>
-                      {partner.phone && (() => {
-                        const unlockAt = new Date(order.created_at).getTime() + CALL_LOCK_MS
-                        const minsLeft = Math.ceil((unlockAt - nowMs) / 60000)
-                        return minsLeft > 0 ? (
-                          <span className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F3F4F6] text-[#9CA3AF] rounded-xl text-[12px] font-[600] shrink-0 text-center leading-tight">
-                            <Phone className="w-3.5 h-3.5 shrink-0" /> Call in {minsLeft} min
-                          </span>
-                        ) : (
-                          <a href={`tel:${partner.phone}`}
-                            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#F0FDF4] text-[#16A34A] rounded-xl text-[12.5px] font-[600] hover:bg-[#DCFCE7] transition-all shrink-0">
-                            <Phone className="w-3.5 h-3.5" /> Call
-                          </a>
-                        )
-                      })()}
+                      <CallRiderButton
+                        orderId={order.id}
+                        callsUsed={order.rider_calls_used ?? 0}
+                        lockedUntilMs={new Date(order.created_at).getTime() + CALL_LOCK_MS}
+                        nowMs={nowMs}
+                      />
                     </div>
                   )}
                   <div className="bg-white rounded-2xl border border-[#E5E7EB] p-4 mb-5 shadow-zippy-sm">

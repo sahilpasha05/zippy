@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
 import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue, DELIVERY_FEE } from '@/lib/cartPricing'
 import { useLiveLocation } from '@/lib/store/liveLocation'
+import RainNote from '@/components/RainNote'
 import { ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 
 export default function CartSidebar() {
@@ -164,6 +165,7 @@ export default function CartSidebar() {
               <Zap className="w-4 h-4 text-[#16A34A]" strokeWidth={2} />
               <p className="text-[12.5px] font-medium text-[#14532D]">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
             </div>
+            <RainNote />
 
             {/* Bill Summary */}
             <div className="space-y-2">

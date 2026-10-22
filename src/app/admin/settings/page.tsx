@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket } from 'lucide-react'
+import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket, CloudRain } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { CITY } from '@/lib/city'
 
@@ -27,6 +27,10 @@ export default function AdminSettingsPage() {
   })
   const [categories, setCategories] = useState<GroceryCategory[]>([])
   const [togglingCategory, setTogglingCategory] = useState<string | null>(null)
+  const [rainMode, setRainMode] = useState(false)
+  const [rainBusy, setRainBusy] = useState(false)
+  const [rainMessage, setRainMessage] = useState('Due to the rain, your order may be delayed.')
+  const [rainMessageSaved, setRainMessageSaved] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -45,6 +49,8 @@ export default function AdminSettingsPage() {
           groceriesAvailable: data.groceries_available ?? true,
         }))
       }
+      setRainMode(!!(data as { rain_mode?: boolean } | null)?.rain_mode)
+      { const m = (data as { rain_message?: string } | null)?.rain_message; if (m) setRainMessage(m) }
       setCategories((cats as GroceryCategory[]) ?? [])
       setLoading(false)
     }
@@ -64,6 +70,27 @@ export default function AdminSettingsPage() {
     const { error } = await supabase.from('grocery_categories').update({ available: next }).eq('id', cat.id)
     if (error) setCategories((cs) => cs.map((c) => c.id === cat.id ? { ...c, available: !next } : c))
     setTogglingCategory(null)
+  }
+
+  // Rain mode takes effect straight away for every customer (no Save needed).
+  async function toggleRain() {
+    const next = !rainMode
+    setRainBusy(true)
+    setRainMode(next)
+    const { error } = await supabase.from('platform_settings').update({ rain_mode: next, updated_at: new Date().toISOString() }).eq('id', 1)
+    if (error) { setRainMode(!next); window.alert(`Could not change rain mode: ${error.message}`) }
+    setRainBusy(false)
+  }
+
+  async function saveRainMessage() {
+    const text = rainMessage.trim()
+    if (!text) return
+    setRainBusy(true)
+    const { error } = await supabase.from('platform_settings').update({ rain_message: text, updated_at: new Date().toISOString() }).eq('id', 1)
+    setRainBusy(false)
+    if (error) { window.alert(`Could not save the message: ${error.message}`); return }
+    setRainMessageSaved(true)
+    setTimeout(() => setRainMessageSaved(false), 2000)
   }
 
   async function save() {
@@ -134,6 +161,36 @@ export default function AdminSettingsPage() {
                 <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Support Email</label>
                 <input value={settings.supportEmail} onChange={(e) => set('supportEmail', e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED] transition-all" />
+              </div>
+            </div>
+          </div>
+
+          {/* Rain mode */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <CloudRain className="w-4 h-4 text-[#1D4ED8]" />
+              <h2 className="text-[14px] font-[700] text-[#111827]">Rain mode</h2>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-[13.5px] font-[600] text-[#111827]">Show rain on the customer site</p>
+                <p className="text-[12px] text-[#6B7280]">Takes effect immediately for everyone, with no need to hit Save. Customers see falling rain and a notice that their order may be delayed, and the cart and checkout carry a rain note. Turn it off when the rain stops.</p>
+              </div>
+              <button onClick={toggleRain} disabled={rainBusy}
+                className={`relative w-11 h-6 rounded-full shrink-0 ml-4 transition-all duration-300 disabled:opacity-60 ${rainMode ? 'bg-[#2563EB]' : 'bg-[#D1D5DB]'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${rainMode ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            <div className="mt-2 border-t border-[#F3F4F6] pt-3">
+              <label className="block text-[12px] font-[600] text-[#374151] mb-1.5">Message customers see</label>
+              <textarea value={rainMessage} onChange={(e) => setRainMessage(e.target.value)} rows={2} maxLength={160}
+                placeholder="Due to rain and a power cut, your order may be slightly delayed."
+                className="w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#2563EB] transition-all resize-none" />
+              <div className="mt-2 flex items-center gap-3">
+                <button onClick={saveRainMessage} disabled={rainBusy || !rainMessage.trim()}
+                  className="px-4 py-2 rounded-xl bg-[#2563EB] text-white text-[12.5px] font-[600] hover:bg-[#1D4ED8] disabled:opacity-50 transition-all">Update message</button>
+                {rainMessageSaved && <span className="text-[12px] font-[600] text-[#16A34A]">Saved. Customers see it now.</span>}
+                <span className="ml-auto text-[11px] text-[#9CA3AF]">{rainMessage.length}/160</span>
               </div>
             </div>
           </div>

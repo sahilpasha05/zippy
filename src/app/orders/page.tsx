@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
-import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star, Phone, Bike, RotateCcw, X } from 'lucide-react'
+import { Package, CheckCircle, XCircle, Truck, ChefHat, MapPin, ChevronRight, Loader2, Star, Bike, RotateCcw, X } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import ReviewModal from '@/components/ReviewModal'
@@ -11,6 +11,9 @@ import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
 import CartConflictDialog from '@/components/CartConflictDialog'
+import CallRiderButton from '@/components/CallRiderButton'
+import RainNote from '@/components/RainNote'
+import { useNow } from '@/lib/useNow'
 import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import type { CartItem } from '@/types'
 
@@ -46,7 +49,8 @@ type OrderRow = {
   address: string | null
   created_at: string
   restaurants: Rel<{ name: string }>
-  delivery_partners: Rel<{ name: string; phone: string | null }> | null
+  delivery_partners: Rel<{ name: string }> | null
+  rider_calls_used: number | null
   order_items: { name: string; quantity: number }[] | null
 }
 
@@ -55,7 +59,7 @@ function restName(o: OrderRow): string | null {
   return Array.isArray(o.restaurants) ? o.restaurants[0]?.name ?? null : o.restaurants.name
 }
 
-function riderInfo(o: OrderRow): { name: string; phone: string | null } | null {
+function riderInfo(o: OrderRow): { name: string } | null {
   if (!o.delivery_partners) return null
   return Array.isArray(o.delivery_partners) ? o.delivery_partners[0] ?? null : o.delivery_partners
 }
@@ -65,6 +69,7 @@ function OrderCard({ order, eta, onReview, onReorder, reordering }: { order: Ord
   const isActive = !CLOSED.includes(order.status)
   const currentStep = STEPS.indexOf(order.status)
   const rider = riderInfo(order)
+  const nowMs = useNow()
 
   const items = order.order_items ?? []
   const totalUnits = items.reduce((sum, i) => sum + i.quantity, 0)
@@ -158,12 +163,13 @@ function OrderCard({ order, eta, onReview, onReorder, reordering }: { order: Ord
               <p className="text-[12.5px] font-[700] text-[#4C1D95] truncate">{rider.name}</p>
               <p className="text-[11px] text-[#7C3AED]">Delivery partner assigned</p>
             </div>
-            {rider.phone && (
-              <a href={`tel:${rider.phone}`}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#7C3AED] text-white text-[12px] font-[600] rounded-xl hover:bg-[#6D28D9] transition-all shrink-0">
-                <Phone className="w-3 h-3" /> Call
-              </a>
-            )}
+            <CallRiderButton
+              orderId={order.id}
+              callsUsed={order.rider_calls_used ?? 0}
+              lockedUntilMs={new Date(order.created_at).getTime() + 20 * 60 * 1000}
+              nowMs={nowMs}
+              variant="solid"
+            />
           </div>
         )}
 
@@ -290,7 +296,7 @@ export default function OrdersPage() {
       // query honest about its intent rather than relying on the policy alone.
       const { data } = await supabase
         .from('orders')
-        .select('id, order_type, status, total, address, created_at, restaurant_id, delivery_partner_id, restaurants(name), delivery_partners(name, phone), order_items(name, quantity), reviews(id)')
+        .select('id, order_type, status, total, address, created_at, restaurant_id, delivery_partner_id, rider_calls_used, restaurants(name), delivery_partners(name), order_items(name, quantity), reviews(id)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
@@ -339,6 +345,8 @@ export default function OrdersPage() {
               </button>
             ))}
           </div>
+
+          {tab === 'active' && active.length > 0 && <RainNote className="mb-4" />}
 
           <div className="space-y-4">
             {loading ? (

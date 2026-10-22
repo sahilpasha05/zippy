@@ -20,6 +20,7 @@ import LocationPicker from '@/components/LocationPicker'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { CITY } from '@/lib/city'
+import RainNote from '@/components/RainNote'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -577,6 +578,7 @@ export default function CheckoutPage() {
                   <Zap className="w-3.5 h-3.5 text-[#16A34A] fill-[#16A34A]" />
                   <p className="text-[11.5px] text-[#14532D] font-medium">Estimated delivery in <strong>{deliveryEta} minutes</strong></p>
                 </div>
+                <RainNote className="mt-2" />
 
                 {/* Desktop place order button — mobile uses the fixed bottom bar */}
                 <button
