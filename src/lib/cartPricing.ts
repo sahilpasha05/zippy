@@ -1,19 +1,23 @@
 import type { CartItem } from '@/types'
 import { getDeliveryTier } from '@/lib/deliveryZone'
+import { isMarkupExempt } from '@/lib/markupExempt'
 
 // A margin applied once an item is in the cart — the product/menu card still
 // shows the plain stored price, but every cart-facing number (unit price,
 // subtotal, and what actually gets charged/stored on the order) is 4% higher.
 export const PRICE_MARKUP = 1.04
 
-function applyPriceMarkup(price: number): number {
+function applyPriceMarkup(price: number, productId?: string | null): number {
+  // A few products (the cold drinks) are sold at their listed price, no markup.
+  if (isMarkupExempt(productId)) return Math.round(price * 100) / 100
   return Math.round(price * PRICE_MARKUP * 100) / 100
 }
 
 // Inverse of applyPriceMarkup — recovers the restaurant's actual menu price
 // from a stored order_items.price, for anywhere (restaurant/admin analytics)
 // that needs to show what the restaurant is owed, not what the customer paid.
-export function removePriceMarkup(markedUpPrice: number): number {
+export function removePriceMarkup(markedUpPrice: number, productId?: string | null): number {
+  if (isMarkupExempt(productId)) return Math.round(markedUpPrice * 100) / 100
   return Math.round((markedUpPrice / PRICE_MARKUP) * 100) / 100
 }
 
@@ -52,10 +56,10 @@ export function getPlatformFee(orderValue: number): number {
 }
 
 export function getCartBaseTotal(items: CartItem[]): number {
-  return items.reduce((sum, i) => sum + applyPriceMarkup(i.price) * i.quantity, 0)
+  return items.reduce((sum, i) => sum + applyPriceMarkup(i.price, i.product_id) * i.quantity, 0)
 }
 
 // The per-unit price to display/charge for one item.
-export function getAdjustedUnitPrice(item: Pick<CartItem, 'price'>): number {
-  return applyPriceMarkup(item.price)
+export function getAdjustedUnitPrice(item: Pick<CartItem, 'price'> & { product_id?: string | null }): number {
+  return applyPriceMarkup(item.price, item.product_id)
 }

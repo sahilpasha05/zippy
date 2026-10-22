@@ -15,7 +15,7 @@ const supabase = createClient()
 
 type Order = { id: string; status: string; total: number; placed_at: string; restaurant_id: string | null }
 
-type TodayOrderItem = { name: string; quantity: number; price: number }
+type TodayOrderItem = { name: string; quantity: number; price: number; product_id?: string | null }
 type TodayOrder = {
   id: string; status: string; total: number; placed_at: string
   restaurant_id: string | null
@@ -58,7 +58,7 @@ function restName(o: TodayOrder) {
 // checkout (see PRICE_MARKUP in cartPricing.ts) — removePriceMarkup recovers
 // the actual menu price the restaurant listed.
 function menuTotal(o: TodayOrder) {
-  return (o.order_items ?? []).reduce((s, item) => s + removePriceMarkup(item.price) * item.quantity, 0)
+  return (o.order_items ?? []).reduce((s, item) => s + removePriceMarkup(item.price, item.product_id) * item.quantity, 0)
 }
 function dayKey(iso: string) {
   const d = new Date(iso)
@@ -95,7 +95,7 @@ export default function AdminAnalyticsPage() {
       const end = new Date(range.to + 'T23:59:59.999')
       const data = await fetchAllRows<TodayOrder>((from, to) => supabase
         .from('orders')
-        .select('id, status, total, placed_at, restaurant_id, customer_name, customer_phone, restaurants(name), order_items(name, quantity, price)')
+        .select('id, status, total, placed_at, restaurant_id, customer_name, customer_phone, restaurants(name), order_items(name, quantity, price, product_id)')
         .gte('placed_at', start.toISOString()).lte('placed_at', end.toISOString())
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
@@ -450,7 +450,7 @@ export default function AdminAnalyticsPage() {
                                       <Package className="w-3 h-3 text-[#9CA3AF] shrink-0" />
                                       <span className="truncate">{item.name} × {item.quantity}</span>
                                     </span>
-                                    <span className="font-[600] shrink-0">₹{(removePriceMarkup(item.price) * item.quantity).toLocaleString()}</span>
+                                    <span className="font-[600] shrink-0">₹{(removePriceMarkup(item.price, item.product_id) * item.quantity).toLocaleString()}</span>
                                   </div>
                                 ))}
                               </div>
