@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { Star, Clock, MapPin, ChevronRight, Plus, Minus, Search, Heart, Share2, Flame, Loader2 } from 'lucide-react'
+import { Star, Clock, MapPin, ChevronRight, Plus, Minus, Search, Heart, Share2, Flame, Loader2, UtensilsCrossed, X } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -152,6 +152,8 @@ export default function RestaurantDetailClient() {
     return new URLSearchParams(window.location.search).get('q') ?? ''
   })
   const [wishlist, setWishlist] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const cartCount = useCartStore((st) => st.items.reduce((n, i) => n + i.quantity, 0))
 
   useEffect(() => {
     async function load() {
@@ -213,6 +215,26 @@ export default function RestaurantDetailClient() {
     ...section,
     items: section.items.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())),
   })).filter((s) => s.items.length > 0)
+
+  // Keep the highlighted category in step with the section that is at the top
+  // of the screen while the customer scrolls.
+  const visibleKey = filteredMenu.map((s) => s.category).join('|')
+  useEffect(() => {
+    if (!visibleKey) return
+    const cats = visibleKey.split('|')
+    function onScroll() {
+      const line = window.innerHeight * 0.28
+      let current = cats[0]
+      for (const c of cats) {
+        const el = document.getElementById(`category-${c}`)
+        if (el && el.getBoundingClientRect().top <= line) current = c
+      }
+      setActiveCategory((prev) => (prev === current ? prev : current))
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [visibleKey])
 
   const cover = restaurant?.cover_url ?? 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1400&h=500&fit=crop'
   const logo  = restaurant?.logo_url  ?? 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop'
@@ -296,19 +318,10 @@ export default function RestaurantDetailClient() {
           </div>
         </div>
 
-        {/* Category filter bar — mobile/tablet, where the sidebar below is hidden */}
+        {/* Mobile: sticky label showing which category is on screen, plus a floating Menu button (below) */}
         {menu.length > 0 && (
-          <div style={{ top: 'var(--zippy-header-h, 168px)' }} className="lg:hidden sticky z-10 bg-white border-b border-[#E5E7EB] px-4 py-3">
-            <div className="flex gap-2 overflow-x-auto">
-              {menu.map((section) => (
-                <button key={section.category} onClick={() => scrollToCategory(section.category)}
-                  className={cn('px-4 py-1.5 rounded-xl text-[12.5px] font-medium whitespace-nowrap transition-all shrink-0',
-                    activeCategory === section.category ? 'bg-[#16A34A] text-white shadow-[0_2px_6px_rgba(22,163,74,0.3)]' : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]')}>
-                  {section.category}
-                  <span className="ml-1.5 text-[10.5px] opacity-70">({section.items.length})</span>
-                </button>
-              ))}
-            </div>
+          <div style={{ top: 'var(--zippy-header-h, 168px)' }} className="lg:hidden sticky z-10 bg-white border-b border-[#E5E7EB] px-4 py-2.5">
+            <p className="text-[13.5px] font-[800] text-[#111827]">{activeCategory}</p>
           </div>
         )}
 
@@ -359,6 +372,36 @@ export default function RestaurantDetailClient() {
           </div>
         </div>
       </div>
+      {menu.length > 0 && (
+        <div className="lg:hidden">
+          {menuOpen && (
+            <div className="fixed inset-0 z-[60]" onClick={() => setMenuOpen(false)}>
+              <div className="absolute inset-0 bg-black/60" />
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={cn('absolute right-4 w-[min(78vw,320px)] max-h-[60vh] overflow-y-auto rounded-3xl bg-[#1F2937] p-2 shadow-2xl',
+                  cartCount > 0 ? 'bottom-[212px]' : 'bottom-[152px]')}>
+                {menu.map((section) => (
+                  <button key={section.category}
+                    onClick={() => { setMenuOpen(false); scrollToCategory(section.category) }}
+                    className={cn('flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left text-[15px]',
+                      activeCategory === section.category ? 'font-[800] text-[#4ADE80]' : 'font-[500] text-white')}>
+                    <span>{section.category}</span>
+                    <span className={cn('text-[14px]', activeCategory === section.category ? 'font-[800]' : 'text-white/70')}>{section.items.length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Browse menu categories'}
+            className={cn('fixed right-4 z-[61] flex items-center gap-2 rounded-full bg-[#1F2937] px-5 py-3 text-[14px] font-[700] text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] active:scale-95 transition-all',
+              cartCount > 0 ? 'bottom-[140px]' : 'bottom-[84px]')}>
+            {menuOpen ? <><X className="h-4 w-4" /> Close</> : <><UtensilsCrossed className="h-4 w-4" /> Menu</>}
+          </button>
+        </div>
+      )}
       <SiteFooter />
     </>
   )
