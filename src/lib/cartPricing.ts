@@ -1,5 +1,5 @@
 import type { CartItem } from '@/types'
-import { getDeliveryTier } from '@/lib/deliveryZone'
+import { resolveZoneRule } from '@/lib/deliveryZones'
 import { isMarkupExempt } from '@/lib/markupExempt'
 
 // A margin applied once an item is in the cart — the product/menu card still
@@ -31,15 +31,13 @@ export const OUTSIDE_DELIVERY_FEE: number = 80
 export const OUTSIDE_MIN_ORDER: number = 600
 
 export function getDeliveryFee(lat: number | null | undefined, lng: number | null | undefined): number {
-  if (lat == null || lng == null) return DELIVERY_FEE
-  const tier = getDeliveryTier(lat, lng)
-  return tier === 'core' ? DELIVERY_FEE : tier === 'extended' ? OUTER_DELIVERY_FEE : OUTSIDE_DELIVERY_FEE
+  return resolveZoneRule(lat, lng).fee
 }
 
-// Minimum cart value (items, before fees) — only outside the outer boundary.
+// Minimum cart value (items, before fees) for the zone the customer is in.
 export function getMinOrderValue(lat: number | null | undefined, lng: number | null | undefined): number {
   if (lat == null || lng == null) return 0
-  return getDeliveryTier(lat, lng) === 'outside' ? OUTSIDE_MIN_ORDER : 0
+  return resolveZoneRule(lat, lng).minOrder
 }
 
 // Platform fee, banded by cart subtotal (before discount and delivery).

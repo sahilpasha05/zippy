@@ -7,9 +7,10 @@ import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-re
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue, DELIVERY_FEE } from '@/lib/cartPricing'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
 import { useLiveLocation } from '@/lib/store/liveLocation'
 import RainNote from '@/components/RainNote'
+import { resolveZoneRule, defaultZoneRule, useDeliveryZones } from '@/lib/deliveryZones'
 import { ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 
 export default function CartSidebar() {
@@ -23,7 +24,9 @@ export default function CartSidebar() {
   const [locating, setLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [offerManual, setOfferManual] = useState(false)
+  useDeliveryZones((s) => s.version) // re-price when the admin's zones finish loading
   const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
+  const zoneRule = resolveZoneRule(liveCoords?.lat, liveCoords?.lng)
   const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
   const belowMinOrder = minOrder > 0 && cartTotal < minOrder
 
@@ -174,7 +177,7 @@ export default function CartSidebar() {
                 <span>₹{cartTotal.toFixed(0)}</span>
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">
-                <span>Delivery fee{deliveryFee > DELIVERY_FEE ? ' (outside core area)' : ''}</span>
+                <span>Delivery fee{liveCoords && deliveryFee > defaultZoneRule().fee ? ` (${zoneRule.name})` : ''}</span>
                 <span>₹{deliveryFee}</span>
               </div>
               <div className="flex justify-between text-[13px] text-[#6B7280]">

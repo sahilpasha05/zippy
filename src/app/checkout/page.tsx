@@ -11,8 +11,9 @@ import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
 import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
 import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getDeliveryTier, NEEDS_CONFIRMATION_MESSAGE, ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
+import { NEEDS_CONFIRMATION_MESSAGE, ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 import { useLiveLocation } from '@/lib/store/liveLocation'
+import { resolveZoneRule, useDeliveryZones } from '@/lib/deliveryZones'
 import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import SiteFooter from '@/components/layout/SiteFooter'
@@ -98,12 +99,15 @@ export default function CheckoutPage() {
   const [showNoLocationConfirm, setShowNoLocationConfirm] = useState(false)
   const locationReady = (liveStatus === 'granted' && !!liveCoords) || noLiveLocation
 
-  const tier = liveCoords ? getDeliveryTier(liveCoords.lat, liveCoords.lng) : 'core'
-  const needsConfirmation = tier === 'outside'
+  useDeliveryZones((s) => s.version) // re-price when the admin's zones finish loading
+  const zoneRule = resolveZoneRule(liveCoords?.lat, liveCoords?.lng)
+  // A zone can require an executive's confirmation (the order is held), and/or be cash only.
+  const needsConfirmation = zoneRule.needsConfirmation
+  const codOnly = zoneRule.codOnly || zoneRule.needsConfirmation
 
   // Nothing is charged online until the executive has confirmed delivery is
   // possible, so these orders are cash on delivery only.
-  const selectedPayment = needsConfirmation ? 'cod' : chosenPayment
+  const selectedPayment = codOnly ? 'cod' : chosenPayment
 
   const deliveryFee = getDeliveryFee(liveCoords?.lat, liveCoords?.lng)
   const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
@@ -496,7 +500,7 @@ export default function CheckoutPage() {
                     <button
                       key={id}
                       onClick={() => setSelectedPayment(id)}
-                      disabled={needsConfirmation && id !== 'cod'}
+                      disabled={codOnly && id !== 'cod'}
                       className={cn('w-full text-left flex items-center gap-4 p-4 rounded-xl border-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed', selectedPayment === id ? 'border-[#16A34A] bg-[#F0FDF4]' : 'border-[#E5E7EB] hover:border-[#D1D5DB]')}
                     >
                       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', selectedPayment === id ? 'bg-[#DCFCE7]' : 'bg-[#F3F4F6]')}>
