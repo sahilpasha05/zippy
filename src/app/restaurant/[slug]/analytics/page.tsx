@@ -4,7 +4,7 @@ import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
-import { TrendingUp, ShoppingBag, Star, Clock, Loader2, X, Package } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Star, Clock, Loader2, X, Package, BadgeCheck, Wallet } from 'lucide-react'
 import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 import { getDailyRevenue, todayKey } from '@/lib/analytics'
@@ -17,6 +17,7 @@ const supabase = createBrowserClient(
 
 type Restaurant = { id: string; name: string; slug: string }
 type OrderItem = { name: string; quantity: number; price: number }
+type Settlement = { id: string; order_date: string; orders_count: number; amount: number; paid_by: string; paid_on: string }
 type Order = {
   id: string; status: string; total: number; placed_at: string
   customer_name: string | null; customer_phone: string | null
@@ -46,6 +47,7 @@ export default function SlugAnalyticsPage() {
   // 'revenue' opens the delivered orders behind Total Revenue; any other value
   // is an order status (e.g. 'cancelled') whose orders are listed instead.
   const [drill, setDrill] = useState<string | null>(null)
+  const [settlements, setSettlements] = useState<Settlement[]>([])
 
   useEffect(() => {
     async function load() {
@@ -61,6 +63,8 @@ export default function SlugAnalyticsPage() {
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
       setOrders(ords)
+      const { data: paid } = await supabase.from('restaurant_settlements').select('id, order_date, orders_count, amount, paid_by, paid_on').eq('restaurant_id', rest.id).order('order_date', { ascending: false })
+      setSettlements((paid as Settlement[]) ?? [])
       setLoading(false)
     }
     load()
@@ -104,6 +108,21 @@ export default function SlugAnalyticsPage() {
 
   const statusCounts = orders.reduce((acc, o) => { acc[o.status] = (acc[o.status] ?? 0) + 1; return acc }, {} as Record<string, number>)
 
+  // Settlements: each delivered day not yet marked paid by Zippy is upcoming; paid days show who paid.
+  const paidDays = new Set(settlements.map((x) => x.order_date))
+  const upcoming = (() => {
+    const map = new Map<string, { day: string; count: number; amount: number }>()
+    for (const o of delivered) {
+      const key = dayKey(o.placed_at)
+      if (paidDays.has(key)) continue
+      if (!map.has(key)) map.set(key, { day: key, count: 0, amount: 0 })
+      const e = map.get(key)!; e.count += 1; e.amount += menuTotal(o)
+    }
+    return Array.from(map.values()).sort((a, b) => b.day.localeCompare(a.day))
+  })()
+  const upcomingTotal = upcoming.reduce((s, x) => s + x.amount, 0)
+  const fmtDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
   const stats = [
     { label: 'Total Revenue',   value: `₹${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: '#16A34A', bg: '#DCFCE7' },
     { label: 'Total Orders',    value: orders.length,                        icon: ShoppingBag, color: '#0891B2', bg: '#ECFEFF' },
@@ -145,6 +164,47 @@ export default function SlugAnalyticsPage() {
                     </Tag>
                   )
                 })}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="flex items-center gap-2 text-[15px] font-[700] text-[#111827]"><Wallet className="w-4 h-4 text-[#D97706]" /> Upcoming settlement</h2>
+                    <p className="text-[12px] text-[#9CA3AF]">Delivered days Zippy hasn&apos;t paid yet · menu items only</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[20px] font-[800] text-[#D97706]" style={{ fontWeight: 800 }}>₹{Math.round(upcomingTotal).toLocaleString()}</div>
+                    <div className="text-[11px] text-[#9CA3AF]">to be paid</div>
+                  </div>
+                </div>
+                {upcoming.length === 0 ? (
+                  <p className="py-3 text-[13px] text-[#9CA3AF]">Nothing pending in this date range.</p>
+                ) : (
+                  <div className="divide-y divide-[#F3F4F6]">
+                    {upcoming.map((x) => (
+                      <div key={x.day} className="flex items-center justify-between py-2.5 text-[13px]">
+                        <span className="text-[#111827] font-[600]">{fmtDay(x.day)} <span className="font-normal text-[#9CA3AF]">· {x.count} order{x.count !== 1 ? 's' : ''}</span></span>
+                        <span className="font-[700] text-[#111827]">₹{Math.round(x.amount).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {settlements.length > 0 && (
+                  <div className="mt-5 border-t border-[#F3F4F6] pt-4">
+                    <h3 className="mb-2 text-[13px] font-[700] text-[#111827]">Paid</h3>
+                    <div className="divide-y divide-[#F3F4F6]">
+                      {settlements.map((x) => (
+                        <div key={x.id} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                          <div className="min-w-0">
+                            <p className="font-[600] text-[#111827]">{fmtDay(x.order_date)} <span className="font-normal text-[#9CA3AF]">· {x.orders_count} order{x.orders_count !== 1 ? 's' : ''}</span></p>
+                            <p className="flex items-center gap-1 text-[11.5px] text-[#15803D]"><BadgeCheck className="w-3.5 h-3.5" /> Paid by {x.paid_by} on {new Date(x.paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                          </div>
+                          <span className="font-[800] text-[#15803D] shrink-0" style={{ fontWeight: 800 }}>₹{Number(x.amount).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 shadow-zippy-sm">

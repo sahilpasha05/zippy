@@ -4,7 +4,7 @@ import RefundsPanel from '@/components/admin/RefundsPanel'
 import { fetchAllRows } from '@/lib/fetchAllRows'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { TrendingUp, ShoppingBag, Store, Users, X, ChevronLeft, ChevronRight, Package, Clock } from 'lucide-react'
+import { TrendingUp, ShoppingBag, Store, Users, X, ChevronLeft, ChevronRight, Package, Clock, BadgeCheck } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateRangeFilter'
 import { getDailyRevenue, todayKey } from '@/lib/analytics'
@@ -23,6 +23,8 @@ type TodayOrder = {
   restaurants: { name: string } | { name: string }[] | null
   order_items: TodayOrderItem[]
 }
+
+type Settlement = { id: string; restaurant_id: string; order_date: string; orders_count: number; amount: number; paid_by: string; paid_on: string }
 
 type Bucket = 'total' | 'delivered' | 'pending' | 'cancelled'
 const BUCKET_CFG: Record<Bucket, { label: string; color: string; bg: string }> = {
@@ -77,6 +79,56 @@ export default function AdminAnalyticsPage() {
   const [refreshNonce, setRefreshNonce] = useState(0)
   const [drillBucket, setDrillBucket] = useState<Bucket | null>(null)
   const [drillRestKey, setDrillRestKey] = useState<string | null>(null)
+  // Payouts already marked paid for the restaurant open in the drill-down, keyed by order day.
+  const [settlements, setSettlements] = useState<Record<string, Settlement>>({})
+  const [payForm, setPayForm] = useState<{ day: string; count: number; due: number; amount: string; paidBy: string; paidOn: string } | null>(null)
+  const [paySaving, setPaySaving] = useState(false)
+  const [payError, setPayError] = useState('')
+
+  useEffect(() => {
+    if (!drillRestKey || drillRestKey === GROCERY_KEY) { queueMicrotask(() => setSettlements({})); return }
+    let cancelled = false
+    supabase.from('restaurant_settlements').select('*').eq('restaurant_id', drillRestKey).then(({ data }) => {
+      if (cancelled) return
+      setSettlements(Object.fromEntries(((data as Settlement[]) ?? []).map((r) => [r.order_date, r])))
+    })
+    return () => { cancelled = true }
+  }, [drillRestKey])
+
+  function openPay(day: string, count: number, due: number) {
+    let paidBy = ''
+    try { paidBy = localStorage.getItem('zippy-paid-by') ?? '' } catch {}
+    setPayError('')
+    setPayForm({ day, count, due, amount: String(Math.round(due * 100) / 100), paidBy, paidOn: todayKey() })
+  }
+
+  async function savePay() {
+    if (!payForm || !drillRestKey) return
+    const amount = Number(payForm.amount)
+    if (!payForm.paidBy.trim()) { setPayError('Enter who paid.'); return }
+    if (!(amount >= 0) || payForm.amount === '') { setPayError('Enter the amount paid.'); return }
+    setPaySaving(true); setPayError('')
+    const { data, error } = await supabase.from('restaurant_settlements').upsert({
+      restaurant_id: drillRestKey, order_date: payForm.day, orders_count: payForm.count,
+      amount, paid_by: payForm.paidBy.trim(), paid_on: payForm.paidOn,
+    }, { onConflict: 'restaurant_id,order_date' }).select().single()
+    setPaySaving(false)
+    if (error) {
+      setPayError(error.message.includes('restaurant_settlements') ? 'Settlements are not set up yet — run supabase-migration-restaurant-settlements.sql once in Supabase.' : error.message)
+      return
+    }
+    try { localStorage.setItem('zippy-paid-by', payForm.paidBy.trim()) } catch {}
+    setSettlements((prev) => ({ ...prev, [payForm.day]: data as Settlement }))
+    setPayForm(null)
+  }
+
+  async function undoPay(day: string) {
+    const row = settlements[day]
+    if (!row || !confirm('Mark this day as not paid?')) return
+    const { error } = await supabase.from('restaurant_settlements').delete().eq('id', row.id)
+    if (error) { alert(error.message); return }
+    setSettlements((prev) => { const n = { ...prev }; delete n[day]; return n })
+  }
 
   // Follows the same range picker as the section below — always joined
   // with restaurant name + line items since the drill-down needs both,
@@ -428,6 +480,24 @@ export default function AdminAnalyticsPage() {
                           {dayOrders.length} order{dayOrders.length !== 1 ? 's' : ''} · <span className="font-[700] text-[#111827]">₹{menuAmount.toLocaleString()}</span> menu
                         </span>
                       </div>
+                      {drillBucket === 'delivered' && drillRestKey !== GROCERY_KEY && (
+                        <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-[#F3F4F6]">
+                          {settlements[day] ? (
+                            <>
+                              <p className="flex items-center gap-1.5 text-[12px] font-[600] text-[#15803D] min-w-0">
+                                <BadgeCheck className="w-4 h-4 shrink-0" />
+                                <span className="truncate">Paid ₹{Number(settlements[day].amount).toLocaleString()} by {settlements[day].paid_by} on {new Date(settlements[day].paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                              </p>
+                              <button onClick={() => undoPay(day)} className="text-[11.5px] font-[600] text-[#9CA3AF] hover:text-[#DC2626] shrink-0">Undo</button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-[12px] text-[#D97706] font-[600]">Not paid yet · ₹{Math.round(menuAmount).toLocaleString()} due</p>
+                              <button onClick={() => openPay(day, dayOrders.length, menuAmount)} className="rounded-lg bg-[#16A34A] px-3 py-1.5 text-[12px] font-[700] text-white hover:bg-[#15803D]">Mark paid</button>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <div className="divide-y divide-[#F3F4F6]">
                         {dayOrders.map((o) => (
                           <div key={o.id} className="px-5 py-4">
@@ -466,6 +536,37 @@ export default function AdminAnalyticsPage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {payForm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPayForm(null)} />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-3">
+            <div>
+              <h3 className="text-[16px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>Mark as paid</h3>
+              <p className="text-[12px] text-[#6B7280]">
+                {selectedRestaurant?.name} · {new Date(payForm.day + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · {payForm.count} order{payForm.count !== 1 ? 's' : ''} · ₹{Math.round(payForm.due).toLocaleString()} due
+              </p>
+            </div>
+            <label className="block text-[12px] font-[600] text-[#374151]">Amount paid (₹)
+              <input type="number" min="0" step="0.01" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
+            </label>
+            <label className="block text-[12px] font-[600] text-[#374151]">Paid by
+              <input type="text" value={payForm.paidBy} onChange={(e) => setPayForm({ ...payForm, paidBy: e.target.value })} placeholder="Name"
+                className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
+            </label>
+            <label className="block text-[12px] font-[600] text-[#374151]">Paid on
+              <input type="date" value={payForm.paidOn} onChange={(e) => setPayForm({ ...payForm, paidOn: e.target.value })}
+                className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
+            </label>
+            {payError && <p className="rounded-lg bg-[#FEF2F2] px-3 py-2 text-[12px] text-[#B91C1C]">{payError}</p>}
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => setPayForm(null)} className="flex-1 rounded-lg border border-[#E5E7EB] py-2 text-[13px] font-[600] text-[#374151]">Cancel</button>
+              <button onClick={savePay} disabled={paySaving} className="flex-1 rounded-lg bg-[#16A34A] py-2 text-[13px] font-[700] text-white disabled:opacity-60">{paySaving ? 'Saving…' : 'Save'}</button>
             </div>
           </div>
         </div>
