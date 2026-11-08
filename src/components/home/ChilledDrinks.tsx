@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import BlinkitProductCard, { type BlinkitProduct } from '@/components/BlinkitProductCard'
-import QuickStockEditor from '@/components/admin/QuickStockEditor'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +18,7 @@ function rank(name: string) {
 }
 
 // A permanent "Chilled drinks & energy" row on the home screen, fed by the Drinks
-// category: anything in stock there with a photo shows up. Hidden when there is none.
+// category: anything there with a photo (out-of-stock ones show a label) shows up. Hidden when there is none.
 export default function ChilledDrinks() {
   const [products, setProducts] = useState<BlinkitProduct[]>([])
 
@@ -31,7 +30,6 @@ export default function ChilledDrinks() {
       .select('id, name, price, mrp, weight, image_url, in_stock')
       .eq('category_id', cat.id)
       .eq('is_active', true)
-      .eq('in_stock', true)
       .not('image_url', 'is', null)
       .limit(12)
     setProducts(((data as BlinkitProduct[]) ?? []).sort((a, b) => rank(a.name) - rank(b.name)))
@@ -39,7 +37,7 @@ export default function ChilledDrinks() {
 
   useEffect(() => { queueMicrotask(() => { void load() }) }, [load])
 
-  if (products.length === 0) return <div className="flex justify-end"><QuickStockEditor title="Cold drinks — prices & stock" categorySlug="drinks" onChanged={load} /></div>
+  if (products.length === 0) return null
 
   return (
     <section className="rounded-3xl bg-gradient-to-b from-[#E6F5FF] via-[#F2FAFF] to-white p-4 lg:p-6 ring-1 ring-[#D4ECFB]">
@@ -48,12 +46,9 @@ export default function ChilledDrinks() {
           <h2 className="text-[20px] lg:text-[22px] font-[800] tracking-tight text-[#0C4A6E]" style={{ fontWeight: 800 }}>Chilled drinks &amp; energy</h2>
           <p className="mt-0.5 text-[12.5px] text-[#4B7A94]">Ice-cold cans, delivered in minutes</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <Link href="/essentials/drinks" className="text-[13px] font-[700] text-[#16A34A] hover:text-[#15803D] transition-colors">
-            See all →
-          </Link>
-          <QuickStockEditor title="Cold drinks — prices & stock" categorySlug="drinks" onChanged={load} />
-        </div>
+        <Link href="/essentials/drinks" className="text-[13px] font-[700] text-[#16A34A] hover:text-[#15803D] transition-colors">
+          See all →
+        </Link>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {products.map((p) => <BlinkitProductCard key={p.id} p={p} />)}

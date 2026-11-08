@@ -6,7 +6,6 @@ import { ChevronRight } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import BlinkitProductCard, { type BlinkitProduct } from '@/components/BlinkitProductCard'
 import { currentFestival } from '@/lib/festival'
-import QuickStockEditor from '@/components/admin/QuickStockEditor'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -81,7 +80,6 @@ export default function FestiveSweets() {
   const [fruitsSlug, setFruitsSlug] = useState<string | null>(null)
   const [festival] = useState(currentFestival)
   const rowRef = useRef<HTMLDivElement>(null)
-  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
     if (!festival) return
@@ -114,7 +112,7 @@ export default function FestiveSweets() {
     }
     load()
     return () => { cancelled = true }
-  }, [festival, reloadTick])
+  }, [festival])
 
   // The row drifts sideways on its own and loops (the list is rendered twice).
   // It stops while a finger or the mouse is on it and picks up again shortly
@@ -246,9 +244,6 @@ export default function FestiveSweets() {
           <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#14532D]/55" />
           <h3 className="text-[19px] font-[800] text-[#14532D] tracking-tight" style={{ fontWeight: 800 }}>Festive Sweets</h3>
           <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#14532D]/55" />
-        </div>
-        <div className="mb-3 flex justify-center px-6">
-          <QuickStockEditor title="Festive sweets — prices & stock" nameWords={SWEET_WORDS} onChanged={() => setReloadTick((t) => t + 1)} />
         </div>
 
         <div ref={rowRef} className="flex gap-3 overflow-x-auto px-6 lg:px-10 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
