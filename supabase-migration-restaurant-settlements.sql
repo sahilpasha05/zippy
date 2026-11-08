@@ -6,7 +6,8 @@ create table if not exists public.restaurant_settlements (
   order_date date not null,              -- the day whose delivered orders were settled
   orders_count int not null default 0,
   amount numeric(10,2) not null check (amount >= 0),
-  paid_by text not null,
+  paid_by text,                          -- optional
+  paid_to text,                          -- optional
   paid_on date not null default current_date,
   created_at timestamptz not null default now(),
   unique (restaurant_id, order_date)

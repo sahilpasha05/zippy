@@ -17,7 +17,7 @@ const supabase = createBrowserClient(
 
 type Restaurant = { id: string; name: string; slug: string }
 type OrderItem = { name: string; quantity: number; price: number }
-type Settlement = { id: string; order_date: string; orders_count: number; amount: number; paid_by: string; paid_on: string }
+type Settlement = { id: string; order_date: string; orders_count: number; amount: number; paid_by: string | null; paid_to: string | null; paid_on: string }
 type Order = {
   id: string; status: string; total: number; placed_at: string
   customer_name: string | null; customer_phone: string | null
@@ -63,7 +63,7 @@ export default function SlugAnalyticsPage() {
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
       setOrders(ords)
-      const { data: paid } = await supabase.from('restaurant_settlements').select('id, order_date, orders_count, amount, paid_by, paid_on').eq('restaurant_id', rest.id).order('order_date', { ascending: false })
+      const { data: paid } = await supabase.from('restaurant_settlements').select('id, order_date, orders_count, amount, paid_by, paid_to, paid_on').eq('restaurant_id', rest.id).order('order_date', { ascending: false })
       setSettlements((paid as Settlement[]) ?? [])
       setLoading(false)
     }
@@ -197,7 +197,7 @@ export default function SlugAnalyticsPage() {
                         <div key={x.id} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
                           <div className="min-w-0">
                             <p className="font-[600] text-[#111827]">{fmtDay(x.order_date)} <span className="font-normal text-[#9CA3AF]">· {x.orders_count} order{x.orders_count !== 1 ? 's' : ''}</span></p>
-                            <p className="flex items-center gap-1 text-[11.5px] text-[#15803D]"><BadgeCheck className="w-3.5 h-3.5" /> Paid by {x.paid_by} on {new Date(x.paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                            <p className="flex items-center gap-1 text-[11.5px] text-[#15803D]"><BadgeCheck className="w-3.5 h-3.5" /> Paid{x.paid_by ? ` by ${x.paid_by}` : ''}{x.paid_to ? ` to ${x.paid_to}` : ''} on {new Date(x.paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                           </div>
                           <span className="font-[800] text-[#15803D] shrink-0" style={{ fontWeight: 800 }}>₹{Number(x.amount).toLocaleString()}</span>
                         </div>

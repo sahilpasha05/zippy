@@ -24,7 +24,7 @@ type TodayOrder = {
   order_items: TodayOrderItem[]
 }
 
-type Settlement = { id: string; restaurant_id: string; order_date: string; orders_count: number; amount: number; paid_by: string; paid_on: string }
+type Settlement = { id: string; restaurant_id: string; order_date: string; orders_count: number; amount: number; paid_by: string | null; paid_to: string | null; paid_on: string }
 
 type Bucket = 'total' | 'delivered' | 'pending' | 'cancelled'
 const BUCKET_CFG: Record<Bucket, { label: string; color: string; bg: string }> = {
@@ -81,7 +81,7 @@ export default function AdminAnalyticsPage() {
   const [drillRestKey, setDrillRestKey] = useState<string | null>(null)
   // Payouts already marked paid for the restaurant open in the drill-down, keyed by order day.
   const [settlements, setSettlements] = useState<Record<string, Settlement>>({})
-  const [payForm, setPayForm] = useState<{ day: string; count: number; due: number; amount: string; paidBy: string; paidOn: string } | null>(null)
+  const [payForm, setPayForm] = useState<{ day: string; count: number; due: number; amount: string; paidBy: string; paidTo: string; paidOn: string } | null>(null)
   const [paySaving, setPaySaving] = useState(false)
   const [payError, setPayError] = useState('')
 
@@ -99,18 +99,17 @@ export default function AdminAnalyticsPage() {
     let paidBy = ''
     try { paidBy = localStorage.getItem('zippy-paid-by') ?? '' } catch {}
     setPayError('')
-    setPayForm({ day, count, due, amount: String(Math.round(due * 100) / 100), paidBy, paidOn: todayKey() })
+    setPayForm({ day, count, due, amount: String(Math.round(due * 100) / 100), paidBy, paidTo: '', paidOn: todayKey() })
   }
 
   async function savePay() {
     if (!payForm || !drillRestKey) return
     const amount = Number(payForm.amount)
-    if (!payForm.paidBy.trim()) { setPayError('Enter who paid.'); return }
     if (!(amount >= 0) || payForm.amount === '') { setPayError('Enter the amount paid.'); return }
     setPaySaving(true); setPayError('')
     const { data, error } = await supabase.from('restaurant_settlements').upsert({
       restaurant_id: drillRestKey, order_date: payForm.day, orders_count: payForm.count,
-      amount, paid_by: payForm.paidBy.trim(), paid_on: payForm.paidOn,
+      amount, paid_by: payForm.paidBy.trim() || null, paid_to: payForm.paidTo.trim() || null, paid_on: payForm.paidOn,
     }, { onConflict: 'restaurant_id,order_date' }).select().single()
     setPaySaving(false)
     if (error) {
@@ -486,7 +485,7 @@ export default function AdminAnalyticsPage() {
                             <>
                               <p className="flex items-center gap-1.5 text-[12px] font-[600] text-[#15803D] min-w-0">
                                 <BadgeCheck className="w-4 h-4 shrink-0" />
-                                <span className="truncate">Paid ₹{Number(settlements[day].amount).toLocaleString()} by {settlements[day].paid_by} on {new Date(settlements[day].paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                <span className="truncate">Paid ₹{Number(settlements[day].amount).toLocaleString()}{settlements[day].paid_by ? ` by ${settlements[day].paid_by}` : ''}{settlements[day].paid_to ? ` to ${settlements[day].paid_to}` : ''} on {new Date(settlements[day].paid_on + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                               </p>
                               <button onClick={() => undoPay(day)} className="text-[11.5px] font-[600] text-[#9CA3AF] hover:text-[#DC2626] shrink-0">Undo</button>
                             </>
@@ -555,8 +554,12 @@ export default function AdminAnalyticsPage() {
               <input type="number" min="0" step="0.01" value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })}
                 className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
             </label>
-            <label className="block text-[12px] font-[600] text-[#374151]">Paid by
+            <label className="block text-[12px] font-[600] text-[#374151]">Paid by <span className="font-normal text-[#9CA3AF]">(optional)</span>
               <input type="text" value={payForm.paidBy} onChange={(e) => setPayForm({ ...payForm, paidBy: e.target.value })} placeholder="Name"
+                className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
+            </label>
+            <label className="block text-[12px] font-[600] text-[#374151]">Paid to <span className="font-normal text-[#9CA3AF]">(optional)</span>
+              <input type="text" value={payForm.paidTo} onChange={(e) => setPayForm({ ...payForm, paidTo: e.target.value })} placeholder="Name"
                 className="mt-1 w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[14px] outline-none focus:border-[#16A34A]" />
             </label>
             <label className="block text-[12px] font-[600] text-[#374151]">Paid on
