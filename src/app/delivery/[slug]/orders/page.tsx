@@ -36,7 +36,7 @@ type Order = {
   id: string; status: string; total: number; customer_name: string | null
   customer_phone: string | null; address: string | null; placed_at: string
   delivery_latitude: number | null; delivery_longitude: number | null
-  accepted_at: string | null
+  accepted_at: string | null; restaurant_id: string | null
   online_amount: number | null; cod_amount: number | null
   payment_status: string | null; cash_collected_at: string | null; delivered_at: string | null
   collection_mode: 'cash' | 'online' | null; collected_amount: number | null
@@ -261,7 +261,7 @@ export default function DeliveryOrdersPage() {
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, online_amount, cod_amount, payment_status, cash_collected_at, collection_mode, collected_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
+      .select('id, status, total, customer_name, customer_phone, address, placed_at, delivery_latitude, delivery_longitude, accepted_at, delivered_at, restaurant_id, online_amount, cod_amount, payment_status, cash_collected_at, collection_mode, collected_amount, order_items(name, quantity, price), restaurants(name, address, phone)')
       .eq('delivery_partner_id', partnerId)
       // Most recently assigned first — admin stamps updated_at when it assigns,
       // so a re-assignment brings the order back to the top of this board.
@@ -271,6 +271,17 @@ export default function DeliveryOrdersPage() {
       // assigned from admin simply never appeared on their board.
       .limit(500)
     const raw = (data as unknown as Order[]) ?? []
+    // A switched-off restaurant can't be read through the join above, which made its orders look
+    // like "Zippy Mart" with no address or phone. Fetch those details separately.
+    const missing = raw.filter((o) => o.restaurant_id && !o.restaurants).map((o) => o.id)
+    if (missing.length > 0) {
+      const { data: info } = await supabase.rpc('order_restaurant_info', { p_order_ids: missing })
+      const byOrder = Object.fromEntries(((info as { order_id: string; name: string; address: string | null; phone: string | null }[]) ?? []).map((r) => [r.order_id, r]))
+      for (const o of raw) {
+        const r = byOrder[o.id]
+        if (r) o.restaurants = { name: r.name, address: r.address, phone: r.phone }
+      }
+    }
     // Anything still awaiting acceptance floats above the rest.
     const fetched = [...raw].sort((a, b) => Number(!!a.accepted_at) - Number(!!b.accepted_at))
     setOrders(fetched)
