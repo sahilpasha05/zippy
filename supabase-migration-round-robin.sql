@@ -5,7 +5,7 @@
 -- browsers are open. A rider with max_pending unfinished orders (placed in the
 -- last stale_hours) is "full" and is skipped until down to resume_at; if every
 -- rider is full the new orders wait unassigned and are handed out as riders
--- deliver or cancel. Orders on hold, and online orders still unpaid, are skipped.
+-- deliver or cancel. Orders on hold are skipped. Online orders still unpaid ARE assigned (changed 2026-11-08).
 -- Applied to the Tarikere project on 2026-10-21.
 
 create table if not exists public.rr_settings (
@@ -61,7 +61,6 @@ begin
       and o.status not in ('delivered', 'cancelled')
       and o.placed_at > now() - make_interval(hours => s.queue_hours)
       and coalesce(o.notes, '') not ilike 'ON HOLD%'
-      and not (coalesce(o.online_amount, 0) > 0 and o.payment_status in ('pending', 'failed'))
     order by o.placed_at, o.id
     for update
   loop
