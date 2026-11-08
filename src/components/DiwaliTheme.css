@@ -1,0 +1,121 @@
+/* Diwali theme. Switched on by <DiwaliTheme /> (adds .diwali to <html> on customer pages only).
+   The site's greens are hard-coded as Tailwind classes, so they are re-coloured here by class.
+   To remove the theme: delete this file and <DiwaliTheme /> in layout.tsx. */
+
+html.diwali {
+  --diwali-primary: #E8590C;
+  --diwali-primary-dark: #C2410C;
+  --diwali-gold: #F5A524;
+  --diwali-light: #FFEBD0;
+  --diwali-lighter: #FFF7EA;
+  --diwali-border: #FBD59C;
+  --diwali-maroon: #7C2D12;
+  --primary: #E8590C;
+  --ring: #E8590C;
+  --accent: #FFEBD0;
+  --accent-foreground: #7C2D12;
+}
+html.diwali ::selection { background: #FFEBD0; color: #7C2D12; }
+html.diwali body { background-image: radial-gradient(ellipse at 50% -10%, rgba(245,165,36,0.10), transparent 55%); background-attachment: fixed; }
+
+/* ── backgrounds ── */
+html.diwali [class~="bg-[#16A34A]"] { background-color: var(--diwali-primary) !important; }
+html.diwali [class~="hover:bg-[#15803D]"]:hover,
+html.diwali [class~="disabled:hover:bg-[#16A34A]"]:hover { background-color: var(--diwali-primary-dark) !important; }
+html.diwali [class~="bg-[#DCFCE7]"],
+html.diwali [class~="hover:bg-[#DCFCE7]"]:hover { background-color: var(--diwali-light) !important; }
+html.diwali [class~="bg-[#F0FDF4]"],
+html.diwali [class~="hover:bg-[#F0FDF4]"]:hover { background-color: var(--diwali-lighter) !important; }
+html.diwali [class~="hover:bg-[#BBF7D0]"]:hover { background-color: var(--diwali-border) !important; }
+html.diwali [class~="bg-[#14532D]"] { background-color: var(--diwali-maroon) !important; }
+
+/* ── text ── */
+html.diwali [class~="text-[#16A34A]"],
+html.diwali [class~="hover:text-[#16A34A]"]:hover,
+html.diwali .group:hover [class~="group-hover:text-[#16A34A]"] { color: var(--diwali-primary-dark) !important; }
+html.diwali [class~="text-[#15803D]"],
+html.diwali [class~="hover:text-[#15803D]"]:hover { color: var(--diwali-primary-dark) !important; }
+html.diwali [class~="text-[#14532D]"] { color: var(--diwali-maroon) !important; }
+html.diwali [class~="text-[#DCFCE7]"] { color: var(--diwali-light) !important; }
+html.diwali [class~="text-[#4ADE80]"] { color: var(--diwali-gold) !important; }
+/* text on a solid orange button stays white */
+html.diwali [class~="bg-[#16A34A]"][class~="text-white"] { color: #fff !important; }
+
+/* ── borders, rings, accents ── */
+html.diwali [class~="border-[#16A34A]"],
+html.diwali [class~="focus:border-[#16A34A]"]:focus,
+html.diwali [class~="focus-within:border-[#16A34A]"]:focus-within,
+html.diwali [class~="hover:border-[#16A34A]"]:hover,
+html.diwali .group:hover [class~="group-hover:border-[#16A34A]"] { border-color: var(--diwali-primary) !important; }
+html.diwali [class~="border-[#BBF7D0]"],
+html.diwali [class~="border-[#DCFCE7]"] { border-color: var(--diwali-border) !important; }
+html.diwali [class~="accent-[#16A34A]"] { accent-color: var(--diwali-primary) !important; }
+html.diwali [class~="fill-[#16A34A]"] { fill: var(--diwali-primary) !important; }
+html.diwali [class~="ring-[#16A34A]"],
+html.diwali [class~="focus:ring-[#16A34A]"]:focus { --tw-ring-color: var(--diwali-primary) !important; }
+html.diwali [class~="ring-[#14532D]"] { --tw-ring-color: var(--diwali-maroon) !important; }
+
+/* ── gradients ── */
+html.diwali [class~="from-[#14532D]"] { --tw-gradient-from: var(--diwali-maroon) !important; }
+html.diwali [class~="to-[#14532D]"] { --tw-gradient-to: var(--diwali-maroon) !important; }
+html.diwali [class~="to-[#16A34A]"] { --tw-gradient-to: var(--diwali-primary) !important; }
+html.diwali [class~="from-[#F0FDF4]"] { --tw-gradient-from: var(--diwali-lighter) !important; }
+
+/* ── green glow shadows (shadow-[...rgba(22,163,74,…)]) become a warm glow ── */
+html.diwali [class*="rgba(22,163,74"] { box-shadow: 0 6px 18px rgba(232, 89, 12, 0.32) !important; }
+
+/* ── the home page's festive (Happy Diwali) section: saffron instead of green ── */
+html.diwali .festive-section {
+  background: linear-gradient(180deg, #5B1A06 0%, #B8400C 26%, #F5A45A 58%, #FFF0DC 100%) !important;
+}
+html.diwali .festive-section > [aria-hidden][style*="rgba(134,239,172"] {
+  background: radial-gradient(circle, rgba(255, 183, 77, 0.55) 0%, rgba(255, 183, 77, 0) 70%) !important;
+}
+html.diwali .festive-section [class~="to-[#14532D]/55"] { --tw-gradient-to: rgba(124, 45, 18, 0.55) !important; }
+html.diwali .festive-section [class*="rgba(20,83,45"] { box-shadow: 0 8px 20px rgba(124, 45, 18, 0.28) !important; }
+html.diwali .festive-section p[class*="text-[#FDE68A]"] { color: #FFE2A8 !important; }
+html.diwali .festive-section p[class*="text-[#DCFCE7]"] { color: #FFEBD0 !important; }
+/* the "Fresh Fruits" box */
+html.diwali .festive-fruit-box {
+  background: linear-gradient(180deg, #FFEBD0, #FFC27A) !important;
+  box-shadow: 0 8px 20px rgba(124, 45, 18, 0.25) !important;
+}
+html.diwali .festive-fruit-box p:first-child, html.diwali .festive-fruit-box > span { color: #7C2D12 !important; }
+html.diwali .festive-fruit-box p:nth-child(2) { color: #9A5B1E !important; }
+html.diwali .festive-section [class*="ring-[#F5C542]"] { --tw-ring-color: rgba(245, 165, 36, 0.9) !important; }
+
+/* ── string of lights hanging along the very top (floats over the header, changes no spacing) ── */
+.diwali-lights {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 18px;
+  z-index: 70;
+  pointer-events: none;
+  overflow: hidden;
+}
+.diwali-lights::before {            /* the wire */
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: linear-gradient(90deg, #7C2D12, #C2410C, #7C2D12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.diwali-lights span {
+  position: absolute; top: 4px;
+  width: 7px; height: 11px;
+  border-radius: 50% 50% 55% 55%;
+  background: var(--c);
+  box-shadow: 0 0 7px 2px var(--c);
+  animation: diwali-twinkle 1.8s ease-in-out infinite;
+  animation-delay: var(--d);
+}
+.diwali-lights span::before {       /* cap */
+  content: '';
+  position: absolute; left: 1px; top: -2px; width: 5px; height: 3px;
+  background: #5B1F0B; border-radius: 1px;
+}
+@keyframes diwali-twinkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.88); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .diwali-lights span { animation: none; }
+}

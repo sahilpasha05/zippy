@@ -682,7 +682,7 @@ export default function AdminOrdersPage() {
                                     )}
                                     <span className="flex-1 text-[12.5px] text-[#111827]">{item.name}</span>
                                     <span className="text-[12px] text-[#6B7280]">× {item.quantity}</span>
-                                    <span className="text-[12.5px] font-[600] text-[#111827] w-16 text-right">₹{item.price * item.quantity}</span>
+                                    <span className="text-[12.5px] font-[600] text-[#111827] w-16 text-right">₹{Math.round(item.price * item.quantity)}</span>
                                   </div>
                                 ))}
                               </div>

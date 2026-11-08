@@ -880,7 +880,7 @@ export default function DeliveryOrdersPage() {
                           {o.order_items.map((item, i) => (
                             <div key={i} className="flex items-center justify-between text-[12px] text-[#374151]">
                               <span>{item.name} × {item.quantity}</span>
-                              <span className="font-[600]">₹{item.price * item.quantity}</span>
+                              <span className="font-[600]">₹{Math.round(item.price * item.quantity)}</span>
                             </div>
                           ))}
                           <div className="flex items-center justify-between border-t border-dashed border-[#E5E7EB] pt-1 text-[12.5px] font-[800] text-[#111827]">

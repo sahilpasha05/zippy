@@ -426,7 +426,7 @@ export default function SlugOrdersPage() {
                                 </div>
                                 <span className="text-[#374151] break-words min-w-0">{item.name} <span className="text-[#9CA3AF] whitespace-nowrap">× {item.quantity}</span></span>
                               </div>
-                              <span className="text-[#111827] font-medium shrink-0 whitespace-nowrap">₹{item.price * item.quantity}</span>
+                              <span className="text-[#111827] font-medium shrink-0 whitespace-nowrap">₹{Math.round(item.price * item.quantity)}</span>
                             </div>
                           ))}
                         </div>

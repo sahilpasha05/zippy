@@ -169,7 +169,7 @@ export default function DairyOrdersPage() {
                           {o.order_items?.map((item, i) => (
                             <div key={i} className="flex items-center justify-between text-[12.5px]">
                               <span className="text-[#374151]">{item.name} <span className="text-[#9CA3AF]">×{item.quantity}</span></span>
-                              <span className="font-[600] text-[#111827]">₹{item.price * item.quantity}</span>
+                              <span className="font-[600] text-[#111827]">₹{Math.round(item.price * item.quantity)}</span>
                             </div>
                           ))}
                         </div>

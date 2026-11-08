@@ -379,7 +379,7 @@ export default function GrocerySlugOrdersPage() {
                                 </div>
                                 <span className="text-[#374151] truncate">{item.name} <span className="text-[#9CA3AF]">× {item.quantity}</span></span>
                               </div>
-                              <span className="text-[#111827] font-medium shrink-0">₹{item.price * item.quantity}</span>
+                              <span className="text-[#111827] font-medium shrink-0">₹{Math.round(item.price * item.quantity)}</span>
                             </div>
                           ))}
                         </div>

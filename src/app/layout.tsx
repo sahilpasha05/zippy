@@ -4,6 +4,7 @@ import CanonicalUrl from "@/components/CanonicalUrl";
 import BottomNav from "@/components/layout/BottomNav";
 import ActiveOrderBar from "@/components/ActiveOrderBar";
 import RainMode from "@/components/RainMode";
+import DiwaliTheme from "@/components/DiwaliTheme";
 import DeliveryZonesLoader from "@/components/DeliveryZonesLoader";
 import "./globals.css";
 import { CITY } from '@/lib/city'
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-white antialiased">
         <CanonicalUrl />
+        <DiwaliTheme />
         {children}
         <BottomNav />
         <ActiveOrderBar />

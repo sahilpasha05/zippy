@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import BlinkitProductCard, { type BlinkitProduct } from '@/components/BlinkitProductCard'
+import QuickStockEditor from '@/components/admin/QuickStockEditor'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,27 +23,23 @@ function rank(name: string) {
 export default function ChilledDrinks() {
   const [products, setProducts] = useState<BlinkitProduct[]>([])
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      const { data: cat } = await supabase.from('grocery_categories').select('id').eq('slug', 'drinks').maybeSingle()
-      if (!cat || cancelled) return
-      const { data } = await supabase
-        .from('grocery_products')
-        .select('id, name, price, mrp, weight, image_url, in_stock')
-        .eq('category_id', cat.id)
-        .eq('is_active', true)
-        .eq('in_stock', true)
-        .not('image_url', 'is', null)
-        .limit(12)
-      if (cancelled) return
-      setProducts(((data as BlinkitProduct[]) ?? []).sort((a, b) => rank(a.name) - rank(b.name)))
-    }
-    load()
-    return () => { cancelled = true }
+  const load = useCallback(async () => {
+    const { data: cat } = await supabase.from('grocery_categories').select('id').eq('slug', 'drinks').maybeSingle()
+    if (!cat) return
+    const { data } = await supabase
+      .from('grocery_products')
+      .select('id, name, price, mrp, weight, image_url, in_stock')
+      .eq('category_id', cat.id)
+      .eq('is_active', true)
+      .eq('in_stock', true)
+      .not('image_url', 'is', null)
+      .limit(12)
+    setProducts(((data as BlinkitProduct[]) ?? []).sort((a, b) => rank(a.name) - rank(b.name)))
   }, [])
 
-  if (products.length === 0) return null
+  useEffect(() => { queueMicrotask(() => { void load() }) }, [load])
+
+  if (products.length === 0) return <div className="flex justify-end"><QuickStockEditor title="Cold drinks — prices & stock" categorySlug="drinks" onChanged={load} /></div>
 
   return (
     <section className="rounded-3xl bg-gradient-to-b from-[#E6F5FF] via-[#F2FAFF] to-white p-4 lg:p-6 ring-1 ring-[#D4ECFB]">
@@ -51,9 +48,12 @@ export default function ChilledDrinks() {
           <h2 className="text-[20px] lg:text-[22px] font-[800] tracking-tight text-[#0C4A6E]" style={{ fontWeight: 800 }}>Chilled drinks &amp; energy</h2>
           <p className="mt-0.5 text-[12.5px] text-[#4B7A94]">Ice-cold cans, delivered in minutes</p>
         </div>
-        <Link href="/essentials/drinks" className="text-[13px] font-[700] text-[#16A34A] hover:text-[#15803D] transition-colors">
-          See all →
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <Link href="/essentials/drinks" className="text-[13px] font-[700] text-[#16A34A] hover:text-[#15803D] transition-colors">
+            See all →
+          </Link>
+          <QuickStockEditor title="Cold drinks — prices & stock" categorySlug="drinks" onChanged={load} />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {products.map((p) => <BlinkitProductCard key={p.id} p={p} />)}

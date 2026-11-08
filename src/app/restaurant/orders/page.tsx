@@ -369,7 +369,7 @@ export default function RestaurantOrdersPage() {
                           {items.map((item, idx) => (
                             <div key={idx} className="flex justify-between text-[12.5px]">
                               <span className="text-[#374151]">{item.name} <span className="text-[#9CA3AF]">× {item.quantity}</span></span>
-                              <span className="text-[#111827] font-medium">₹{item.price * item.quantity}</span>
+                              <span className="text-[#111827] font-medium">₹{Math.round(item.price * item.quantity)}</span>
                             </div>
                           ))}
                         </div>

@@ -6,6 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import BlinkitProductCard, { type BlinkitProduct } from '@/components/BlinkitProductCard'
 import { currentFestival } from '@/lib/festival'
+import QuickStockEditor from '@/components/admin/QuickStockEditor'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,7 +63,7 @@ function FestiveBox({ title, subtitle, pics, href, onClick, tone }: {
       </span>
     </>
   )
-  const cls = `block min-w-0 rounded-[22px] p-3 text-left shadow-[0_8px_20px_rgba(20,83,45,0.2)] ring-1 ring-white/70 active:scale-[0.98] transition-transform ${sweet ? 'bg-gradient-to-b from-[#FFF3C9] to-[#FFD970]' : 'bg-gradient-to-b from-[#E4F9E9] to-[#9BE0AE]'}`
+  const cls = `${sweet ? '' : 'festive-fruit-box '}block min-w-0 rounded-[22px] p-3 text-left shadow-[0_8px_20px_rgba(20,83,45,0.2)] ring-1 ring-white/70 active:scale-[0.98] transition-transform ${sweet ? 'bg-gradient-to-b from-[#FFF3C9] to-[#FFD970]' : 'bg-gradient-to-b from-[#E4F9E9] to-[#9BE0AE]'}`
   return href
     ? <Link href={href} className={cls}>{body}</Link>
     : <button type="button" onClick={onClick} className={`${cls} w-full`}>{body}</button>
@@ -80,6 +81,7 @@ export default function FestiveSweets() {
   const [fruitsSlug, setFruitsSlug] = useState<string | null>(null)
   const [festival] = useState(currentFestival)
   const rowRef = useRef<HTMLDivElement>(null)
+  const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
     if (!festival) return
@@ -112,7 +114,7 @@ export default function FestiveSweets() {
     }
     load()
     return () => { cancelled = true }
-  }, [festival])
+  }, [festival, reloadTick])
 
   // The row drifts sideways on its own and loops (the list is rendered twice).
   // It stops while a finger or the mouse is on it and picks up again shortly
@@ -192,7 +194,7 @@ export default function FestiveSweets() {
 
   return (
     <section
-      className="relative -mx-6 lg:mx-0 lg:rounded-3xl overflow-hidden"
+      className="festive-section relative -mx-6 lg:mx-0 lg:rounded-3xl overflow-hidden"
       style={{ background: 'linear-gradient(180deg, #0B4A2A 0%, #15803D 26%, #86D49C 58%, #E7F8EC 100%)' }}
     >
       {/* Festoon of marigolds along the top edge */}
@@ -244,6 +246,9 @@ export default function FestiveSweets() {
           <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#14532D]/55" />
           <h3 className="text-[19px] font-[800] text-[#14532D] tracking-tight" style={{ fontWeight: 800 }}>Festive Sweets</h3>
           <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#14532D]/55" />
+        </div>
+        <div className="mb-3 flex justify-center px-6">
+          <QuickStockEditor title="Festive sweets — prices & stock" nameWords={SWEET_WORDS} onChanged={() => setReloadTick((t) => t + 1)} />
         </div>
 
         <div ref={rowRef} className="flex gap-3 overflow-x-auto px-6 lg:px-10 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
