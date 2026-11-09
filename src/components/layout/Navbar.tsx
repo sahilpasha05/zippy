@@ -14,7 +14,7 @@ import { useAddresses } from '@/lib/hooks/useAddresses'
 import { useAddressStore } from '@/lib/store/address'
 import { useCartStore } from '@/lib/store/cart'
 import { cn } from '@/lib/utils'
-import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { useDeliveryEta, useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
 import { createClient } from '@/lib/supabase/client'
 import LocationPicker from '@/components/LocationPicker'
 import { CITY } from '@/lib/city'
@@ -34,7 +34,8 @@ export default function Navbar() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [confirmingSignOut, setConfirmingSignOut] = useState(false)
   const [user, setUser] = useState<{ id: string; phone?: string; email?: string } | null>(null)
-  const deliveryEta = useDeliveryEta()
+  const restaurantEta = useDeliveryEta()
+  const groceryEta = useGroceryDeliveryEta()
   const { addresses, selectedId, ready: addressesReady } = useAddresses()
 
   useEffect(() => {
@@ -71,6 +72,8 @@ export default function Navbar() {
   const locationSubLabel = selectedAddress ? selectedAddress.label : 'Set your location'
 
   const onRestaurantSide = pathname.startsWith('/restaurant')
+  // Groceries and restaurants have their own delivery times.
+  const deliveryEta = onRestaurantSide ? restaurantEta : groceryEta
   // On a restaurant's own page the page has its "Search menu" box, so the
   // site-wide product search is hidden to avoid two search bars.
   const onRestaurantMenu = /^\/restaurants\/[^/]+/.test(pathname)

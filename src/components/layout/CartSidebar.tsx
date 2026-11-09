@@ -6,8 +6,9 @@ import { useCartStore } from '@/lib/store/cart'
 import { X, ShoppingCart, Plus, Minus, Trash2, Zap, ArrowRight } from 'lucide-react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { useDeliveryEta } from '@/lib/useDeliveryEta'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
+import { useDeliveryEta, useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
+import YouMightAlsoLike from '@/components/YouMightAlsoLike'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getHandlingFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
 import { useLiveLocation } from '@/lib/store/liveLocation'
 import RainNote from '@/components/RainNote'
 import { resolveZoneRule, defaultZoneRule, useDeliveryZones } from '@/lib/deliveryZones'
@@ -57,8 +58,11 @@ export default function CartSidebar() {
     closeCart()
     router.push('/checkout')
   }
-  const grandTotal = cartTotal + deliveryFee + platformFee
-  const deliveryEta = useDeliveryEta()
+  const handlingFee = getHandlingFee(items)
+  const grandTotal = cartTotal + deliveryFee + platformFee + handlingFee
+  const restaurantEta = useDeliveryEta()
+  const groceryEta = useGroceryDeliveryEta()
+  const deliveryEta = items.some((i) => i.restaurant_id) ? restaurantEta : groceryEta
 
   useEffect(() => {
     useCartStore.persist.rehydrate()
@@ -156,6 +160,7 @@ export default function CartSidebar() {
                 </div>
                 )
               })}
+              <YouMightAlsoLike compact />
             </div>
           )}
         </div>
@@ -184,6 +189,12 @@ export default function CartSidebar() {
                 <span>Platform fee</span>
                 <span>₹{platformFee}</span>
               </div>
+              {handlingFee > 0 && (
+                <div className="flex justify-between text-[13px] text-[#6B7280]">
+                  <span>Handling fee <span className="text-[11px] text-[#9CA3AF]">(more than 9 items)</span></span>
+                  <span>₹{handlingFee}</span>
+                </div>
+              )}
               <div className="flex justify-between text-[15px] font-700 text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 700 }}>
                 <span>Total</span>
                 <span>₹{grandTotal.toFixed(0)}</span>

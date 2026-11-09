@@ -8,6 +8,9 @@ import FeaturedRestaurants from '@/components/home/FeaturedRestaurants'
 import QuickCategories from '@/components/home/QuickCategories'
 import FestiveSweets from '@/components/home/FestiveSweets'
 import ChilledDrinks from '@/components/home/ChilledDrinks'
+import DailyMilk from '@/components/home/DailyMilk'
+import { ShopTabs, ShopTiles } from '@/components/home/ShopShortcuts'
+import IceCreamRow from '@/components/home/IceCreamRow'
 import SiteFooter from '@/components/layout/SiteFooter'
 import HomeSignInPrompt from '@/components/HomeSignInPrompt'
 
@@ -25,9 +28,13 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-[1440px] mx-auto px-6 lg:px-10 space-y-10 lg:space-y-16 pb-20 pt-4 lg:pt-0">
+        <ShopTabs />
         <BannerCarousel />
+        <ShopTiles />
+        <DailyMilk />
         <FestiveSweets />
         <ChilledDrinks />
+        <IceCreamRow />
         <QuickCategories />
         <TrendingProducts />
         <FeaturedRestaurants />

@@ -1,0 +1,20 @@
+/* The home page's "Happy Diwali" section is red. Only this section: the rest of the site stays green. */
+.festive-section {
+  background: linear-gradient(180deg, #5E0B0B 0%, #B91C1C 28%, #F2766B 60%, #FFE8E4 100%) !important;
+}
+.festive-section > [aria-hidden][style*="rgba(134,239,172"] {
+  background: radial-gradient(circle, rgba(255, 200, 120, 0.5) 0%, rgba(255, 200, 120, 0) 70%) !important;
+}
+.festive-section [class~="to-[#14532D]/55"] { --tw-gradient-to: rgba(127, 29, 29, 0.55) !important; }
+.festive-section [class*="rgba(20,83,45"] { box-shadow: 0 8px 20px rgba(127, 29, 29, 0.3) !important; }
+.festive-section p[class*="text-[#FDE68A]"] { color: #FFE2A8 !important; }
+.festive-section p[class*="text-[#DCFCE7]"] { color: #FFE4E0 !important; }
+.festive-section [class~="text-[#14532D]"] { color: #7F1D1D !important; }
+/* the "Fresh Fruits" box */
+.festive-fruit-box {
+  background: linear-gradient(180deg, #FFE9E4, #FFB8AE) !important;
+  box-shadow: 0 8px 20px rgba(127, 29, 29, 0.25) !important;
+}
+.festive-fruit-box p:first-child, .festive-fruit-box > span { color: #7F1D1D !important; }
+.festive-fruit-box p:nth-child(2) { color: #9B3B33 !important; }
+.festive-section [class*="ring-[#F5C542]"] { --tw-ring-color: rgba(245, 165, 36, 0.9) !important; }

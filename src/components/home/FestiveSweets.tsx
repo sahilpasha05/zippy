@@ -6,6 +6,7 @@ import { ChevronRight } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import BlinkitProductCard, { type BlinkitProduct } from '@/components/BlinkitProductCard'
 import { currentFestival } from '@/lib/festival'
+import './FestiveRed.css'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -68,6 +69,15 @@ function FestiveBox({ title, subtitle, pics, href, onClick, tone }: {
     : <button type="button" onClick={onClick} className={`${cls} w-full`}>{body}</button>
 }
 
+// Famous chocolates and Kinder Joy for gifting, shown under the sweets.
+const CHOC_WORDS = ['kinder', 'kitkat', 'cadbury', 'dairy milk', 'silk', 'ferrero', 'snickers', 'munch', 'five star', '5 star', 'perk', 'gems', 'bournville', 'toblerone', 'oreo']
+const NOT_CHOC = ['cake', 'ice cream', 'shake', 'lassi', 'cookie', 'peda', 'burfi', 'ladoo']
+function chocRank(name: string) {
+  const n = name.toLowerCase()
+  const i = CHOC_WORDS.findIndex((w) => n.includes(w))
+  return i === -1 ? CHOC_WORDS.length : i
+}
+
 function rank(name: string) {
   const n = name.toLowerCase()
   const i = SWEET_WORDS.findIndex((w) => n.includes(w))
@@ -76,6 +86,7 @@ function rank(name: string) {
 
 export default function FestiveSweets() {
   const [sweets, setSweets] = useState<Sweet[]>([])
+  const [chocolates, setChocolates] = useState<Sweet[]>([])
   const [fruits, setFruits] = useState<Pic[]>([])
   const [fruitsSlug, setFruitsSlug] = useState<string | null>(null)
   const [festival] = useState(currentFestival)
@@ -95,6 +106,16 @@ export default function FestiveSweets() {
         .limit(40)
       if (cancelled) return
       setSweets(((data as Sweet[]) ?? []).sort((a, b) => rank(a.name) - rank(b.name) || a.price - b.price))
+
+      const { data: choc } = await supabase
+        .from('grocery_products')
+        .select('id, name, price, mrp, weight, image_url, in_stock')
+        .eq('is_active', true)
+        .not('image_url', 'is', null)
+        .or(CHOC_WORDS.map((w) => `name.ilike.%${w}%`).join(','))
+        .limit(40)
+      if (cancelled) return
+      setChocolates(((choc as Sweet[]) ?? []).filter((p) => !NOT_CHOC.some((w) => p.name.toLowerCase().includes(w))).sort((a, b) => chocRank(a.name) - chocRank(b.name) || a.price - b.price))
 
       const { data: cat } = await supabase.from('grocery_categories').select('id, slug').eq('slug', 'fruits-vegetables').maybeSingle()
       if (cancelled || !cat) return
@@ -259,6 +280,24 @@ export default function FestiveSweets() {
         </div>
 
       </div>
+      )}
+
+      {/* Chocolates and Kinder Joy */}
+      {chocolates.length > 0 && (
+        <div className="relative pb-6">
+          <div className="flex items-center gap-3 mb-4 px-6 lg:px-10">
+            <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[#14532D]/55" />
+            <h3 className="text-[19px] font-[800] text-[#14532D] tracking-tight" style={{ fontWeight: 800 }}>Chocolates &amp; Kinder Joy</h3>
+            <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[#14532D]/55" />
+          </div>
+          <div className="flex gap-3 overflow-x-auto px-6 lg:px-10 pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {chocolates.map((p) => (
+              <div key={p.id} className="shrink-0 w-[152px] sm:w-[172px] rounded-2xl bg-white p-1.5 ring-1 ring-[#F5C542]/80 shadow-[0_6px_16px_rgba(20,83,45,0.22)]">
+                <BlinkitProductCard p={p} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </section>
   )

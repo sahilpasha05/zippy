@@ -9,7 +9,7 @@ import Navbar from '@/components/layout/Navbar'
 import CartSidebar from '@/components/layout/CartSidebar'
 import ViewCartBar from '@/components/layout/ViewCartBar'
 import { createBrowserClient } from '@supabase/ssr'
-import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
 import { useGroceriesAvailable } from '@/lib/launchConfig'
 import BlinkitProductCard from '@/components/BlinkitProductCard'
 import CategoryComingSoon from '@/components/CategoryComingSoon'
@@ -65,7 +65,7 @@ function EssentialsPageInner() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [comingSoon, setComingSoon] = useState<Category | null>(null)
-  const deliveryEta = useDeliveryEta()
+  const deliveryEta = useGroceryDeliveryEta()
   const groceriesAvailable = useGroceriesAvailable()
 
   useEffect(() => {

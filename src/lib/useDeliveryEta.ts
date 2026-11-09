@@ -11,12 +11,18 @@ const supabase = createBrowserClient(
 // Single app-wide subscription shared by every useDeliveryEta() caller, so having
 // many product cards mounted at once doesn't spawn a realtime channel each.
 let currentMinutes = 10
+let currentGroceryMinutes = 30
 let initialized = false
 const listeners = new Set<(minutes: number) => void>()
+const groceryListeners = new Set<(minutes: number) => void>()
 
 function notify(minutes: number) {
   currentMinutes = minutes
   listeners.forEach((l) => l(minutes))
+}
+function notifyGrocery(minutes: number) {
+  currentGroceryMinutes = minutes
+  groceryListeners.forEach((l) => l(minutes))
 }
 
 function ensureInitialized() {
@@ -25,23 +31,25 @@ function ensureInitialized() {
 
   supabase
     .from('platform_settings')
-    .select('delivery_minutes')
+    .select('delivery_minutes, grocery_delivery_minutes')
     .eq('id', 1)
     .single()
     .then(({ data }) => {
       if (data?.delivery_minutes) notify(data.delivery_minutes)
+      if (data?.grocery_delivery_minutes) notifyGrocery(data.grocery_delivery_minutes)
     })
 
   supabase
     .channel('platform-settings-eta')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'platform_settings' }, (payload) => {
-      const next = (payload.new as { delivery_minutes?: number })?.delivery_minutes
-      if (next) notify(next)
+      const row = payload.new as { delivery_minutes?: number; grocery_delivery_minutes?: number }
+      if (row?.delivery_minutes) notify(row.delivery_minutes)
+      if (row?.grocery_delivery_minutes) notifyGrocery(row.grocery_delivery_minutes)
     })
     .subscribe()
 }
 
-// Admin-configured delivery ETA (minutes) from platform_settings. Defaults to 10.
+// Admin-configured delivery ETA (minutes) from platform_settings, for restaurant orders. Defaults to 10.
 // Updates live everywhere the moment an admin saves a new value.
 export function useDeliveryEta() {
   const [minutes, setMinutes] = useState<number>(currentMinutes)
@@ -51,6 +59,19 @@ export function useDeliveryEta() {
     listeners.add(setMinutes)
     setMinutes(currentMinutes)
     return () => { listeners.delete(setMinutes) }
+  }, [])
+
+  return minutes
+}
+
+// Delivery time for groceries (Settings -> Grocery delivery time). Defaults to 30.
+export function useGroceryDeliveryEta() {
+  const [minutes, setMinutes] = useState<number>(currentGroceryMinutes)
+
+  useEffect(() => {
+    ensureInitialized()
+    groceryListeners.add(setMinutes)
+    return () => { groceryListeners.delete(setMinutes) }
   }, [])
 
   return minutes

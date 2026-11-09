@@ -42,12 +42,7 @@ export function toLocalDateInput(d: string): string {
 // A plain single-substring match misses "amul butter" against a product named
 // "Butter (Amul, 500g)" — every typed word has to appear somewhere across the
 // searchable fields, but not in any particular order or field.
-export function matchesSearchQuery(query: string, ...fields: (string | null | undefined)[]): boolean {
-  const q = query.trim().toLowerCase()
-  if (!q) return true
-  const haystack = fields.filter(Boolean).join(' ').toLowerCase()
-  return q.split(/\s+/).every((word) => haystack.includes(word))
-}
+export { matchesSearchQuery } from '@/lib/search'
 
 // wa.me expects the number as digits only (country code, no + or leading 0).
 const SUPPORT_WHATSAPP_NUMBER = `91${CITY.supportWhatsapp}`

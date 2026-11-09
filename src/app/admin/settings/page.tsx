@@ -18,6 +18,7 @@ export default function AdminSettingsPage() {
     platformName: 'Zippy',
     supportEmail: CITY.supportEmail,
     deliveryMinutes: '10',
+    groceryDeliveryMinutes: '30',
     maxDeliveryFee: '99',
     minOrderValue: '49',
     orderNotifications: true,
@@ -44,6 +45,7 @@ export default function AdminSettingsPage() {
           platformName: data.platform_name ?? s.platformName,
           supportEmail: data.support_email ?? s.supportEmail,
           deliveryMinutes: String(data.delivery_minutes ?? 10),
+          groceryDeliveryMinutes: String((data as { grocery_delivery_minutes?: number }).grocery_delivery_minutes ?? 30),
           maxDeliveryFee: String(data.max_delivery_fee ?? 99),
           minOrderValue: String(data.min_order_value ?? 49),
           groceriesAvailable: data.groceries_available ?? true,
@@ -99,6 +101,7 @@ export default function AdminSettingsPage() {
       platform_name: settings.platformName,
       support_email: settings.supportEmail,
       delivery_minutes: +settings.deliveryMinutes || 10,
+      grocery_delivery_minutes: +settings.groceryDeliveryMinutes || 30,
       max_delivery_fee: +settings.maxDeliveryFee || 99,
       min_order_value: +settings.minOrderValue || 49,
       groceries_available: settings.groceriesAvailable,
@@ -135,8 +138,16 @@ export default function AdminSettingsPage() {
               <h2 className="text-[14px] font-[700] text-[#111827]">Delivery Promise</h2>
             </div>
             <p className="text-[12.5px] text-[#6B7280]">
-              Shown everywhere on the customer app — navbar, hero, product cards, cart and checkout.
+              Groceries and restaurants have their own delivery time. Shown in the navbar, product cards (under the price), cart and checkout.
             </p>
+            <p className="text-[12px] font-[700] text-[#374151]">Groceries (Zippy)</p>
+            <div className="flex items-center gap-3">
+              <input type="number" min="1" value={settings.groceryDeliveryMinutes} onChange={(e) => set('groceryDeliveryMinutes', e.target.value)}
+                className="w-28 px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[18px] font-[800] text-center outline-none focus:border-[#7C3AED] transition-all" />
+              <span className="text-[13.5px] text-[#374151] font-medium">minutes</span>
+              <span className="ml-auto text-[12px] text-[#9CA3AF] italic">Preview: &quot;{settings.groceryDeliveryMinutes || '30'} mins&quot;</span>
+            </div>
+            <p className="text-[12px] font-[700] text-[#374151]">Restaurants</p>
             <div className="flex items-center gap-3">
               <input type="number" min="1" value={settings.deliveryMinutes} onChange={(e) => set('deliveryMinutes', e.target.value)}
                 className="w-28 px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[18px] font-[800] text-center outline-none focus:border-[#7C3AED] transition-all" />

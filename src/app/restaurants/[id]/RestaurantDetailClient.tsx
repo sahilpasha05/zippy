@@ -154,6 +154,7 @@ export default function RestaurantDetailClient() {
   const [wishlist, setWishlist] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const cartCount = useCartStore((st) => st.items.reduce((n, i) => n + i.quantity, 0))
+  const cartOpen = useCartStore((st) => st.isOpen)
 
   useEffect(() => {
     async function load() {
@@ -372,7 +373,7 @@ export default function RestaurantDetailClient() {
           </div>
         </div>
       </div>
-      {menu.length > 0 && (
+      {menu.length > 0 && !cartOpen && (
         <div className="lg:hidden">
           {menuOpen && (
             <div className="fixed inset-0 z-[60]" onClick={() => setMenuOpen(false)}>

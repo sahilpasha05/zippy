@@ -5,7 +5,7 @@ import { Plus, Minus, Timer, Package } from 'lucide-react'
 import { useState } from 'react'
 import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
-import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
 import { useOrderingEnabled, useGroceriesAvailable } from '@/lib/launchConfig'
 
 export type BlinkitProduct = {
@@ -30,7 +30,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
     if (conflictsWithCart(items, null)) { setAskReplace(true); return }
     addItem(draft)
   }
-  const deliveryEta = useDeliveryEta()
+  const deliveryEta = useGroceryDeliveryEta()
   const launchEnabled = useOrderingEnabled()
   const groceriesAvailable = useGroceriesAvailable()
   // Admin can pause grocery ordering (Settings -> Groceries) independently of
@@ -69,12 +69,6 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
         )}
       </div>
 
-      {/* ETA chip */}
-      <div className="flex items-center gap-0.5 bg-[#F8F8F8] rounded-[4px] px-1 py-0.5 w-fit mb-1">
-        <Timer className="w-2.5 h-2.5 text-[#666]" strokeWidth={2.5} />
-        <span className="text-[9px] font-[700] text-[#666] tracking-wide uppercase">{deliveryEta} mins</span>
-      </div>
-
       {/* Name + weight */}
       <h3 className="text-[13px] font-[600] text-[#1F1F1F] leading-snug line-clamp-2 mb-0.5">{p.name}</h3>
       <p className="text-[12px] text-[#666] mb-3">{p.weight ?? ''}</p>
@@ -84,6 +78,7 @@ export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
         <div className="leading-tight">
           <div className="text-[13px] font-[700] text-[#1F1F1F]">₹{p.price}</div>
           {discount > 0 && <div className="text-[11px] text-[#9CA3AF] line-through">₹{mrp}</div>}
+          <div className="mt-0.5 flex items-center gap-0.5 text-[10px] font-[600] text-[#6B7280]"><Timer className="h-2.5 w-2.5" strokeWidth={2.5} />{deliveryEta} mins</div>
         </div>
         {orderingEnabled && inStock ? (
           cartItem ? (

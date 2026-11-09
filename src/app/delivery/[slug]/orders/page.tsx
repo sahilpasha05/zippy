@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
 import { format, isToday, isYesterday } from 'date-fns'
 import Link from 'next/link'
-import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle, QrCode, Banknote, Smartphone, ChevronDown } from 'lucide-react'
+import { Search, Truck, CheckCircle, XCircle, Clock, AlertCircle, ChefHat, Phone, MapPin, Loader2, Bike, Volume2, VolumeX, BellRing, LogOut, Navigation, Map, Package, BarChart3, X, ChevronRight, MessageCircle, RefreshCw, QrCode, Banknote, Smartphone, ChevronDown } from 'lucide-react'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm, chime, systemNotify } from '@/lib/orderAlarm'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
@@ -257,6 +257,9 @@ export default function DeliveryOrdersPage() {
   const [deliveringBusy, setDeliveringBusy] = useState(false)
   const [deliverError, setDeliverError] = useState('')
   const [slideAttempt, setSlideAttempt] = useState(0)
+  // "Check payment": asks Cashfree whether an online payment that still shows pending has come through.
+  const [checkingPay, setCheckingPay] = useState<string | null>(null)
+  const [payResult, setPayResult] = useState<Record<string, string>>({})
 
   const loadOrders = useCallback(async (partnerId: string) => {
     const { data } = await supabase
@@ -539,6 +542,24 @@ export default function DeliveryOrdersPage() {
     </div>
   )
 
+  async function checkPayment(orderId: string) {
+    setCheckingPay(orderId)
+    setPayResult((r) => ({ ...r, [orderId]: '' }))
+    let msg = 'Could not check. Try again.'
+    try {
+      const res = await fetch(`/api/cashfree/status/${orderId}`)
+      const json = await res.json()
+      if (json.state === 'COMPLETED') {
+        msg = 'Payment received'
+        if (partnerIdRef.current) await loadOrders(partnerIdRef.current)
+      } else if (json.state === 'PENDING') msg = 'Still pending. Not paid yet.'
+      else if (json.state === 'FAILED') msg = 'Payment failed or expired'
+    } catch { /* keep the default message */ }
+    setCheckingPay(null)
+    setPayResult((r) => ({ ...r, [orderId]: msg }))
+    setTimeout(() => setPayResult((r) => ({ ...r, [orderId]: '' })), 6000)
+  }
+
   const activeOrders = orders.filter((o) => !['delivered', 'cancelled'].includes(o.status))
   // Not yet picked up: still with the kitchen, or assigned but not accepted.
   const pendingOrders = activeOrders.filter((o) => !o.accepted_at || ['pending', 'confirmed', 'preparing'].includes(o.status))
@@ -807,6 +828,16 @@ export default function DeliveryOrdersPage() {
                             ? 'online payment not received'
                             : 'cash on delivery'}
                       </span>
+                    </div>
+                  )}
+                  {!['delivered', 'cancelled'].includes(o.status) && (o.online_amount ?? 0) > 0 && !onlineSettled(o) && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <button onClick={() => void checkPayment(o.id)} disabled={checkingPay === o.id}
+                        className="flex items-center gap-1.5 rounded-lg border border-[#16A34A] bg-[#F0FDF4] px-3 py-1.5 text-[12px] font-[700] text-[#15803D] transition-all active:scale-95 disabled:opacity-60">
+                        <RefreshCw className={cn('h-3.5 w-3.5', checkingPay === o.id && 'animate-spin')} />
+                        {checkingPay === o.id ? 'Checking...' : `Check payment (₹${o.online_amount})`}
+                      </button>
+                      {payResult[o.id] && <span className={cn('text-[11.5px] font-[600]', payResult[o.id] === 'Payment received' ? 'text-[#15803D]' : 'text-[#B45309]')}>{payResult[o.id]}</span>}
                     </div>
                   )}
 

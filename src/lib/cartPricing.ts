@@ -53,6 +53,16 @@ export function getPlatformFee(orderValue: number): number {
   return PLATFORM_FEE_BANDS.find((b) => orderValue < b.upTo)!.fee
 }
 
+// A grocery order of more than 9 items (counting quantities) carries a flat ₹9 handling fee. Restaurant orders never do.
+export const HANDLING_FEE: number = 9
+export const HANDLING_FEE_AFTER_ITEMS: number = 9
+
+export function getHandlingFee(items: CartItem[]): number {
+  if (items.length === 0 || items.some((i) => i.restaurant_id)) return 0
+  const units = items.reduce((n, i) => n + i.quantity, 0)
+  return units > HANDLING_FEE_AFTER_ITEMS ? HANDLING_FEE : 0
+}
+
 export function getCartBaseTotal(items: CartItem[]): number {
   return items.reduce((sum, i) => sum + applyPriceMarkup(i.price, i.product_id) * i.quantity, 0)
 }

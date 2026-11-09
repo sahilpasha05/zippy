@@ -9,8 +9,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCartStore } from '@/lib/store/cart'
 import { useAddresses } from '@/lib/hooks/useAddresses'
-import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
-import { useDeliveryEta } from '@/lib/useDeliveryEta'
+import { getCartBaseTotal, getAdjustedUnitPrice, getPlatformFee, getHandlingFee, getDeliveryFee, getMinOrderValue } from '@/lib/cartPricing'
+import { useDeliveryEta, useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
 import { NEEDS_CONFIRMATION_MESSAGE, ALLOW_LOCATION_MESSAGE, MANUAL_ADDRESS_NOTE } from '@/lib/deliveryZone'
 import { useLiveLocation } from '@/lib/store/liveLocation'
 import { resolveZoneRule, useDeliveryZones } from '@/lib/deliveryZones'
@@ -22,6 +22,7 @@ import PhoneLoginModal from '@/components/PhoneLoginModal'
 import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { CITY } from '@/lib/city'
 import RainNote from '@/components/RainNote'
+import YouMightAlsoLike from '@/components/YouMightAlsoLike'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,9 +40,11 @@ const LABEL_ICONS: Record<string, typeof Home> = { Home, Work: Briefcase, Other:
 export default function CheckoutPage() {
   const { items, clearCart } = useCartStore()
   const { addresses, selectedId, selectAddress, ready: addressesReady } = useAddresses()
-  const deliveryEta = useDeliveryEta()
+  const restaurantEta = useDeliveryEta()
+  const groceryEta = useGroceryDeliveryEta()
   const [mounted, setMounted] = useState(false)
   const cartTotal = getCartBaseTotal(items)
+  const deliveryEta = items.some((i) => i.restaurant_id) ? restaurantEta : groceryEta
   const [chosenPayment, setSelectedPayment] = useState('upi')
   const [placing, setPlacing] = useState(false)
   const [placed, setPlaced] = useState(false)
@@ -113,7 +116,8 @@ export default function CheckoutPage() {
   const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
   const belowMinOrder = minOrder > 0 && cartTotal < minOrder
   const platformFee = getPlatformFee(cartTotal)
-  const grandTotal = cartTotal + deliveryFee + platformFee
+  const handlingFee = getHandlingFee(items)
+  const grandTotal = cartTotal + deliveryFee + platformFee + handlingFee
   const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
   const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
   const codAmount = isSplitPayment ? grandTotal - onlineAmount : (selectedPayment === 'cod' ? grandTotal : 0)
@@ -567,6 +571,12 @@ export default function CheckoutPage() {
                     <span>Platform fee</span>
                     <span>₹{platformFee}</span>
                   </div>
+                  {handlingFee > 0 && (
+                    <div className="flex justify-between text-[13px] text-[#6B7280]">
+                      <span>Handling fee <span className="text-[11px] text-[#9CA3AF]">(more than 9 items)</span></span>
+                      <span>₹{handlingFee}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-[16px] font-[800] text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 800 }}>
                     <span>Total</span><span>₹{grandTotal.toFixed(0)}</span>
                   </div>
@@ -606,6 +616,7 @@ export default function CheckoutPage() {
               </div>
             </div>
           </div>
+          {mounted && items.length > 0 && <div className="pb-24 lg:pb-4"><YouMightAlsoLike /></div>}
         </div>
       </div>
 
