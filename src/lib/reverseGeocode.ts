@@ -29,20 +29,35 @@ export function getCurrentPosition(): Promise<GeolocationPosition> {
       ))
       return
     }
+    // iPhone browsers can leave this call hanging (the position timeout does not cover the
+    // permission prompt, and some in-app browsers never answer), which left "Proceed to
+    // Checkout" doing nothing. A watchdog guarantees an answer so the customer always gets
+    // either their position or a clear message with the manual-address option.
+    let done = false
+    const watchdog = setTimeout(() => {
+      if (done) return
+      done = true
+      reject(new Error('Timed out finding your location. Check that Location is allowed for this browser (iPhone: Settings > Privacy > Location Services), then try again.'))
+    }, 12000)
     navigator.geolocation.getCurrentPosition(
-      resolve,
+      (pos) => { if (done) return; done = true; clearTimeout(watchdog); resolve(pos) },
       // GeolocationPositionError is not an Error instance, so callers doing
       // `err instanceof Error` would otherwise lose the reason entirely.
-      (err) => reject(new Error(
-        err.code === err.PERMISSION_DENIED
-          ? 'Location permission is blocked. Allow location access for this site in your browser settings and try again.'
-          : err.code === err.POSITION_UNAVAILABLE
-            ? 'Your location could not be determined. Check that device location/GPS is switched on.'
-            : err.code === err.TIMEOUT
-              ? 'Timed out finding your location. Move somewhere with a clearer signal and try again.'
-              : err.message || 'Could not get your location'
-      )),
-      { enableHighAccuracy: true, timeout: 15000 }
+      (err) => {
+        if (done) return
+        done = true; clearTimeout(watchdog)
+        reject(new Error(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission is blocked. Allow location access for this site in your browser settings and try again.'
+            : err.code === err.POSITION_UNAVAILABLE
+              ? 'Your location could not be determined. Check that device location/GPS is switched on.'
+              : err.code === err.TIMEOUT
+                ? 'Timed out finding your location. Move somewhere with a clearer signal and try again.'
+                : err.message || 'Could not get your location'
+        ))
+      },
+      // Network/Wi-Fi accuracy is quick and plenty for the delivery zone; a recent fix is reused.
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }
     )
   })
 }

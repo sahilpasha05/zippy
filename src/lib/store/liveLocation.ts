@@ -20,7 +20,9 @@ interface LiveLocationStore {
   continueManually: () => void
 }
 
-export const useLiveLocation = create<LiveLocationStore>()((set, get) => ({
+let inflight: Promise<boolean> | null = null
+
+export const useLiveLocation = create<LiveLocationStore>()((set) => ({
   coords: null,
   status: 'idle',
   error: '',
@@ -28,8 +30,10 @@ export const useLiveLocation = create<LiveLocationStore>()((set, get) => ({
 
   continueManually: () => set({ manualMode: true }),
 
-  request: async () => {
-    if (get().status === 'loading') return false
+  request: () => {
+    // A second tap while a request is still running waits for it instead of failing silently.
+    if (inflight) return inflight
+    inflight = (async () => {
     set({ status: 'loading', error: '' })
     try {
       const pos = await getCurrentPosition()
@@ -38,6 +42,10 @@ export const useLiveLocation = create<LiveLocationStore>()((set, get) => ({
     } catch (err) {
       set({ coords: null, status: 'denied', error: err instanceof Error ? err.message : 'Could not get your location' })
       return false
+    } finally {
+      inflight = null
     }
+    })()
+    return inflight
   },
 }))
