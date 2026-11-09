@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Product and tile photos are served from our own /public/products. Let browsers keep them for a day
+  // (and reuse them while refreshing for a week) so repeat visits do not wait on the network.
+  async headers() {
+    return [
+      { source: '/products/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
+      { source: '/categories/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
+    ]
+  },
   images: {
     // Vercel's image optimizer is over its plan quota and answers every
     // /_next/image request with 402 (OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED),
