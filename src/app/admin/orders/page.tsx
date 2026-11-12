@@ -29,6 +29,15 @@ const TABS = ['All', 'Active', 'On hold', 'Unassigned', 'Preparing', 'Delivered'
 function isHeld(notes: string | null | undefined): boolean {
   return !!notes && notes.startsWith('ON HOLD')
 }
+// A rider cancels with a written reason, saved as a line in the order's notes:
+// "CANCELLED BY RIDER <name> (<time>): <reason>". Pull the latest one out so it can be shown in full.
+function riderCancellation(notes: string | null | undefined): { by: string; when: string; reason: string } | null {
+  const lines = (notes ?? '').split('\n').filter((l) => l.startsWith('CANCELLED BY RIDER'))
+  const last = lines[lines.length - 1]
+  if (!last) return null
+  const m = last.match(/^CANCELLED BY RIDER\s*(.*?)\s*\(([^)]*)\):\s*([\s\S]*)$/)
+  return m ? { by: m[1], when: m[2], reason: m[3].trim() } : { by: '', when: '', reason: last.replace('CANCELLED BY RIDER', '').trim() }
+}
 function heldRestaurantId(notes: string | null | undefined): string | null {
   return notes?.match(/\[rid:([0-9a-fA-F-]{36})\]/)?.[1] ?? null
 }
@@ -622,6 +631,11 @@ export default function AdminOrdersPage() {
                             placeholder="Add note..."
                             className="w-36 px-2 py-1 border border-[#E5E7EB] rounded-lg text-[12px] outline-none focus:border-[#7C3AED] bg-white"
                           />
+                          {o.status === 'cancelled' && riderCancellation(o.notes)?.reason && (
+                            <p title={riderCancellation(o.notes)!.reason} className="mt-1 w-36 line-clamp-2 text-[11px] font-[600] leading-snug text-[#B91C1C]">
+                              Reason: {riderCancellation(o.notes)!.reason}
+                            </p>
+                          )}
                         </td>
                         <td className="px-5 py-3.5 text-[12px] text-[#9CA3AF]">
                           <span className="block"><TimeAgo date={o.placed_at} /></span>
@@ -631,6 +645,14 @@ export default function AdminOrdersPage() {
                       {isExpanded && (
                         <tr className="bg-[#FAFAFA]">
                           <td colSpan={13} className="px-5 py-4 border-t border-b border-[#F3F4F6]">
+                            {riderCancellation(o.notes) && (
+                              <div className="mb-4 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3">
+                                <p className="text-[11px] font-[700] uppercase tracking-wide text-[#B91C1C]">
+                                  Cancelled by rider{riderCancellation(o.notes)!.by ? ` ${riderCancellation(o.notes)!.by}` : ''}{riderCancellation(o.notes)!.when ? ` · ${riderCancellation(o.notes)!.when}` : ''}
+                                </p>
+                                <p className="mt-1 whitespace-pre-wrap text-[13.5px] font-[600] text-[#7F1D1D]">{riderCancellation(o.notes)!.reason}</p>
+                              </div>
+                            )}
                             <div className="grid sm:grid-cols-3 gap-4">
                               <div>
                                 <p className="flex items-center gap-1.5 text-[11px] font-[600] text-[#9CA3AF] uppercase tracking-wide mb-1.5"><Phone className="w-3 h-3" /> Contact</p>
