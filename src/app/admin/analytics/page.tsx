@@ -67,6 +67,13 @@ function dayKey(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Restaurants the admin flagged "keep out of wallet & order counts". Empty until the
+// supabase-migration-restaurant-exclude-totals.sql column exists.
+async function excludedRestaurantIds() {
+  const { data } = await supabase.from('restaurants').select('id').eq('exclude_from_totals', true)
+  return new Set(((data as { id: string }[] | null) ?? []).map((r) => r.id))
+}
+
 export default function AdminAnalyticsPage() {
   const [range, setRange] = useState<DateRange>(presetRange(30))
   const [orders, setOrders] = useState<Order[]>([])
@@ -74,6 +81,7 @@ export default function AdminAnalyticsPage() {
   const [loading, setLoading] = useState(true)
 
   const [todayOrders, setTodayOrders] = useState<TodayOrder[]>([])
+  const [excludedCount, setExcludedCount] = useState(0)
   const [todayLoading, setTodayLoading] = useState(true)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [refreshNonce, setRefreshNonce] = useState(0)
@@ -150,7 +158,9 @@ export default function AdminAnalyticsPage() {
         .gte('placed_at', start.toISOString()).lte('placed_at', end.toISOString())
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
-      setTodayOrders(data)
+      const skip = await excludedRestaurantIds()
+      setTodayOrders(data.filter((o) => !o.restaurant_id || !skip.has(o.restaurant_id)))
+      setExcludedCount(data.filter((o) => o.restaurant_id && skip.has(o.restaurant_id)).length)
       setTodayLoading(false)
       setLastRefreshed(new Date())
     }
@@ -174,7 +184,8 @@ export default function AdminAnalyticsPage() {
           .range(from, to)),
         supabase.from('restaurants').select('*', { count: 'exact', head: true }).eq('is_active', true),
       ])
-      setOrders(ords)
+      const skip = await excludedRestaurantIds()
+      setOrders(ords.filter((o) => !o.restaurant_id || !skip.has(o.restaurant_id)))
       setRestaurantCount(count ?? 0)
       setLoading(false)
     }
@@ -259,6 +270,7 @@ export default function AdminAnalyticsPage() {
     { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: '#7C3AED', bg: '#F5F3FF' },
     { label: 'Total Orders', value: orders.length, icon: ShoppingBag, color: '#0891B2', bg: '#ECFEFF' },
     { label: 'Active Restaurants', value: restaurantCount, icon: Store, color: '#16A34A', bg: '#DCFCE7' },
+    ...(excludedCount > 0 ? [{ label: 'Separate-count orders', value: excludedCount, icon: Store, color: '#6B7280', bg: '#F3F4F6' }] : []),
     { label: 'Avg Order Value', value: `₹${avgOrderValue.toFixed(0)}`, icon: Users, color: '#D97706', bg: '#FFFBEB' },
   ]
 

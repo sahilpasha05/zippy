@@ -15,6 +15,7 @@ type Restaurant = {
   cover_url: string | null; logo_url: string | null; address: string; phone: string | null
   delivery_time: number; min_order: number; delivery_fee: number
   is_open: boolean; is_active: boolean; owner_id: string | null
+  exclude_from_totals?: boolean
 }
 
 export default function ManageRestaurantPage() {
@@ -81,6 +82,7 @@ export default function ManageRestaurantPage() {
       address: restaurant.address, phone: restaurant.phone, delivery_time: restaurant.delivery_time,
       min_order: restaurant.min_order, delivery_fee: restaurant.delivery_fee,
       is_open: restaurant.is_open, is_active: restaurant.is_active, owner_id: restaurant.owner_id,
+      exclude_from_totals: !!restaurant.exclude_from_totals,
     }).eq('id', id)
     if (err) { setError(err.message); setSaving(false); return }
     setSaved(true)
@@ -222,6 +224,13 @@ export default function ManageRestaurantPage() {
                 <input type="checkbox" checked={restaurant.is_active} onChange={(e) => setField('is_active', e.target.checked)} className="w-4 h-4 accent-[#7C3AED]" />
                 <span className="text-[13px] text-[#374151]">Active (visible on app)</span>
               </label>
+            </div>
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!restaurant.exclude_from_totals} onChange={(e) => setField('exclude_from_totals', e.target.checked)} className="w-4 h-4 accent-[#7C3AED]" />
+                <span className="text-[13px] text-[#374151]">Keep out of wallet &amp; order counts</span>
+              </label>
+              <p className="text-[11.5px] text-[#9CA3AF] mt-1 ml-6">Hidden from Collections, Day Book and Analytics totals (counted separately in Analytics). Delivery boy analytics still count these orders.</p>
             </div>
           </div>
 

@@ -49,9 +49,12 @@ export default function AdminCollectionsPage() {
           .gte('placed_at', fromISO).lte('placed_at', toISO)
           .order('placed_at', { ascending: false }),
       ])
+      const { data: ex } = await supabase.from('restaurants').select('id').eq('exclude_from_totals', true)
+      const skip = new Set(((ex as { id: string }[] | null) ?? []).map((r) => r.id))
+      const keep = (o: Order) => !o.restaurant_id || !skip.has(o.restaurant_id)
       setPartners((parts as Partner[]) ?? [])
-      setOrders((ords as unknown as Order[]) ?? [])
-      setCancelledOrders((cancelled as unknown as Order[]) ?? [])
+      setOrders(((ords as unknown as Order[]) ?? []).filter(keep))
+      setCancelledOrders(((cancelled as unknown as Order[]) ?? []).filter(keep))
       setLoading(false)
     }
     load()

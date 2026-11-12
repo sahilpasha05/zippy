@@ -13,6 +13,8 @@ const supabase = createBrowserClient(
 
 // "You might also like": only that restaurant's own dishes for a restaurant cart (bestsellers first),
 // and products from across the whole store for a grocery cart. Items already in the cart are left out.
+const LEAD = /diet coke|water bottle|bisleri|mineral water/i
+
 export default function YouMightAlsoLike({ compact = false }: { compact?: boolean }) {
   const items = useCartStore((s) => s.items)
   const restaurantId = items.find((i) => i.restaurant_id)?.restaurant_id ?? null
@@ -38,11 +40,17 @@ export default function YouMightAlsoLike({ compact = false }: { compact?: boolea
         const { data } = await supabase.from('grocery_products').select('id, name, price, mrp, weight, image_url, in_stock')
           .eq('is_active', true).eq('in_stock', true).not('image_url', 'is', null).limit(80)
         if (cancelled) return
-        const pool = ((data as BlinkitProduct[]) ?? []).filter((p) => !inCart.has(p.id))
+        const pool = ((data as BlinkitProduct[]) ?? []).filter((p) => !inCart.has(p.id) && !LEAD.test(p.name))
         // Stable shuffle so the row differs between carts but does not jump around on re-render.
         const seed = [...ids].reduce((n, c) => n + c.charCodeAt(0), 0)
         pool.sort((a, b) => ((a.id.charCodeAt(0) * 31 + seed) % 97) - ((b.id.charCodeAt(0) * 31 + seed) % 97))
-        setDishes([]); setProducts(pool.slice(0, 12))
+        // Diet Coke and a water bottle always lead the row (fetched on their own so they show even if they missed the 80-product sample).
+        const { data: pinned } = await supabase.from('grocery_products').select('id, name, price, mrp, weight, image_url, in_stock')
+          .eq('is_active', true).eq('in_stock', true).or('name.ilike.%diet coke%,name.ilike.%water bottle%,name.ilike.%bisleri%,name.ilike.%mineral water%').limit(6)
+        if (cancelled) return
+        const lead = ((pinned as BlinkitProduct[]) ?? []).filter((p) => !inCart.has(p.id) && LEAD.test(p.name))
+          .sort((a, b) => Number(/diet coke/i.test(b.name)) - Number(/diet coke/i.test(a.name)))
+        setDishes([]); setProducts([...lead, ...pool].slice(0, 12))
       }
     }
     void load()

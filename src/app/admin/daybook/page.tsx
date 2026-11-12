@@ -38,12 +38,14 @@ export default function AdminDayBookPage() {
     const toISO = new Date(`${day}T23:59:59.999`).toISOString()
     const [{ data: ords }, { data: ents, error: entErr }] = await Promise.all([
       supabase.from('orders')
-        .select('total, payment_status, online_amount, collection_mode, collected_amount')
+        .select('total, payment_status, online_amount, collection_mode, collected_amount, restaurant_id')
         .eq('status', 'delivered')
         .gte('delivered_at', fromISO).lte('delivered_at', toISO),
       supabase.from('daybook_entries').select('id, kind, label, amount').eq('entry_date', day).order('created_at'),
     ])
-    setOrders((ords as DayOrder[]) ?? [])
+    const { data: ex } = await supabase.from('restaurants').select('id').eq('exclude_from_totals', true)
+    const skip = new Set(((ex as { id: string }[] | null) ?? []).map((r) => r.id))
+    setOrders(((ords as (DayOrder & { restaurant_id?: string | null })[]) ?? []).filter((o) => !o.restaurant_id || !skip.has(o.restaurant_id)))
     setEntries(((ents as Entry[]) ?? []).map((e) => ({ ...e, amount: Number(e.amount) })))
     if (entErr) setError('Day Book entries are not set up yet — run supabase-migration-daybook.sql once in Supabase.')
     setLoading(false)
