@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket, CloudRain } from 'lucide-react'
+import { Bell, Shield, Store, Save, CheckCircle, Zap, Loader2, ShoppingBasket, CloudRain, Clock } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import { CITY } from '@/lib/city'
 
@@ -25,6 +25,10 @@ export default function AdminSettingsPage() {
     newRestaurantAlerts: true,
     maintenanceMode: false,
     groceriesAvailable: true,
+    storeHoursEnabled: false,
+    storeOpenTime: '10:30',
+    storeCloseTime: '21:30',
+    storeForceClosed: false,
   })
   const [categories, setCategories] = useState<GroceryCategory[]>([])
   const [togglingCategory, setTogglingCategory] = useState<string | null>(null)
@@ -49,6 +53,10 @@ export default function AdminSettingsPage() {
           maxDeliveryFee: String(data.max_delivery_fee ?? 99),
           minOrderValue: String(data.min_order_value ?? 49),
           groceriesAvailable: data.groceries_available ?? true,
+          storeHoursEnabled: !!(data as { store_hours_enabled?: boolean }).store_hours_enabled,
+          storeOpenTime: (data as { store_open_time?: string }).store_open_time ?? '10:30',
+          storeCloseTime: (data as { store_close_time?: string }).store_close_time ?? '21:30',
+          storeForceClosed: !!(data as { store_force_closed?: boolean }).store_force_closed,
         }))
       }
       setRainMode(!!(data as { rain_mode?: boolean } | null)?.rain_mode)
@@ -105,6 +113,10 @@ export default function AdminSettingsPage() {
       max_delivery_fee: +settings.maxDeliveryFee || 99,
       min_order_value: +settings.minOrderValue || 49,
       groceries_available: settings.groceriesAvailable,
+      store_hours_enabled: settings.storeHoursEnabled,
+      store_open_time: settings.storeOpenTime,
+      store_close_time: settings.storeCloseTime,
+      store_force_closed: settings.storeForceClosed,
       updated_at: new Date().toISOString(),
     }).eq('id', 1)
     setSaving(false)
@@ -203,6 +215,44 @@ export default function AdminSettingsPage() {
                 {rainMessageSaved && <span className="text-[12px] font-[600] text-[#16A34A]">Saved. Customers see it now.</span>}
                 <span className="ml-auto text-[11px] text-[#9CA3AF]">{rainMessage.length}/160</span>
               </div>
+            </div>
+          </div>
+
+          {/* Store hours */}
+          <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-[#7C3AED]" />
+              <h2 className="text-[14px] font-[700] text-[#111827]">Store hours (groceries)</h2>
+            </div>
+            <p className="text-[12px] text-[#6B7280] mb-3">Outside these hours customers see &quot;Store closed — please come back at …&quot; and can&apos;t order groceries. Restaurants keep their own open/closed switch. Times are India time. Press Save Changes to apply.</p>
+            <div className="flex items-center justify-between py-2">
+              <p className="text-[13.5px] font-[600] text-[#111827]">Use store hours</p>
+              <button onClick={() => set('storeHoursEnabled', !settings.storeHoursEnabled)}
+                className={`relative w-11 h-6 rounded-full shrink-0 ml-4 transition-all duration-300 ${settings.storeHoursEnabled ? 'bg-[#16A34A]' : 'bg-[#D1D5DB]'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${settings.storeHoursEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 py-2">
+              <label className="block">
+                <span className="text-[12px] font-[600] text-[#374151]">Opens at</span>
+                <input type="time" value={settings.storeOpenTime} onChange={(e) => set('storeOpenTime', e.target.value)}
+                  className="mt-1 w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED]" />
+              </label>
+              <label className="block">
+                <span className="text-[12px] font-[600] text-[#374151]">Closes at</span>
+                <input type="time" value={settings.storeCloseTime} onChange={(e) => set('storeCloseTime', e.target.value)}
+                  className="mt-1 w-full px-3.5 py-2.5 border border-[#E5E7EB] rounded-xl text-[13.5px] outline-none focus:border-[#7C3AED]" />
+              </label>
+            </div>
+            <div className="flex items-center justify-between py-2 border-t border-[#F3F4F6]">
+              <div>
+                <p className="text-[13.5px] font-[600] text-[#111827]">Close the store now</p>
+                <p className="text-[12px] text-[#6B7280]">Emergency switch: closes groceries right away, even during opening hours.</p>
+              </div>
+              <button onClick={() => set('storeForceClosed', !settings.storeForceClosed)}
+                className={`relative w-11 h-6 rounded-full shrink-0 ml-4 transition-all duration-300 ${settings.storeForceClosed ? 'bg-[#DC2626]' : 'bg-[#D1D5DB]'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${settings.storeForceClosed ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
             </div>
           </div>
 

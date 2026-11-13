@@ -1,5 +1,6 @@
 'use client'
 
+import { useStoreStatus } from '@/lib/storeHours'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCartStore } from '@/lib/store/cart'
@@ -30,6 +31,8 @@ export default function CartSidebar() {
   const zoneRule = resolveZoneRule(liveCoords?.lat, liveCoords?.lng)
   const minOrder = getMinOrderValue(liveCoords?.lat, liveCoords?.lng)
   const belowMinOrder = minOrder > 0 && cartTotal < minOrder
+  const store = useStoreStatus()
+  const storeClosedBlock = store.closed && !items.some((i) => i.restaurant_id)
 
   async function handleProceed() {
     setLocationError(''); setOfferManual(false)
@@ -202,6 +205,9 @@ export default function CartSidebar() {
             </div>
 
             {/* Checkout CTA */}
+            {storeClosedBlock && (
+              <p className="text-[12.5px] text-[#374151] bg-[#F3F4F6] border border-[#E5E7EB] rounded-xl px-3 py-2 leading-relaxed">Store closed. Please come back {store.comeBack}.</p>
+            )}
             {belowMinOrder && !locationError && (
               <p className="text-[12.5px] text-[#B45309] bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3 py-2 leading-relaxed">Minimum order for your area is ₹{minOrder}. Add ₹{Math.ceil(minOrder - cartTotal)} more to continue.</p>
             )}
@@ -213,7 +219,7 @@ export default function CartSidebar() {
                 Continue with manual address
               </button>
             )}
-            <button onClick={handleProceed} disabled={locating}
+            <button onClick={handleProceed} disabled={locating || storeClosedBlock}
               className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#16A34A] text-white text-[15px] font-700 rounded-2xl hover:bg-[#15803D] active:scale-[0.98] transition-all disabled:opacity-70 shadow-[0_4px_16px_rgba(22,163,74,0.35)] hover:shadow-[0_6px_20px_rgba(22,163,74,0.45)]" style={{ fontWeight: 700 }}>
               {locating ? 'Getting your live location…' : <>Proceed to Checkout<ArrowRight className="w-4.5 h-4.5" /></>}
             </button>

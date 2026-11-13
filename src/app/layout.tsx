@@ -7,6 +7,7 @@ import RainMode from "@/components/RainMode";
 import DeliveryZonesLoader from "@/components/DeliveryZonesLoader";
 import ErrorReporter from "@/components/ErrorReporter";
 import VisitorPing from "@/components/VisitorPing";
+import FrustrationMonitor from "@/components/FrustrationMonitor";
 import "./globals.css";
 import { CITY } from '@/lib/city'
 
@@ -33,6 +34,7 @@ export default function RootLayout({
         <DeliveryZonesLoader />
         <ErrorReporter />
         <VisitorPing />
+        <FrustrationMonitor />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-7L0GLNZ8MP" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">
           {`

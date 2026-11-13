@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Activity, AlertTriangle, CheckCircle2, Database, Loader2, RefreshCw, Users, Trash2, XCircle } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, Database, Loader2, MousePointerClick, RefreshCw, Users, Trash2, XCircle } from 'lucide-react'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 
 const supabase = createClient()
@@ -38,6 +38,7 @@ export default function AdminHealthPage() {
   const [health, setHealth] = useState<Health | null>(null)
   const [healthErr, setHealthErr] = useState('')
   const [checks, setChecks] = useState<Check[]>([])
+  const [frustration, setFrustration] = useState<{ source: string; message: string; url: string | null }[]>([])
   const [visitors, setVisitors] = useState<Visitor[]>([])
   const [visitors24, setVisitors24] = useState(0)
   const [errors, setErrors] = useState<AppError[]>([])
@@ -45,9 +46,19 @@ export default function AdminHealthPage() {
   const [updated, setUpdated] = useState<Date | null>(null)
   const [openCheck, setOpenCheck] = useState<string | null>(null)
 
+  // Visitors refresh on their own fast loop (every 10 s) so the panel is never more than ~30 s behind.
+  const loadVisitors = useCallback(async () => {
+    const [now, day] = await Promise.all([
+      supabase.from('site_visitors').select('path, device, last_seen').gt('last_seen', new Date(Date.now() - 40_000).toISOString()).limit(500),
+      supabase.from('site_visitors').select('*', { count: 'exact', head: true }).gt('last_seen', mins(24 * 60)),
+    ])
+    setVisitors((now.data as Visitor[] | null) ?? [])
+    setVisitors24(day.count ?? 0)
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
-    const [h, unassigned, stuck, failedPay, pendingPay, riders, today, errs, errN, vis] = await Promise.all([
+    const [h, unassigned, stuck, failedPay, pendingPay, riders, today, errs, errN, fr] = await Promise.all([
       supabase.rpc('admin_db_health'),
       supabase.from('orders').select('id, placed_at, status').in('status', ['pending', 'confirmed', 'preparing', 'ready']).is('delivery_partner_id', null).lt('placed_at', mins(10)).gt('placed_at', mins(24 * 60)).limit(50),
       supabase.from('orders').select('id, placed_at, status').in('status', OPEN).lt('placed_at', mins(120)).gt('placed_at', mins(24 * 60)).limit(50),
@@ -55,9 +66,9 @@ export default function AdminHealthPage() {
       supabase.from('orders').select('id, placed_at, online_amount').eq('payment_status', 'pending').gt('online_amount', 0).in('status', OPEN).lt('placed_at', mins(30)).gt('placed_at', mins(24 * 60)).limit(50),
       supabase.from('delivery_partners').select('name, last_location_at').eq('is_available', true).eq('is_active', true).or(`last_location_at.is.null,last_location_at.lt.${mins(15)}`).limit(50),
       supabase.from('orders').select('status').gte('placed_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()).limit(2000),
-      supabase.from('app_errors').select('id, created_at, message, url, user_agent, details').gt('created_at', mins(24 * 60)).order('created_at', { ascending: false }).limit(40),
-      supabase.from('app_errors').select('*', { count: 'exact', head: true }).gt('created_at', mins(24 * 60)),
-    supabase.from('site_visitors').select('path, device, last_seen').gt('last_seen', mins(24 * 60)).limit(5000),
+      supabase.from('app_errors').select('id, created_at, message, url, user_agent, details').eq('source', 'client').gt('created_at', mins(24 * 60)).order('created_at', { ascending: false }).limit(40),
+      supabase.from('app_errors').select('*', { count: 'exact', head: true }).eq('source', 'client').gt('created_at', mins(24 * 60)),
+    supabase.from('app_errors').select('source, message, url').in('source', ['rage_click', 'dead_click', 'quick_back']).gt('created_at', mins(24 * 60)).limit(2000),
       ])
 
     if (h.error) { setHealthErr(h.error.message); setHealth(null) } else { setHealthErr(''); setHealth(h.data as Health) }
@@ -84,18 +95,18 @@ export default function AdminHealthPage() {
     ])
     setErrors((errs.data as AppError[]) ?? [])
     setErrCount24(errN.count ?? 0)
-    const allVis = (vis.data as Visitor[] | null) ?? []
-    setVisitors24(allVis.length)
-    setVisitors(allVis.filter((v) => new Date(v.last_seen).getTime() > Date.now() - 2 * 60_000))
+    setFrustration((fr.data as { source: string; message: string; url: string | null }[] | null) ?? [])
     setUpdated(new Date())
     setLoading(false)
   }, [])
 
   useEffect(() => {
     queueMicrotask(() => { void load() })
+    queueMicrotask(() => { void loadVisitors() })
     const t = setInterval(() => { void load() }, 60_000)
-    return () => clearInterval(t)
-  }, [load])
+    const v = setInterval(() => { void loadVisitors() }, 10_000)
+    return () => { clearInterval(t); clearInterval(v) }
+  }, [load, loadVisitors])
 
   async function clearErrors() {
     if (!confirm('Delete all logged errors?')) return
@@ -152,7 +163,7 @@ export default function AdminHealthPage() {
                 ))}
               </div>
               {visitors.length === 0 ? (
-                <p className="mt-3 text-[12px] text-[#9CA3AF]">Nobody on the site in the last 2 minutes.</p>
+                <p className="mt-3 text-[12px] text-[#9CA3AF]">Nobody on the site right now.</p>
               ) : (
                 <ul className="mt-3 space-y-1">
                   {Object.entries(visitors.reduce<Record<string, number>>((m, v) => { m[v.path] = (m[v.path] ?? 0) + 1; return m }, {}))
@@ -163,8 +174,51 @@ export default function AdminHealthPage() {
                     ))}
                 </ul>
               )}
-              <p className="mt-3 text-[11px] text-[#9CA3AF]">Counted when someone has a page open and visible; a person is dropped after 2 minutes of no activity. Admin pages are not counted.</p>
+              <p className="mt-3 text-[11px] text-[#9CA3AF]">Counted when someone has a page open and visible; a person is dropped after about 40 seconds of no activity. Admin pages are not counted.</p>
             </div>
+          </section>
+
+          {/* Frustration signals */}
+          <section>
+            <h2 className="text-[14px] font-[700] text-[#111827] mb-2 flex items-center gap-1.5" style={{ fontWeight: 700 }}><MousePointerClick className="w-4 h-4 text-[#7C3AED]" /> Frustration signals (24 h)</h2>
+            {(() => {
+              const LABEL: Record<string, { name: string; color: string }> = {
+                rage_click: { name: 'Rage click', color: '#DC2626' },
+                dead_click: { name: 'Dead click', color: '#D97706' },
+                quick_back: { name: 'Quick back', color: '#2563EB' },
+              }
+              const groups = Object.values(frustration.reduce<Record<string, { source: string; message: string; url: string | null; n: number }>>((m, f) => {
+                const k = `${f.source}|${f.url}|${f.message}`
+                m[k] = m[k] ? { ...m[k], n: m[k].n + 1 } : { ...f, n: 1 }
+                return m
+              }, {})).sort((a, b) => b.n - a.n).slice(0, 25)
+              const total = (src: string) => frustration.filter((f) => f.source === src).length
+              return (
+                <div className="rounded-2xl border border-[#E5E7EB] bg-white p-4">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    {Object.entries(LABEL).map(([k, v]) => (
+                      <div key={k} className="bg-[#F9FAFB] rounded-xl py-2.5">
+                        <p className="text-[20px] font-[800]" style={{ color: v.color, fontWeight: 800 }}>{total(k)}</p>
+                        <p className="text-[11px] text-[#6B7280]">{v.name}s</p>
+                      </div>
+                    ))}
+                  </div>
+                  {groups.length === 0 ? (
+                    <p className="mt-3 text-[12px] text-[#9CA3AF]">Nothing yet. Customers repeatedly tapping something, tapping buttons that do nothing, or bouncing straight back will show up here by page.</p>
+                  ) : (
+                    <ul className="mt-3 space-y-1.5">
+                      {groups.map((g) => (
+                        <li key={`${g.source}|${g.url}|${g.message}`} className="flex items-start gap-2 text-[12.5px] border-t border-[#F3F4F6] pt-1.5">
+                          <span className="shrink-0 mt-0.5 rounded px-1.5 py-0.5 text-[10.5px] font-[700] text-white" style={{ background: LABEL[g.source]?.color ?? '#6B7280' }}>{LABEL[g.source]?.name ?? g.source}</span>
+                          <span className="flex-1 min-w-0"><span className="text-[#111827]">{g.message}</span><span className="block text-[11px] text-[#9CA3AF] truncate">on {g.url}</span></span>
+                          <span className="font-[800] text-[#111827]">×{g.n}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })()}
           </section>
 
           {/* Order & payment problems */}

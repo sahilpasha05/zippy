@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const supabase = createClient()
-const EVERY_MS = 45_000
+const EVERY_MS = 15_000
 
 // Tells Admin > System Health that someone is on the site and which page they are on. One small
-// call every 45 s, only while the tab is visible. The admin panel itself is not counted.
+// call every 15 s, only while the tab is visible. The admin panel itself is not counted.
 export default function VisitorPing() {
   const pathname = usePathname()
   useEffect(() => {

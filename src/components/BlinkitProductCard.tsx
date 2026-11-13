@@ -7,6 +7,7 @@ import { useCartStore, conflictsWithCart } from '@/lib/store/cart'
 import CartConflictDialog from '@/components/CartConflictDialog'
 import { useGroceryDeliveryEta } from '@/lib/useDeliveryEta'
 import { useOrderingEnabled, useGroceriesAvailable } from '@/lib/launchConfig'
+import { useStoreStatus } from '@/lib/storeHours'
 
 export type BlinkitProduct = {
   id: string
@@ -37,7 +38,8 @@ export default function BlinkitProductCard({ p, addOn = false }: { p: BlinkitPro
   const groceriesAvailable = useGroceriesAvailable()
   // Admin can pause grocery ordering (Settings -> Groceries) independently of
   // the general pre-launch flag, so the Add button has to respect both.
-  const orderingEnabled = launchEnabled && groceriesAvailable
+  const storeClosed = useStoreStatus().closed
+  const orderingEnabled = launchEnabled && groceriesAvailable && (!storeClosed || addOn)
   const cartItem = items.find((i) => i.product_id === p.id)
   const inStock = p.in_stock ?? true
   const mrp = p.mrp ?? p.price
@@ -66,7 +68,7 @@ export default function BlinkitProductCard({ p, addOn = false }: { p: BlinkitPro
         )}
         {(!orderingEnabled || !inStock) && (
           <div className="absolute inset-0 bg-white/75 flex items-center justify-center">
-            <span className="text-[11px] font-semibold text-[#6B7280]">{!orderingEnabled ? 'Coming soon' : 'Out of stock'}</span>
+            <span className="text-[11px] font-semibold text-[#6B7280]">{!orderingEnabled ? (storeClosed ? 'Store closed' : 'Coming soon') : 'Out of stock'}</span>
           </div>
         )}
       </div>

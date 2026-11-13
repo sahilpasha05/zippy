@@ -1,5 +1,6 @@
 'use client'
 
+import { useStoreStatus } from '@/lib/storeHours'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -74,6 +75,8 @@ export default function Navbar() {
   const onRestaurantSide = pathname.startsWith('/restaurant')
   // Groceries and restaurants have their own delivery times.
   const deliveryEta = onRestaurantSide ? restaurantEta : groceryEta
+  const store = useStoreStatus()
+  const storeClosed = !onRestaurantSide && store.closed
   // On a restaurant's own page the page has its "Search menu" box, so the
   // site-wide product search is hidden to avoid two search bars.
   const onRestaurantMenu = /^\/restaurants\/[^/]+/.test(pathname)
@@ -132,9 +135,16 @@ export default function Navbar() {
         <div className="lg:hidden px-4 pt-3 pb-3">
           <div className="flex items-start justify-between gap-3 mb-3">
             <button onClick={() => setShowLocationPicker(true)} className="text-left min-w-0">
-              <div className="text-[17px] font-[900] text-[#1F1F1F] leading-tight" style={{ fontWeight: 900 }}>
-                Delivery in {deliveryEta} minutes
-              </div>
+              {storeClosed ? (
+                <>
+                  <div className="text-[12.5px] font-[700] text-[#374151] leading-tight" style={{ fontWeight: 700 }}>Please come back {store.comeBack}</div>
+                  <div className="text-[24px] font-[900] text-[#1F1F1F] leading-tight" style={{ fontWeight: 900 }}>Store closed</div>
+                </>
+              ) : (
+                <div className="text-[17px] font-[900] text-[#1F1F1F] leading-tight" style={{ fontWeight: 900 }}>
+                  Delivery in {deliveryEta} minutes
+                </div>
+              )}
               <div className="flex items-center gap-1 text-[13px] text-[#374151]">
                 <span className="truncate max-w-[220px]">{locationLabel}</span>
                 <ChevronDown className="w-4 h-4 shrink-0" />
@@ -182,7 +192,7 @@ export default function Navbar() {
               <MapPin className="w-4 h-4 text-[#16A34A] shrink-0" strokeWidth={2} />
               <div className="text-left min-w-0">
                 <div className="text-[12px] font-[800] text-[#111827] leading-none mb-0.5" style={{ fontWeight: 800 }}>
-                  Delivery in {deliveryEta} minutes
+                  {storeClosed ? `Store closed · back ${store.comeBack}` : `Delivery in ${deliveryEta} minutes`}
                 </div>
                 <div className="text-[11.5px] text-[#6B7280] truncate leading-none">
                   {locationSubLabel === 'Set your location' ? locationLabel : `${locationSubLabel} · ${locationLabel}`}
