@@ -20,14 +20,16 @@ export type BlinkitProduct = {
 
 // Blinkit-style product card: blue OFF ribbon, contained image, "X MINS" chip,
 // name, weight, price + green outlined ADD button.
-export default function BlinkitProductCard({ p }: { p: BlinkitProduct }) {
+// `addOn`: a Zippy add-on offered inside a restaurant cart (Diet Coke, water bottle). It rides on the
+// restaurant order instead of asking to replace the cart.
+export default function BlinkitProductCard({ p, addOn = false }: { p: BlinkitProduct; addOn?: boolean }) {
   const { addItem, replaceCartWith, items, updateQuantity } = useCartStore()
   const [askReplace, setAskReplace] = useState(false)
 
   const draft = { product_id: p.id, product_type: 'grocery' as const, restaurant_id: null, name: p.name, image_url: p.image_url ?? null, price: p.price, quantity: 1 }
 
   function handleAdd() {
-    if (conflictsWithCart(items, null)) { setAskReplace(true); return }
+    if (!addOn && conflictsWithCart(items, null)) { setAskReplace(true); return }
     addItem(draft)
   }
   const deliveryEta = useGroceryDeliveryEta()

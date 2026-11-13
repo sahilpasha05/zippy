@@ -8,6 +8,7 @@ import RestaurantSidebar from '@/components/restaurant/RestaurantSidebar'
 import { cn } from '@/lib/utils'
 import TimeAgo from '@/components/TimeAgo'
 
+import { stripAddOns } from '@/lib/addOns'
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -24,7 +25,7 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
 
 type Order = {
   id: string; status: string; total: number; customer_name: string | null
-  placed_at: string; order_items: { name: string; quantity: number; price: number }[]
+  placed_at: string; order_items: { name: string; quantity: number; price: number; product_type?: string | null }[]
 }
 type Restaurant = { id: string; name: string; slug: string; is_open: boolean; rating: number }
 
@@ -48,11 +49,11 @@ export default function SlugDashboard() {
       setIsOpen(rest.is_open)
       const { data: ords } = await supabase
         .from('orders')
-        .select('id, status, total, customer_name, placed_at, order_items(name, quantity, price)')
+        .select('id, status, total, customer_name, placed_at, order_items(name, quantity, price, product_type)')
         .eq('restaurant_id', rest.id)
         .order('placed_at', { ascending: false })
         .limit(20)
-      setOrders((ords as Order[]) ?? [])
+      setOrders(stripAddOns((ords as Order[]) ?? []))
       setLoading(false)
     }
     load()

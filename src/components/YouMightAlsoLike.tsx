@@ -34,7 +34,14 @@ export default function YouMightAlsoLike({ compact = false }: { compact?: boolea
         const list = ((data as never[]) ?? []).map(toDish).filter((d): d is Dish => !!d && !inCart.has(d.id))
         const best = new Set(((data as { id: string; is_bestseller?: boolean }[]) ?? []).filter((r) => r.is_bestseller).map((r) => r.id))
         list.sort((a, b) => Number(best.has(b.id)) - Number(best.has(a.id)))
-        setProducts([]); setDishes(list.slice(0, 10))
+        // Every restaurant cart also offers Diet Coke and a water bottle, billed to the customer but
+        // kept out of the restaurant's own orders and settlements (see lib/addOns.ts).
+        const { data: addOns } = await supabase.from('grocery_products').select('id, name, price, mrp, weight, image_url, in_stock')
+          .eq('is_active', true).eq('in_stock', true).or('name.ilike.%diet coke%,name.ilike.%water bottle%,name.ilike.%bisleri%,name.ilike.%mineral water%').limit(6)
+        if (cancelled) return
+        setProducts(((addOns as BlinkitProduct[]) ?? []).filter((p) => !inCart.has(p.id) && LEAD.test(p.name))
+          .sort((a, b) => Number(/diet coke/i.test(b.name)) - Number(/diet coke/i.test(a.name))))
+        setDishes(list.slice(0, 10))
       } else {
         // Groceries: suggestions come from the whole store, not just the shelves already in the cart.
         const { data } = await supabase.from('grocery_products').select('id, name, price, mrp, weight, image_url, in_stock')
@@ -63,8 +70,8 @@ export default function YouMightAlsoLike({ compact = false }: { compact?: boolea
     <section className="mt-5">
       <h3 className="mb-3 text-[16px] font-[800] text-[#111827]" style={{ fontWeight: 800 }}>You might also like</h3>
       <div className={`-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}>
+        {products.map((p) => <div key={p.id} className={compact ? 'w-[150px] shrink-0' : 'w-[170px] shrink-0'}><BlinkitProductCard p={p} addOn={!!restaurantId} /></div>)}
         {dishes.map((d) => <div key={d.id} className={compact ? 'w-[150px] shrink-0' : 'w-[170px] shrink-0'}><RestaurantDishCard d={d} /></div>)}
-        {products.map((p) => <div key={p.id} className={compact ? 'w-[150px] shrink-0' : 'w-[170px] shrink-0'}><BlinkitProductCard p={p} /></div>)}
       </div>
     </section>
   )

@@ -15,7 +15,7 @@ const supabase = createClient()
 
 type Order = { id: string; status: string; total: number; placed_at: string; restaurant_id: string | null }
 
-type TodayOrderItem = { name: string; quantity: number; price: number; product_id?: string | null }
+type TodayOrderItem = { name: string; quantity: number; price: number; product_id?: string | null; product_type?: string | null }
 type TodayOrder = {
   id: string; status: string; total: number; placed_at: string
   restaurant_id: string | null
@@ -60,7 +60,7 @@ function restName(o: TodayOrder) {
 // checkout (see PRICE_MARKUP in cartPricing.ts) — removePriceMarkup recovers
 // the actual menu price the restaurant listed.
 function menuTotal(o: TodayOrder) {
-  return (o.order_items ?? []).reduce((s, item) => s + removePriceMarkup(item.price, item.product_id) * item.quantity, 0)
+  return (o.order_items ?? []).filter((item) => item.product_type !== 'grocery').reduce((s, item) => s + removePriceMarkup(item.price, item.product_id) * item.quantity, 0)
 }
 function dayKey(iso: string) {
   const d = new Date(iso)
@@ -154,7 +154,7 @@ export default function AdminAnalyticsPage() {
       const end = new Date(range.to + 'T23:59:59.999')
       const data = await fetchAllRows<TodayOrder>((from, to) => supabase
         .from('orders')
-        .select('id, status, total, placed_at, restaurant_id, customer_name, customer_phone, restaurants(name), order_items(name, quantity, price, product_id)')
+        .select('id, status, total, placed_at, restaurant_id, customer_name, customer_phone, restaurants(name), order_items(name, quantity, price, product_id, product_type)')
         .gte('placed_at', start.toISOString()).lte('placed_at', end.toISOString())
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk, Landmark, MapPinned, BookOpen, CupSoda } from 'lucide-react'
+import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk, Landmark, MapPinned, BookOpen, CupSoda, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createClient()
@@ -29,6 +29,7 @@ const NAV = [
   { href: '/admin/reviews',      label: 'Reviews',      icon: Star },
   { href: '/admin/users',        label: 'Users',        icon: Users },
   { href: '/admin/analytics',    label: 'Analytics',    icon: BarChart3 },
+  { href: '/admin/health',      label: 'System Health', icon: Activity },
   { href: '/admin/settings',     label: 'Settings',     icon: Settings },
 ]
 

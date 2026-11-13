@@ -10,13 +10,14 @@ import DateRangeFilter, { presetRange, type DateRange } from '@/components/DateR
 import { getDailyRevenue, todayKey } from '@/lib/analytics'
 import { removePriceMarkup } from '@/lib/cartPricing'
 
+import { stripAddOns } from '@/lib/addOns'
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Restaurant = { id: string; name: string; slug: string }
-type OrderItem = { name: string; quantity: number; price: number }
+type OrderItem = { name: string; quantity: number; price: number; product_type?: string | null }
 type Settlement = { id: string; order_date: string; orders_count: number; amount: number; paid_by: string | null; paid_to: string | null; paid_on: string }
 type Order = {
   id: string; status: string; total: number; placed_at: string
@@ -57,12 +58,12 @@ export default function SlugAnalyticsPage() {
       setRestaurant(rest as Restaurant)
       const fromISO = new Date(range.from + 'T00:00:00').toISOString()
       const toISO = new Date(range.to + 'T23:59:59.999').toISOString()
-      const ords = await fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, placed_at, customer_name, customer_phone, order_items(name, quantity, price)')
+      const ords = await fetchAllRows<Order>((from, to) => supabase.from('orders').select('id, status, total, placed_at, customer_name, customer_phone, order_items(name, quantity, price, product_type)')
         .eq('restaurant_id', rest.id)
         .gte('placed_at', fromISO).lte('placed_at', toISO)
         .order('placed_at', { ascending: false }).order('id')
         .range(from, to))
-      setOrders(ords)
+      setOrders(stripAddOns(ords))
       const { data: paid } = await supabase.from('restaurant_settlements').select('id, order_date, orders_count, amount, paid_by, paid_to, paid_on').eq('restaurant_id', rest.id).order('order_date', { ascending: false })
       setSettlements((paid as Settlement[]) ?? [])
       setLoading(false)

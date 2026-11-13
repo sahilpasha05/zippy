@@ -11,6 +11,7 @@ import DelayedStrip from '@/components/DelayedStrip'
 import { useNow } from '@/lib/useNow'
 import { DELAYED_AFTER_MIN, DELAYED_MAX_AGE_MIN, delayedMinutes } from '@/lib/delay'
 
+import { stripAddOns } from '@/lib/addOns'
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -31,7 +32,7 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; ico
 
 const TABS = ['All', 'Active', 'Preparing', 'Delivered', 'Cancelled']
 
-type OrderItem = { name: string; quantity: number; price: number }
+type OrderItem = { name: string; quantity: number; price: number; product_type?: string | null }
 type Order = {
   id: string; status: string; total: number; customer_name: string | null
   customer_phone: string | null; placed_at: string; address: string | null
@@ -103,13 +104,13 @@ export default function RestaurantOrdersPage() {
   const loadOrders = useCallback(async (restaurantId: string) => {
     const { data } = await supabase
       .from('orders')
-      .select('id, status, total, customer_name, customer_phone, placed_at, address, order_items(name, quantity, price)')
+      .select('id, status, total, customer_name, customer_phone, placed_at, address, order_items(name, quantity, price, product_type)')
       .eq('restaurant_id', restaurantId)
       .order('placed_at', { ascending: false })
       // A busy day runs well past 50 orders; capping here made them vanish
       // from the panel entirely.
       .limit(500)
-    const rows = (data as unknown as Order[]) ?? []
+    const rows = stripAddOns((data as unknown as Order[]) ?? [])
     setOrders(rows)
     return rows
   }, [])
