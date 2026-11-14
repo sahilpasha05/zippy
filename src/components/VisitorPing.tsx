@@ -13,6 +13,7 @@ export default function VisitorPing() {
   const pathname = usePathname()
   useEffect(() => {
     if (pathname.startsWith('/admin')) return
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return // our own testing is not customer data
     let session = ''
     try {
       session = sessionStorage.getItem('zippy-visitor') ?? ''

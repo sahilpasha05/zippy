@@ -11,6 +11,7 @@ const IGNORE = /ResizeObserver loop|Script error\.?$|Non-Error promise rejection
 // Reports uncaught browser errors to public.app_errors so Admin > System Health can list them.
 export default function ErrorReporter() {
   useEffect(() => {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return // our own testing is not customer data
     let sent = 0
     const seen = new Set<string>()
     function report(message: string, details?: string) {

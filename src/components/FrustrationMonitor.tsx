@@ -34,6 +34,7 @@ export default function FrustrationMonitor() {
   // Quick back: A -> B -> A with B open for under 4 seconds.
   useEffect(() => {
     if (pathname.startsWith('/admin')) return
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return // our own testing is not customer data
     const now = Date.now()
     const t = trail.current
     t.push({ path: pathname, at: now })
@@ -46,6 +47,7 @@ export default function FrustrationMonitor() {
 
   useEffect(() => {
     if (pathname.startsWith('/admin')) return
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return // our own testing is not customer data
     const clicks: { t: number; x: number; y: number }[] = []
 
     function onClick(e: MouseEvent) {
@@ -71,14 +73,22 @@ export default function FrustrationMonitor() {
       if (a.tagName === 'A' && (a.target === '_blank' || /^(tel|mailto|sms|whatsapp):/i.test(a.getAttribute('href') ?? '') || a.hasAttribute('download'))) return
       if ((el as HTMLButtonElement).type === 'submit') return
       const startUrl = location.href
+      const startScroll = window.scrollY
       let changed = false
-      const mo = new MutationObserver(() => { changed = true })
+      const mark = () => { changed = true }
+      const mo = new MutationObserver(mark)
       mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true })
+      // Scrolling to a section (the Milk / Sweets tabs) and a page that is still loading are not dead clicks.
+      window.addEventListener('scroll', mark, { capture: true, passive: true })
+      window.addEventListener('popstate', mark)
+      const goesToAnotherPage = a.tagName === 'A' && (a.getAttribute('href') ?? '').startsWith('/')
       const desc = describe(el)
       setTimeout(() => {
         mo.disconnect()
-        if (!changed && location.href === startUrl && document.visibilityState === 'visible') report('dead_click', `Dead click on ${desc}`, path)
-      }, 1500)
+        window.removeEventListener('scroll', mark, true)
+        window.removeEventListener('popstate', mark)
+        if (!changed && location.href === startUrl && window.scrollY === startScroll && document.visibilityState === 'visible') report('dead_click', `Dead click on ${desc}`, path)
+      }, goesToAnotherPage ? 5000 : 1500)
     }
     document.addEventListener('click', onClick, true)
     return () => document.removeEventListener('click', onClick, true)
