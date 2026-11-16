@@ -1,8 +1,8 @@
-// Display order: Golden cafe, My Bite, Jai hind, Smiley cafe, Kohinoor (by
+// Display order: Golden cafe, Smiley cafe, My Bite, Jai hind, Kohinoor (by
 // slug) first, then every other restaurant in its stored sort_order. A closed
 // restaurant drops below all the open ones — keeping the same relative order —
 // and goes back to its place as soon as it opens again.
-const PINNED_SLUGS = ['golden-cafe', 'm', 'jai-hind-restaurant', 'smiley-cafe', 'k']
+const PINNED_SLUGS = ['golden-cafe', 'smiley-cafe', 'm', 'jai-hind-restaurant', 'k']
 
 export function sortRestaurantsForDisplay<T extends { slug: string; is_open: boolean }>(list: T[]): T[] {
   const rank = (r: T) => {
