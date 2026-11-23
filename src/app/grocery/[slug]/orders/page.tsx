@@ -10,6 +10,7 @@ import LiveTrackingMap from '@/components/LiveTrackingMap'
 import { cn, toLocalDateInput } from '@/lib/utils'
 import { unlockAudio, startAlarm, stopAlarm } from '@/lib/orderAlarm'
 import TimeAgo from '@/components/TimeAgo'
+import { fetchPartnerOrders } from '@/lib/partnerOrders'
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,6 +39,7 @@ type Order = {
   delivery_latitude: number | null; delivery_longitude: number | null
   delivery_partner_id: string | null
   order_items: OrderItem[]
+  partial?: boolean
 }
 type Partner = { id: string; name: string; slug: string }
 type DeliveryPartner = { id: string; name: string; phone: string | null }
@@ -107,15 +109,12 @@ export default function GrocerySlugOrdersPage() {
   const riderFor = useCallback((id: string | null) => riders.find((p) => p.id === id) ?? null, [riders])
 
   const loadOrders = useCallback(async (partnerId: string) => {
-    const { data } = await supabase
-      .from('orders')
-      .select('id, status, total, customer_name, customer_phone, placed_at, address, delivery_latitude, delivery_longitude, delivery_partner_id, order_items(name, quantity, price, image_url, product_type)')
-      .eq('grocery_partner_id', partnerId)
-      .order('placed_at', { ascending: false })
-      // A busy day runs well past 50 orders; capping here made them vanish
-      // from the panel entirely.
-      .limit(500)
-    const rows = (data as unknown as Order[]) ?? []
+    // Whole orders an admin assigned to this shop, plus orders where some lines were routed to it
+    // (fruit -> ejju bhaiyya, Nandini -> Nandini milk): for those only the shop's own lines show.
+    // A busy day runs well past 50 orders; capping lower made them vanish from the panel.
+    const rows = (await fetchPartnerOrders<Order>(supabase, partnerId,
+      'id, status, total, customer_name, customer_phone, placed_at, address, delivery_latitude, delivery_longitude, delivery_partner_id',
+      'name, quantity, price, image_url, product_type', { limit: 500 })) as Order[]
     setOrders(rows.map((o) => ({ ...o, order_items: (o.order_items ?? []).filter((i) => i.product_type === 'grocery') })))
     return rows
   }, [])
@@ -203,6 +202,25 @@ export default function GrocerySlugOrdersPage() {
             setTimeout(() => setNewOrderFlash(false), 4000)
           }
           loadOrders(part.id)
+        })
+        // Lines routed to this shop (fruit, Nandini) arrive after the order row itself, on an
+        // order that is not assigned to the shop as a whole, so they need their own listener.
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'order_items',
+          filter: `grocery_partner_id=eq.${part.id}`,
+        }, async (payload) => {
+          const orderId = (payload.new as { order_id?: string }).order_id
+          if (!orderId || poppedRef.current.has(orderId) || loadAnnounced().has(orderId)) { void loadOrders(part.id); return }
+          poppedRef.current.add(orderId)
+          const rows = await loadOrders(part.id)
+          const o = rows.find((r) => r.id === orderId)
+          if (o && !['delivered', 'cancelled'].includes(o.status)) {
+            rememberAnnounced(orderId)
+            setPendingOrder({ ...o, order_items: (o.order_items ?? []).filter((i) => i.product_type === 'grocery') })
+            if (soundOnRef.current) startAlarm('New order')
+            setNewOrderFlash(true)
+            setTimeout(() => setNewOrderFlash(false), 4000)
+          }
         })
         .subscribe()
 
@@ -363,7 +381,7 @@ export default function GrocerySlugOrdersPage() {
                         </div>
                         <div className="text-right">
                           <div className="text-[15px] font-[800] text-[#111827]">₹{o.total}</div>
-                          <div className="text-[11px] text-[#9CA3AF]">{items.length} item{items.length !== 1 ? 's' : ''}</div>
+                          <div className="text-[11px] text-[#9CA3AF]">{items.length} item{items.length !== 1 ? 's' : ''}{o.partial ? ' · your items only' : ''}</div>
                         </div>
                       </div>
 

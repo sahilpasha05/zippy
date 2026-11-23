@@ -6,6 +6,7 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Search, ChefHat, Truck, CheckCircle, XCircle, Clock, AlertCircle, Loader2, Phone } from 'lucide-react'
 import DairySidebar from '@/components/dairy/DairySidebar'
 import { cn } from '@/lib/utils'
+import { fetchPartnerOrders } from '@/lib/partnerOrders'
 import TimeAgo from '@/components/TimeAgo'
 
 const supabase = createBrowserClient(
@@ -43,13 +44,9 @@ export default function DairyOrdersPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const loadOrders = useCallback(async (partnerId: string) => {
-    const { data } = await supabase
-      .from('orders')
-      .select('id, status, total, customer_name, customer_phone, placed_at, address, order_items(name, quantity, price)')
-      .eq('grocery_partner_id', partnerId)
-      .order('placed_at', { ascending: false })
-      .limit(100)
-    setOrders((data as Order[]) ?? [])
+    const data = await fetchPartnerOrders<Order>(supabase, partnerId,
+      'id, status, total, customer_name, customer_phone, placed_at, address', 'name, quantity, price', { limit: 100 })
+    setOrders(data as Order[])
   }, [])
 
   useEffect(() => {
