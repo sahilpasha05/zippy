@@ -49,6 +49,19 @@ export default function AdminSidebar() {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ''))
   }, [])
 
+  // New (still unanswered) support tickets, shown as a red number next to "Support Tickets".
+  const [openTickets, setOpenTickets] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      supabase.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'open')
+        .then(({ count }) => { if (!cancelled) setOpenTickets(count ?? 0) })
+    }
+    load()
+    const id = setInterval(load, 30000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [pathname])
+
   // Remembered so it doesn't spring open again on every page change.
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -101,9 +114,19 @@ export default function AdminSidebar() {
                   : 'text-[#6B7280] hover:bg-[#F8FAFC] hover:text-[#374151]'
               )}
             >
-              <Icon className={cn('w-4 h-4 shrink-0', active ? 'text-[#7C3AED]' : '')} strokeWidth={active ? 2.5 : 2} />
+              <span className="relative shrink-0">
+                <Icon className={cn('w-4 h-4', active ? 'text-[#7C3AED]' : '')} strokeWidth={active ? 2.5 : 2} />
+                {mini && href === '/admin/tickets' && openTickets > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 h-2.5 w-2.5 rounded-full bg-[#EF4444] ring-2 ring-white" />
+                )}
+              </span>
               {!mini && label}
-              {!mini && active && <ChevronRight className="w-3.5 h-3.5 ml-auto text-[#7C3AED]" />}
+              {!mini && href === '/admin/tickets' && openTickets > 0 && (
+                <span className="ml-auto min-w-[20px] rounded-full bg-[#EF4444] px-1.5 py-0.5 text-center text-[11px] font-[700] leading-none text-white" style={{ fontWeight: 700 }}>
+                  {openTickets > 99 ? '99+' : openTickets}
+                </span>
+              )}
+              {!mini && active && <ChevronRight className={cn('w-3.5 h-3.5 text-[#7C3AED]', href === '/admin/tickets' && openTickets > 0 ? 'ml-1' : 'ml-auto')} />}
             </Link>
           )
         })}
