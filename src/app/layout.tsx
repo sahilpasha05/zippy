@@ -8,6 +8,7 @@ import DeliveryZonesLoader from "@/components/DeliveryZonesLoader";
 import ErrorReporter from "@/components/ErrorReporter";
 import VisitorPing from "@/components/VisitorPing";
 import FrustrationMonitor from "@/components/FrustrationMonitor";
+import HelpButton from "@/components/HelpButton";
 import "./globals.css";
 import { CITY } from '@/lib/city'
 
@@ -35,6 +36,7 @@ export default function RootLayout({
         <ErrorReporter />
         <VisitorPing />
         <FrustrationMonitor />
+        <HelpButton />
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-7L0GLNZ8MP" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">
           {`

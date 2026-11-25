@@ -7,7 +7,7 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   MapPin, Bell, User, ChevronDown,
-  Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History
+  Zap, Package, UtensilsCrossed, Menu, X, ShoppingBag, LogOut, History, LifeBuoy
 } from 'lucide-react'
 import PhoneLoginModal from '@/components/PhoneLoginModal'
 import GrocerySearchBox from '@/components/layout/GrocerySearchBox'
@@ -308,6 +308,13 @@ export default function Navbar() {
                   className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-colors"
                 >
                   <History className="w-4 h-4" /> Order History
+                </Link>
+                <Link
+                  href="/tickets"
+                  onClick={closeProfileMenu}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-[#374151] hover:bg-[#F8FAFC] transition-colors"
+                >
+                  <LifeBuoy className="w-4 h-4" /> My Tickets
                 </Link>
                 <button
                   onClick={() => setConfirmingSignOut(true)}

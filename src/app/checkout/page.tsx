@@ -31,8 +31,8 @@ const supabase = createBrowserClient(
 )
 
 const PAYMENT_METHODS = [
-  { id: 'upi',  label: 'UPI',                  icon: Smartphone,  desc: 'Pay the full amount online via UPI' },
-  { id: 'card', label: 'Credit / Debit Card',   icon: CreditCard,  desc: 'Pay the full amount online by card' },
+  { id: 'upi',  label: 'UPI',                  icon: Smartphone,  desc: 'Pay 50% now via UPI, 50% cash on delivery' },
+  { id: 'card', label: 'Credit / Debit Card',   icon: CreditCard,  desc: 'Pay 50% now by card, 50% cash on delivery' },
   { id: 'cod',  label: 'Cash on Delivery',      icon: Banknote,    desc: 'Pay the full amount when delivered' },
 ]
 
@@ -122,10 +122,9 @@ export default function CheckoutPage() {
   const platformFee = getPlatformFee(cartTotal)
   const handlingFee = getHandlingFee(items)
   const grandTotal = cartTotal + deliveryFee + platformFee + handlingFee
-  // UPI / card: the whole amount is paid online. Cash on delivery: the whole amount is paid in cash.
-  const isOnlinePayment = selectedPayment === 'upi' || selectedPayment === 'card'
-  const onlineAmount = isOnlinePayment ? Math.round(grandTotal * 100) / 100 : 0
-  const codAmount = isOnlinePayment ? 0 : grandTotal
+  const isSplitPayment = selectedPayment === 'upi' || selectedPayment === 'card'
+  const onlineAmount = isSplitPayment ? Math.round((grandTotal / 2) * 100) / 100 : 0
+  const codAmount = isSplitPayment ? Math.round((grandTotal - onlineAmount) * 100) / 100 : (selectedPayment === 'cod' ? grandTotal : 0)
 
   const handlePlace = async (confirmedNoLocation = false) => {
     if (submittingRef.current) return
@@ -353,6 +352,12 @@ export default function CheckoutPage() {
               </>)}
               {orderId && (
                 <p className="text-[11.5px] text-[#9CA3AF] font-mono">Order ID: {orderId.slice(0, 8).toUpperCase()}</p>
+              )}
+              {isSplitPayment && (
+                <div className="mt-4 pt-4 border-t border-[#F3F4F6] text-left space-y-1">
+                  <div className="flex justify-between text-[13px] text-[#16A34A] font-medium"><span>Paid online</span><span>₹{onlineAmount.toFixed(0)}</span></div>
+                  <div className="flex justify-between text-[13px] text-[#D97706] font-medium"><span>Cash due on delivery</span><span>₹{codAmount.toFixed(0)}</span></div>
+                </div>
               )}
             </div>
 
@@ -585,6 +590,12 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-[16px] font-[800] text-[#111827] pt-2 border-t border-[#E5E7EB]" style={{ fontWeight: 800 }}>
                     <span>Total</span><span>₹{grandTotal.toFixed(0)}</span>
                   </div>
+                  {isSplitPayment && (
+                    <div className="pt-2 border-t border-dashed border-[#E5E7EB] space-y-1">
+                      <div className="flex justify-between text-[12.5px] text-[#16A34A] font-medium"><span>Pay online now</span><span>₹{onlineAmount.toFixed(0)}</span></div>
+                      <div className="flex justify-between text-[12.5px] text-[#D97706] font-medium"><span>Cash on delivery</span><span>₹{codAmount.toFixed(0)}</span></div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 p-3 bg-[#DCFCE7] rounded-xl flex items-center gap-2">
@@ -611,7 +622,7 @@ export default function CheckoutPage() {
                   ) : belowMinOrder ? (
                     <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
                   ) : (
-                    <>{isOnlinePayment ? `Pay ₹${onlineAmount.toFixed(0)} • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
+                    <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
                   )}
                 </button>
               </div>
@@ -641,7 +652,7 @@ export default function CheckoutPage() {
                   ) : belowMinOrder ? (
             <>Add ₹{Math.ceil(minOrder - cartTotal)} more (min ₹{minOrder})</>
           ) : (
-            <>{isOnlinePayment ? `Pay ₹${onlineAmount.toFixed(0)} • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
+            <>{isSplitPayment ? `Pay ₹${onlineAmount.toFixed(0)} now • Place Order` : `Place Order • ₹${grandTotal.toFixed(0)}`}</>
           )}
         </button>
       </div>
