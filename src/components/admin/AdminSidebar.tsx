@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk, Landmark, MapPinned, BookOpen, CupSoda, Activity } from 'lucide-react'
+import { Star, LayoutDashboard, PanelLeftClose, PanelLeftOpen, Store, Users, ShoppingBag, BarChart3, Settings, Zap, ChevronRight, Bell, LogOut, Menu, X, Shield, Package, Bike, PlusCircle, Warehouse, ShoppingBasket, ImageIcon, PiggyBank, HandCoins, Milk, Landmark, MapPinned, BookOpen, CupSoda, Activity, Ticket, Car, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const supabase = createClient()
@@ -18,6 +18,10 @@ const NAV = [
   { href: '/admin/dairy',        label: 'Dairy & Eggs', icon: Milk },
   { href: '/admin/quick-add',    label: 'Quick Add',    icon: PlusCircle },
   { href: '/admin/orders',       label: 'All Orders',   icon: ShoppingBag },
+  { href: '/admin/auto',         label: 'Auto Rides',   icon: Car },
+  { href: '/admin/places',       label: 'Tarikere Places', icon: MapPin },
+  { href: '/admin/vouchers',     label: 'Vouchers',     icon: Ticket },
+  { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/daybook',      label: 'Day Book',     icon: BookOpen },
   { href: '/admin/cashfree',     label: 'Cashfree Payments', icon: Landmark },
   { href: '/admin/savings',      label: 'Savings & Expenses', icon: PiggyBank },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient as createSessionClient } from '@/lib/supabase/server'
+import { getRequestUser } from '@/lib/requestUser'
 
 // Customer ↔ rider chat for an order. Admins can read and join every thread.
 //
@@ -18,7 +18,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type OrderRow = { id: string; user_id: string | null; status: string; delivery_partner_id: string | null }
 
-async function identify(orderId: string, riderSlug: string | null): Promise<
+async function identify(req: NextRequest, orderId: string, riderSlug: string | null): Promise<
   { role: Role; order: OrderRow; admin: ReturnType<typeof createAdminClient> } | { error: NextResponse }
 > {
   if (!UUID.test(orderId)) return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) }
@@ -33,8 +33,7 @@ async function identify(orderId: string, riderSlug: string | null): Promise<
     .from('orders').select('id, user_id, status, delivery_partner_id').eq('id', orderId).single()
   if (!order) return { error: NextResponse.json({ error: 'Not found' }, { status: 404 }) }
 
-  const session = await createSessionClient()
-  const { data: { user } } = await session.auth.getUser()
+  const user = await getRequestUser(req)
   if (user) {
     const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role === 'admin') return { role: 'admin', order, admin }
@@ -51,7 +50,7 @@ async function identify(orderId: string, riderSlug: string | null): Promise<
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await ctx.params
-  const who = await identify(orderId, req.nextUrl.searchParams.get('rider'))
+  const who = await identify(req, orderId, req.nextUrl.searchParams.get('rider'))
   if ('error' in who) return who.error
 
   const { data, error } = await who.admin
@@ -71,7 +70,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ orderId: s
   let payload: { body?: unknown; rider?: unknown } = {}
   try { payload = await req.json() } catch { /* handled below */ }
   const riderSlug = typeof payload.rider === 'string' ? payload.rider : null
-  const who = await identify(orderId, riderSlug)
+  const who = await identify(req, orderId, riderSlug)
   if ('error' in who) return who.error
 
   const body = typeof payload.body === 'string' ? payload.body.trim() : ''

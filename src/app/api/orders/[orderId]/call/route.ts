@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient as createSessionClient } from '@/lib/supabase/server'
+import { getRequestUser } from '@/lib/requestUser'
 
 // A customer phoning the delivery partner on their order. Each order allows
 // MAX_CALLS calls (and none in the first 20 minutes): the rider's number is only
@@ -9,12 +9,11 @@ const MAX_RIDER_CALLS = 2
 const CALL_LOCK_MS = 20 * 60 * 1000
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export async function POST(_req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await ctx.params
   if (!UUID.test(orderId)) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const session = await createSessionClient()
-  const { data: { user } } = await session.auth.getUser()
+  const user = await getRequestUser(req)
   if (!user) return NextResponse.json({ error: 'Please sign in to call your delivery partner.' }, { status: 401 })
 
   let admin: ReturnType<typeof createAdminClient>

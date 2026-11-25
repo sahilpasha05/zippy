@@ -24,6 +24,8 @@ export type ZoneRow = {
   min_order: number
   cod_only: boolean
   needs_confirmation: boolean
+  auto_enabled: boolean         // Zippy Auto rides may start or end here
+  auto_surcharge: number        // extra ₹ added to an auto fare for a ride touching this zone
   priority: number
   is_active: boolean
 }
@@ -55,6 +57,8 @@ export function normaliseZoneRow(r: Record<string, unknown>): ZoneRow {
     min_order: Number(r.min_order ?? 0),
     cod_only: !!r.cod_only,
     needs_confirmation: !!r.needs_confirmation,
+    auto_enabled: r.auto_enabled !== false,
+    auto_surcharge: Number(r.auto_surcharge ?? 0),
     priority: Number(r.priority ?? 100),
     is_active: r.is_active !== false,
   }

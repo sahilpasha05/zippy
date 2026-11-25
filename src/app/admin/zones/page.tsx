@@ -20,11 +20,12 @@ function Switch({ on, onClick, tone = 'bg-[#16A34A]' }: { on: boolean; onClick: 
   )
 }
 
-function ruleLine(z: Pick<ZoneRow, 'delivery_fee' | 'min_order' | 'cod_only' | 'needs_confirmation'>) {
+function ruleLine(z: Pick<ZoneRow, 'delivery_fee' | 'min_order' | 'cod_only' | 'needs_confirmation' | 'auto_enabled' | 'auto_surcharge'>) {
   const bits = [`₹${z.delivery_fee} delivery`]
   bits.push(z.min_order > 0 ? `min order ₹${z.min_order}` : 'no minimum')
   if (z.cod_only) bits.push('cash only')
   if (z.needs_confirmation) bits.push('executive confirms')
+  bits.push(z.auto_enabled ? (z.auto_surcharge > 0 ? `auto +₹${z.auto_surcharge}` : 'auto on') : 'auto off')
   return bits.join(' · ')
 }
 
@@ -83,7 +84,7 @@ export default function AdminZonesPage() {
     const maxPriority = zones.reduce((m, z) => Math.max(m, z.priority), 0)
     const zone: ZoneRow = {
       id, name: 'New zone', kind: 'zone', color: PALETTE[zones.length % PALETTE.length], polygon: draft,
-      delivery_fee: 59, min_order: 0, cod_only: false, needs_confirmation: false, priority: maxPriority + 10, is_active: true,
+      delivery_fee: 59, min_order: 0, cod_only: false, needs_confirmation: false, auto_enabled: true, auto_surcharge: 0, priority: maxPriority + 10, is_active: true,
     }
     setEdits((prev) => ({ ...prev, [id]: zone }))
     setSelectedId(id)
@@ -101,7 +102,8 @@ export default function AdminZonesPage() {
     const body = {
       name: z.name.trim(), color: z.color, polygon: z.kind === 'zone' ? z.polygon : null,
       delivery_fee: Number(z.delivery_fee) || 0, min_order: Number(z.min_order) || 0,
-      cod_only: z.cod_only, needs_confirmation: z.needs_confirmation, priority: z.priority, is_active: z.is_active,
+      cod_only: z.cod_only, needs_confirmation: z.needs_confirmation, auto_enabled: z.auto_enabled,
+      auto_surcharge: Number(z.auto_surcharge) || 0, priority: z.priority, is_active: z.is_active,
       updated_at: new Date().toISOString(),
     }
     const res = isNew(id)
@@ -288,6 +290,21 @@ export default function AdminZonesPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div><p className="text-[12.5px] font-[600] text-[#111827]">Executive must confirm</p><p className="text-[11px] text-[#9CA3AF]">Orders are held until an executive calls and confirms. Always cash only.</p></div>
                       <Switch on={selected.needs_confirmation} tone="bg-[#DC2626]" onClick={() => patch(selected.id, { needs_confirmation: !selected.needs_confirmation })} />
+                    </div>
+                    <div className="rounded-xl bg-[#F5F3FF] p-3 space-y-2.5">
+                      <p className="text-[11px] font-[800] uppercase tracking-wider text-[#6D28D9]">Zippy Auto (rides)</p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div><p className="text-[12.5px] font-[600] text-[#111827]">Autos available here</p><p className="text-[11px] text-[#6B7280]">A ride can start or end in this area. Off = customers can&apos;t book autos to or from here.</p></div>
+                        <Switch on={selected.auto_enabled} tone="bg-[#7C3AED]" onClick={() => patch(selected.id, { auto_enabled: !selected.auto_enabled })} />
+                      </div>
+                      {selected.auto_enabled && (
+                        <div>
+                          <label className="block text-[11.5px] font-[600] text-[#374151] mb-1">Extra auto fare for rides touching this area (₹)</label>
+                          <input type="number" min={0} value={selected.auto_surcharge} onChange={(e) => patch(selected.id, { auto_surcharge: Number(e.target.value) })}
+                            className="w-full px-3 py-2 border border-[#E5E7EB] rounded-xl text-[13px] outline-none focus:border-[#7C3AED] bg-white" />
+                          <p className="text-[11px] text-[#9CA3AF] mt-1">Added on top of the per-km fare. Use it for far or outer areas. Leave 0 for none.</p>
+                        </div>
+                      )}
                     </div>
                     {selected.kind === 'zone' && (
                       <div className="flex items-center justify-between gap-3">

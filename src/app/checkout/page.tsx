@@ -199,6 +199,7 @@ export default function CheckoutPage() {
       }
 
       const orderPayload = {
+          source: 'website',
           user_id: user?.id ?? null,
           restaurant_id: needsConfirmation ? null : restaurantId,
           order_type: restaurantId ? 'restaurant' : 'grocery',

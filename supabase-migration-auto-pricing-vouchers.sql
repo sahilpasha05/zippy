@@ -1,0 +1,6 @@
+-- Per-km auto pricing, vouchers and the voucher check/redeem functions (applied to the live DB).
+-- See the Supabase migration "auto_pricing_and_vouchers" for the full statements:
+--   auto_ride_types (base_fare, base_km, per_km, min_fare, seats, is_active)
+--   vouchers (admin-created only) + validate_voucher() / redeem_voucher() security-definer functions
+--   auto_bookings: distance_km, voucher_code, discount; total = greatest(fare + tip - discount, 0)
+-- see Supabase migration auto_ride_types_hike_pricing: hike_after_km / hike_per_km

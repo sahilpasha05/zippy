@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Pin the project root: a stray package-lock.json in a parent folder made
+  // Turbopack treat the whole home directory as the workspace, which made
+  // `next dev` take minutes to compile each page.
+  turbopack: { root: path.resolve(__dirname) },
   // Product and tile photos are served from our own /public/products. Let browsers keep them for a day
   // (and reuse them while refreshing for a week) so repeat visits do not wait on the network.
   async headers() {

@@ -50,6 +50,7 @@ type Order = {
   notes: string | null
   delay_issue: string | null; delay_minutes: number | null; delay_reported_at: string | null
   order_type: string | null
+  source: string | null
   delivery_partner_id: string | null; grocery_partner_id: string | null; store_partner_id: string | null
   delivery_latitude: number | null; delivery_longitude: number | null
   restaurant_id: string | null
@@ -78,6 +79,12 @@ function notPlaced(o: { payment_status: string | null; online_amount: number | n
   return null
 }
 
+// Supabase caps every response at 1000 rows, so history beyond the newest page
+// has to be fetched page by page.
+const ORDER_PAGE = 1000
+const ORDER_SELECT =
+  'id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, delay_issue, delay_minutes, delay_reported_at, order_type, source, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)'
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
@@ -105,19 +112,22 @@ export default function AdminOrdersPage() {
     const [{ data: ords }, { data: parts }, { data: groceryParts }, { data: storeParts }, { data: rests }, { data: rrRow }] = await Promise.all([
       supabase
         .from('orders')
-        .select('id, status, total, customer_name, customer_phone, placed_at, address, payment_method, payment_status, online_amount, cod_amount, cash_collected_at, notes, delay_issue, delay_minutes, delay_reported_at, order_type, delivery_partner_id, grocery_partner_id, store_partner_id, delivery_latitude, delivery_longitude, restaurant_id, restaurants(name), order_items(name, quantity, price, image_url)')
+        .select(ORDER_SELECT)
         .order('placed_at', { ascending: false })
-        // The header counts (active / unassigned) and every tab are derived
-        // from this list, so capping at 100 under-reported them once there were
-        // more orders than that.
-        .limit(2000),
+        .order('id')
+        // Newest page only — it is what realtime refreshes re-fetch. The rest of
+        // the history is paged in by loadOlder() below.
+        .range(0, ORDER_PAGE - 1),
       supabase.from('delivery_partners').select('id, name, is_active').order('name'),
       supabase.from('grocery_partners').select('id, name, is_active').order('name'),
       supabase.from('store_partners').select('id, name, is_active').order('name'),
       supabase.from('restaurants').select('id, name, is_active').order('name'),
       supabase.from('rr_settings').select('enabled, partner_ids, max_pending, resume_at, full_ids').eq('id', 1).maybeSingle(),
     ])
-    setOrders((ords as unknown as Order[]) ?? [])
+    const recent = (ords as unknown as Order[]) ?? []
+    const recentIds = new Set(recent.map((o) => o.id))
+    // Keep older orders already loaded (and any local edits to them).
+    setOrders((prev) => [...recent, ...prev.filter((o) => !recentIds.has(o.id))])
     setPartners((parts as Partner[]) ?? [])
     setGroceryPartners((groceryParts as Partner[]) ?? [])
     setStorePartners((storeParts as Partner[]) ?? [])
@@ -128,8 +138,39 @@ export default function AdminOrdersPage() {
     setLoading(false)
   }, [])
 
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const olderLoaded = useRef(false)
+  const [visibleCount, setVisibleCount] = useState(200)
+
+  // Pulls in everything beyond the newest page, once, in the background.
+  const loadOlder = useCallback(async () => {
+    if (olderLoaded.current) return
+    olderLoaded.current = true
+    setLoadingOlder(true)
+    try {
+      for (let from = ORDER_PAGE; ; from += ORDER_PAGE) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select(ORDER_SELECT)
+          .order('placed_at', { ascending: false })
+          .order('id')
+          .range(from, from + ORDER_PAGE - 1)
+        if (error) { olderLoaded.current = false; break }
+        const page = (data as unknown as Order[]) ?? []
+        // New orders arriving mid-load shift the offsets, so de-dupe by id.
+        setOrders((prev) => {
+          const ids = new Set(prev.map((o) => o.id))
+          return [...prev, ...page.filter((o) => !ids.has(o.id))]
+        })
+        if (page.length < ORDER_PAGE) break
+      }
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [])
+
   useEffect(() => {
-    load()
+    load().then(loadOlder)
 
     const channel = supabase
       .channel('admin-orders')
@@ -152,7 +193,7 @@ export default function AdminOrdersPage() {
     }, 20000)
 
     return () => { supabase.removeChannel(channel); supabase.removeChannel(rrChannel); clearInterval(rrTimer) }
-  }, [load])
+  }, [load, loadOlder])
 
   useEffect(() => { autoAssignPartnerRef.current = autoAssignPartner; try { localStorage.setItem('zippy-aa-partner', autoAssignPartner) } catch {} }, [autoAssignPartner])
   useEffect(() => { try { localStorage.setItem('zippy-aa-on', autoAssignOn ? '1' : '0') } catch {} }, [autoAssignOn])
@@ -484,7 +525,7 @@ export default function AdminOrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F8FAFC]">
-                  {filtered.map((o) => {
+                  {filtered.slice(0, visibleCount).map((o) => {
                     const cfg = STATUS_CFG[o.status] ?? STATUS_CFG.pending
                     const Icon = cfg.icon
                     const restName = Array.isArray(o.restaurants) ? o.restaurants[0]?.name : (o.restaurants as { name: string } | null)?.name
@@ -500,6 +541,12 @@ export default function AdminOrdersPage() {
                             {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-[#9CA3AF] shrink-0" />}
                             {o.id.slice(0,8).toUpperCase()}
                           </span>
+                          {o.source && (
+                            <span className={cn('inline-block mt-1 ml-5 px-2 py-0.5 rounded-full text-[10px] font-[700] font-sans',
+                              o.source === 'app' ? 'bg-[#DBEAFE] text-[#1D4ED8]' : 'bg-[#F3E8FF] text-[#7C3AED]')}>
+                              {o.source === 'app' ? 'App' : o.source === 'website' ? 'Website' : o.source}
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5">
                           <p className="text-[13px] font-[600] text-[#111827]">{o.customer_name ?? '—'}</p>
@@ -813,6 +860,18 @@ export default function AdminOrdersPage() {
                   })}
                 </tbody>
               </table>
+              <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-[#F3F4F6] text-[12px] text-[#6B7280]">
+                <span>
+                  Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} orders
+                  {loadingOlder && ' — loading older orders…'}
+                </span>
+                {filtered.length > visibleCount && (
+                  <button onClick={() => setVisibleCount((c) => c + 200)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#7C3AED] text-white font-[600] hover:bg-[#6D28D9]">
+                    Show 200 more
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
